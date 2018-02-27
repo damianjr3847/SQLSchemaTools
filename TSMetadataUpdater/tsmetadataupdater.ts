@@ -150,7 +150,7 @@ if (params.objectname) {
     }
 }
 
-console.log('actionYalm: %j',actionYalm);
+/*console.log('actionYalm: %j',actionYalm);
 console.log('pathYalm: %j',pathYalm);
 console.log('dbDriver: %j', dbDriver);
 console.log('connectionString: %j',dbHost+':'+dbPath);
@@ -158,10 +158,10 @@ console.log('dbPort: %j', dbPort);
 console.log('dbUser: %j', dbUser);
 console.log('dbPass: %j',dbPass);
 console.log('objectType: %j', objectType);
-console.log('objectName: %j', objectName);
+console.log('objectName: %j', objectName);*/
 
 if (actionYalm === 'write') {
     fbMetadata.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass);
 }
-    
+
 
