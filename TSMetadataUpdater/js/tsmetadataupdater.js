@@ -3,12 +3,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var fs_extra_1 = require("fs-extra");
 var params = require("commander");
-//import fbMetadata = require('./js/fbMetadata.js');
 var fbMetadata = require("./fbMetadata");
+var GlobalTypes = require("./globalTypes");
 var actionYalm = '';
 var pathYalm = '';
 var dbDriver = '';
-var connectionString = '';
+var dbPath = '';
+var dbHost = '';
+var dbPort = 0;
 var dbUser = '';
 var dbPass = '';
 var objectType = '';
@@ -18,7 +20,9 @@ params.option('-r, --readyalm', 'Lee el directorio o archivo en el parametro -ya
 params.option('-w, --writeyalm', 'Genera los archivos yalm en el directorio especificado -yalm');
 params.option('-y, --yalm <pathyalm>', 'Path del directorio o archivo Yalm a leer');
 params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB ps=PostgreSql fb=Firebird');
-params.option('-c, --connectionstring <connectionstring>', 'Path de conexion a la DB');
+params.option('-h, --dbhost <dbhost>', 'Host DB');
+params.option('-o, --dbport <dbport>', 'puerto DB');
+params.option('-c, --dbpath <dbpath>', 'path DB');
 params.option('-u, --dbuser <dbuser>', 'User DB');
 params.option('-p, --dbpass <dbpass>', 'Password DB');
 params.option('-t, --objecttype <objecttype>', 'especifica que tipo de cambios se aplican (procedures,triggers,tables,generators');
@@ -41,7 +45,7 @@ else {
     process.exit();
 }
 if (params.dbdriver) {
-    if (['ps', 'fb'].indexOf(params.dbdriver) != -1) {
+    if (GlobalTypes.ArrayDbDriver.indexOf(params.dbdriver) !== -1) {
         dbDriver = params.dbdriver;
     }
     else {
@@ -78,15 +82,29 @@ else {
     console.log('falta dbpass');
     process.exit();
 }
-if (params.connectionstring) {
-    connectionString = params.connectionstring;
+if (params.dbhost) {
+    dbHost = params.dbhost;
 }
 else {
-    console.log('false connectionstring');
+    console.log('falta dbhost');
+    process.exit();
+}
+if (params.dbport) {
+    dbPort = params.dbport;
+}
+else {
+    console.log('falta dbport');
+    process.exit();
+}
+if (params.dbpath) {
+    dbPath = params.dbpath;
+}
+else {
+    console.log('falta dbpath');
     process.exit();
 }
 if (params.objecttype) {
-    if (['procedures', 'triggers', 'tables', 'generators'].indexOf(params.objecttype) != -1) {
+    if (GlobalTypes.ArrayobjectType.indexOf(params.objecttype) !== -1) {
         objectType = params.objecttype;
     }
     else {
@@ -103,9 +121,12 @@ if (params.objectname) {
 console.log('actionYalm: %j', actionYalm);
 console.log('pathYalm: %j', pathYalm);
 console.log('dbDriver: %j', dbDriver);
-console.log('connectionString: %j', connectionString);
+console.log('connectionString: %j', dbHost + ':' + dbPath);
+console.log('dbPort: %j', dbPort);
 console.log('dbUser: %j', dbUser);
 console.log('dbPass: %j', dbPass);
 console.log('objectType: %j', objectType);
 console.log('objectName: %j', objectName);
-fbMetadata.writeYalm();
+if (actionYalm === 'write') {
+    fbMetadata.writeYalm(dbHost, dbPort, dbPath, dbUser, dbPass);
+}
