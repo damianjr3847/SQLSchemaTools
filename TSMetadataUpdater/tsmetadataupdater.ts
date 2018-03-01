@@ -19,18 +19,18 @@ import * as params from 'commander';
 import * as fbMetadata from './fbMetadata';
 import * as GlobalTypes from './globalTypes';
 
-let actionYalm:string = '';
+let actionYalm:string = 'write';
 let pathYalm:string = '';
-let dbDriver:string = '';
-let dbPath:string = '';
-let dbHost:string = '';
-let dbPort:number = 0;
-let dbUser:string = '';
-let dbPass:string = '';
+let dbDriver:string = 'fb';
+let dbPath:string = '/pool/testing/demo.gdb';
+let dbHost:string = 'srv-01.sig2k.com';
+let dbPort:number = 3050;
+let dbUser:string = 'SYSDBA';
+let dbPass:string = 'masterkey';
 let objectType:string = '';
 let objectName:string = '';
 
-params.version('1.0.0');
+/*params.version('1.0.0');
 
 params.option('-r, --readyalm', 'Lee el directorio o archivo en el parametro -yalm para aplicar cambios');
 params.option('-w, --writeyalm', 'Genera los archivos yalm en el directorio especificado -yalm');
@@ -161,7 +161,7 @@ console.log('objectType: %j', objectType);
 console.log('objectName: %j', objectName);*/
 
 if (actionYalm === 'write') {
-    fbMetadata.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass);
+    fbMetadata.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass);    
 }
 
 

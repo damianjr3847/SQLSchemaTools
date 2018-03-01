@@ -6,7 +6,7 @@
   ],
  "module": "commonjs",
  "outDir": "./js",
- "sourceMap": false,
+ "sourceMap": true,
  "strict": false, 
  "removeComments": false,
 },

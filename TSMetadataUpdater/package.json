@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "gitpp"
+    "url": "https://damianjr@git.sig2k.com/Desarrollo/TypeScriptProjects"
   },
   "bin": {
     "tsmetadataupdater": "./js/tsmetadataupdater.js"
