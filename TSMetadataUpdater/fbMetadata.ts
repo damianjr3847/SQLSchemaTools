@@ -3,7 +3,7 @@ import * as fbClass from './classFirebird';
 
 let fb : fbClass.fbConnection;
 
-export function writeYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string)  {
+export async function writeYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string)  {
     
 
     let r;    
@@ -15,7 +15,7 @@ export function writeYalm(ahostName:string, aportNumber:number, adatabase:string
     fb.hostName = ahostName;
     fb.portNumber = aportNumber;
 
-    fb.selectquery('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[],true);
+    await fb.selectquery('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[],true);
     console.log('r2 %j',r);    
 }
 
