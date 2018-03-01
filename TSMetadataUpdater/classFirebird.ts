@@ -1,5 +1,7 @@
 import * as libfirebird from 'node-firebird';
 
+import * as q from 'q';
+
 export class fbConnection { 
     private 
         connectionParams : libfirebird.Options;    
@@ -42,8 +44,20 @@ export class fbConnection {
             /* 
             */
         }
-        selectquery(aQuery:string, aParams: any[], atransactionReadOnly: boolean = true) {
-            let pr;
+
+        connectToDB = function (acfg){
+            var def = q.defer();
+         
+            libfirebird.attach( acfg,
+               function(err, db){
+                  err ? def.reject(err) : def.resolve(db);
+               }
+            );
+            return def.promise;
+        };
+
+        async selectquery(aQuery:string, aParams: any[], atransactionReadOnly: boolean = true) {
+            let db;
             let tType : libfirebird.Isolation;              
             let queryRows;
         
@@ -56,6 +70,9 @@ export class fbConnection {
                 tType = libfirebird.ISOLATION_READ_COMMITED;
             }            
             
+            db = await this.connectToDB(this.connectionParams);
+
+
             libfirebird.attach(this.connectionParams, function(err, db) { 
                             if (err)                  
                                 throw err;

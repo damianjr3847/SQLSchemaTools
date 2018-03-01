@@ -15,7 +15,7 @@ export function writeYalm(ahostName:string, aportNumber:number, adatabase:string
     fb.hostName = ahostName;
     fb.portNumber = aportNumber;
 
-    Promise.resolve(fb.selectquery('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[],true)).then(() => {console.log('r3 %j',r);});
+    fb.selectquery('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[],true);
     console.log('r2 %j',r);    
 }
 
