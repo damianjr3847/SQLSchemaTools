@@ -1,6 +1,9 @@
 import * as libfirebird from 'node-firebird';
 
-import * as q from 'q';
+const {promisify} = require('util');
+const attachAsync = promisify(libfirebird.attach);
+
+//import * as q from 'q';
 
 export class fbConnection { 
     private 
@@ -70,7 +73,9 @@ export class fbConnection {
                 tType = libfirebird.ISOLATION_READ_COMMITED;
             }            
             
-            db = await this.connectToDB(this.connectionParams);
+
+            db = await attachAsync(this.connectionParams);
+            //db = await this.connectToDB(this.connectionParams);
 
 
             libfirebird.attach(this.connectionParams, function(err, db) { 
