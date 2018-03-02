@@ -95,7 +95,7 @@ export class fbConnection {
         dbPassword:string      = 'masterkey';
         lowercase_keys:boolean = false;
         dbrole:any             = null;
-        pageSize:number        = 4096;
+        pageSize:number        = 8192;
         constructor(){
             /* 
             */
