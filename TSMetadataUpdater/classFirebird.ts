@@ -1,5 +1,4 @@
 import * as libfirebird from 'node-firebird';
-import * as q from 'q';
 
 export class fbConnection { 
     private 
@@ -34,23 +33,25 @@ export class fbConnection {
                                     pageSize: this.pageSize};            
         }           
 
-        internalConnect = function (){
-            var def = q.defer();
-         
-            this.checkConnectionParams();
+        internalConnect(): Promise<libfirebird.Database> {
+            return new Promise<libfirebird.Database>((resolve, reject) => {
+                libfirebird.attach( this.connectionParams, function(err, db){
+                    if (err) return reject(err);
+                    resolve(db);
+                });
+            });
+        }
 
-            libfirebird.attach( this.connectionParams,
-               function(err, db){
-                  err ? def.reject(err) : def.resolve(db);
-               }
-            );
-
-            return def.promise;
-        };
-
+        internalDisconnect = function (){
+            return new Promise<null>((resolve, reject) => {
+                this.db.detach(function(err) {
+                    if (err) return reject(err);
+                    resolve(null);
+                });
+            });
+        }
+        
         internalStartTransaction = function (aReadOnly){
-            var def = q.defer();
-
             let tType : libfirebird.Isolation;              
             
             if (aReadOnly) {
@@ -60,11 +61,30 @@ export class fbConnection {
                 tType = libfirebird.ISOLATION_READ_COMMITED;
             }            
 
-            this.db.transaction(tType, function(err, rs){
-                err ? def.reject(err) : def.resolve(rs);
+            return new Promise<libfirebird.Transaction>((resolve, reject) => {
+                this.db.transaction(tType, function(err, rs){
+                    if (err) return reject(err);
+                    resolve(rs);
+                });
             });
+        }
 
-            return def.promise;
+        internalCommit = function (){
+            return new Promise<null>((resolve, reject) => {
+                this.tr.commit(function(err) {
+                    if (err) return reject(err);
+                    resolve(null);
+                });
+            });
+        }
+
+        internalRollback = function (){
+            return new Promise<null>((resolve, reject) => {
+                this.tr.rollback(function(err) {
+                    if (err) return reject(err);
+                    resolve(null);
+                });
+            });
         }
 
     public
@@ -81,42 +101,60 @@ export class fbConnection {
             */
         }
 
+        escape = function (value){
+            return libfirebird.escape(value);
+        }
+
         async connect(){
-            this.db = await this.internalConnect();
+            if (this.db === undefined) {
+                this.checkConnectionParams();
+                this.db = await this.internalConnect();
+            }
         } 
 
-        disconnect = function (){
-            var def = q.defer();
-            
-            this.db.detach(function(err) {
-                err ? def.reject(err) : def.resolve(null);
-            });
-
-            return def.promise;
+        async disconnect(){
+            if (this.db !== undefined) {
+                await this.internalDisconnect();
+                this.db = undefined;
+            }
         }
 
         async startTransaction(aReadOnly){
-            this.tr = await this.internalStartTransaction(aReadOnly);
+            if (this.tr === undefined) {
+                this.tr = await this.internalStartTransaction(aReadOnly);
+            }
         } 
 
-        commit = function (){
-            var def = q.defer();
-            
-            this.tr.commit(function(err) {
-                err ? def.reject(err) : def.resolve(null);
-            });
+        async commit(){
+            if (this.tr !== undefined) {
+                await this.internalCommit();
+                this.tr = undefined;
+            }
+        } 
 
-            return def.promise;
-        }
+        async rollback(){
+            if (this.tr !== undefined) {
+                await this.internalRollback();
+                this.tr = undefined;
+            }
+        } 
 
         query = function (aQuery, aParams){
-            var def = q.defer();
-
-            this.tr.query(aQuery, aParams, function(err, result) {
-                err ? def.reject(err) : def.resolve(result);
+            return new Promise<any>((resolve, reject) => {
+                this.tr.query(aQuery, aParams, function(err, result) {
+                    if (err) return reject(err);
+                    resolve(result);
+                });
             });
+        }
 
-            return def.promise;
+        execute = function (aQuery, aParams){
+            return new Promise<any>((resolve, reject) => {
+                this.tr.execute(aQuery, aParams, function(err, result) {
+                    if (err) return reject(err);
+                    resolve(result);
+                });
+            });
         }
 
 }
