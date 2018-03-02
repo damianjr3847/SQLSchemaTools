@@ -3,7 +3,7 @@ import * as libfirebird from 'node-firebird';
 export class fbConnection { 
     private 
         connectionParams : libfirebird.Options;  
-        db: libfirebird.Database;
+        dbHandle: libfirebird.Database;
         tr: libfirebird.Transaction;
   
         checkConnectionParams() {            
@@ -44,7 +44,7 @@ export class fbConnection {
 
         internalDisconnect = function (){
             return new Promise<null>((resolve, reject) => {
-                this.db.detach(function(err) {
+                this.dbHandle.detach(function(err) {
                     if (err) return reject(err);
                     resolve(null);
                 });
@@ -62,7 +62,7 @@ export class fbConnection {
             }            
 
             return new Promise<libfirebird.Transaction>((resolve, reject) => {
-                this.db.transaction(tType, function(err, rs){
+                this.dbHandle.transaction(tType, function(err, rs){
                     if (err) return reject(err);
                     resolve(rs);
                 });
@@ -96,7 +96,6 @@ export class fbConnection {
         lowercase_keys:boolean = false;
         dbrole:any             = null;
         pageSize:number        = 8192;
-        
         constructor(){
             /* 
             */
@@ -106,17 +105,21 @@ export class fbConnection {
             return libfirebird.escape(value);
         }
 
+        get db(){
+            return this.dbHandle;
+        }
+
         async connect(){
-            if (this.db === undefined) {
+            if (this.dbHandle === undefined) {
                 this.checkConnectionParams();
-                this.db = await this.internalConnect();
+                this.dbHandle = await this.internalConnect();
             }
         } 
 
         async disconnect(){
-            if (this.db !== undefined) {
+            if (this.dbHandle !== undefined) {
                 await this.internalDisconnect();
-                this.db = undefined;
+                this.dbHandle = undefined;
             }
         }
 
