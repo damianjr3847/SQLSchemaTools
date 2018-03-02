@@ -43,7 +43,7 @@ export class fbConnection {
         });
     }
 
-    private internalDisconnect = function (db: libfirebird.Database){
+    private internalDisconnect(db: libfirebird.Database){
         return new Promise<void>((resolve, reject) => {
             db.detach(function(err) {
                 if (err) return reject(err);
@@ -57,7 +57,7 @@ export class fbConnection {
             throw 'transaction is closed';
     }
 
-    private internalStartTransaction = function (db: libfirebird.Database, aReadOnly: boolean){
+    private internalStartTransaction(db: libfirebird.Database, aReadOnly: boolean){
         let tType : libfirebird.Isolation;              
         
         if (aReadOnly) {
@@ -75,7 +75,7 @@ export class fbConnection {
         });
     }
 
-    private internalCommit = function (tr: libfirebird.Transaction){
+    private internalCommit(tr: libfirebird.Transaction){
         return new Promise<void>((resolve, reject) => {
             tr.commit(function(err) {
                 if (err) return reject(err);
@@ -84,7 +84,7 @@ export class fbConnection {
         });
     }
 
-    private internalRollback = function (tr: libfirebird.Transaction){
+    private internalRollback(tr: libfirebird.Transaction){
         return new Promise<void>((resolve, reject) => {
             tr.rollback(function(err) {
                 if (err) return reject(err);
@@ -141,20 +141,18 @@ export class fbConnection {
     } 
 
     async commit(this: fbConnection){
-        if (this.tr) {
-            await this.internalCommit(this.tr);
-            this.tr = undefined;
-        }
+        this.checkTransaction();
+        await this.internalCommit(this.tr!);
+        this.tr = undefined;
     } 
 
     async rollback(this: fbConnection){
-        if (this.tr) {
-            await this.internalRollback(this.tr);
-            this.tr = undefined;
-        }
+        this.checkTransaction();
+        await this.internalRollback(this.tr!);
+        this.tr = undefined;
     } 
 
-    query = function (this: fbConnection, aQuery: string, aParams: Array<any>){
+    query(this: fbConnection, aQuery: string, aParams: Array<any>){
         this.checkTransaction();
         return new Promise<any>((resolve, reject) => {
             this.tr!.query(aQuery, aParams, function(err: any, result: any) {
@@ -164,7 +162,7 @@ export class fbConnection {
         });
     }
 
-    execute = function (this: fbConnection, aQuery: string, aParams: Array<any>){
+    execute(this: fbConnection, aQuery: string, aParams: Array<any>){
         this.checkTransaction();
         return new Promise<any>((resolve, reject) => {
             this.tr!.execute(aQuery, aParams, function(err: any, result: any) {
