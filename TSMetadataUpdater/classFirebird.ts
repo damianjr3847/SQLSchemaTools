@@ -135,7 +135,7 @@ export class fbConnection {
 
     async startTransaction(this: fbConnection, aReadOnly: boolean){
         this.checkConnection;
-        if (this.tr === undefined) {
+        if (!this.tr) {
             this.tr = await this.internalStartTransaction(this.dbHandle!, aReadOnly);
         }
     } 
