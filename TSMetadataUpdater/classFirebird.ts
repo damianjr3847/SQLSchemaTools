@@ -106,6 +106,8 @@ export class fbConnection {
         }
 
         get db(){
+            if (this.dbHandle === undefined) 
+                throw 'connection is not active';
             return this.dbHandle;
         }
 
