@@ -1,5 +1,5 @@
 import * as fs from 'fs-extra';
-import * as fbClass from './classFirebird';
+import * as fbClass from './classFirebird2';
 
 let fb : fbClass.fbConnection;
 
@@ -15,7 +15,7 @@ export async function writeYalm(ahostName:string, aportNumber:number, adatabase:
     fb.hostName = ahostName;
     fb.portNumber = aportNumber;
 
-    await fb.selectquery('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[],true);
+    r = await fb.selectquery('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[],true);
     console.log('r2 %j',r);    
 }
 
