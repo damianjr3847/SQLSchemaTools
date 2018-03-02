@@ -96,6 +96,7 @@ export class fbConnection {
         lowercase_keys:boolean = false;
         dbrole:any             = null;
         pageSize:number        = 8192;
+        
         constructor(){
             /* 
             */
