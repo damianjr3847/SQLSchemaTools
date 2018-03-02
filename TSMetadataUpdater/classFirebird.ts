@@ -3,10 +3,10 @@ import * as q from 'q';
 
 export class fbConnection { 
     private 
+        connectionParams : libfirebird.Options;  
         db: libfirebird.Database;
         tr: libfirebird.Transaction;
-
-        connectionParams : libfirebird.Options;    
+  
         checkConnectionParams() {            
             if (this.hostName === '') {
                 throw 'Connection error: hostName empty';
@@ -33,6 +33,40 @@ export class fbConnection {
                                     role: this.dbrole,
                                     pageSize: this.pageSize};            
         }           
+
+        internalConnect = function (){
+            var def = q.defer();
+         
+            this.checkConnectionParams();
+
+            libfirebird.attach( this.connectionParams,
+               function(err, db){
+                  err ? def.reject(err) : def.resolve(db);
+               }
+            );
+
+            return def.promise;
+        };
+
+        internalStartTransaction = function (aReadOnly){
+            var def = q.defer();
+
+            let tType : libfirebird.Isolation;              
+            
+            if (aReadOnly) {
+                tType = libfirebird.ISOLATION_READ_COMMITED_READ_ONLY;        
+            }
+            else {
+                tType = libfirebird.ISOLATION_READ_COMMITED;
+            }            
+
+            this.db.transaction(tType, function(err, rs){
+                err ? def.reject(err) : def.resolve(rs);
+            });
+
+            return def.promise;
+        }
+
     public
         hostName:string        = '';
         portNumber:number      = 3050;
@@ -47,44 +81,19 @@ export class fbConnection {
             */
         }
 
-        connect = function (){
-            var def = q.defer();
-         
-            this.checkConnectionParams();
+        async connect(){
+            this.db = await this.internalConnect();
+        } 
 
-            libfirebird.attach( this.connectionParams,
-               function(err, db){
-                  err ? def.reject(err) : def.resolve(db);
-               }
-            );
-
-            return def.promise;
-        };
+        async startTransaction(aReadOnly){
+            this.tr = await this.internalStartTransaction(aReadOnly);
+        } 
 
         disconnect = function (){
             var def = q.defer();
             
-            this.tr.detach(function(err) {
+            this.db.detach(function(err) {
                 err ? def.reject(err) : def.resolve(null);
-            });
-
-            return def.promise;
-        }
-
-        startTransaction = function (aReadOnly){
-            var def = q.defer();
-
-            let tType : libfirebird.Isolation;              
-            
-            if (aReadOnly) {
-                tType = libfirebird.ISOLATION_READ_COMMITED_READ_ONLY;        
-            }
-            else {
-                tType = libfirebird.ISOLATION_READ_COMMITED;
-            }            
-
-            this.db.transaction(tType, function(err, rs){
-                err ? def.reject(err) : def.resolve(rs);
             });
 
             return def.promise;

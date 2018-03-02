@@ -160,8 +160,10 @@ console.log('dbPass: %j',dbPass);
 console.log('objectType: %j', objectType);
 console.log('objectName: %j', objectName);*/
 
-if (actionYalm === 'write') {
+(async () => {
+  if (actionYalm === 'write') {
     fbMetadata.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass);    
-}
+  }
 
+})();  
 
