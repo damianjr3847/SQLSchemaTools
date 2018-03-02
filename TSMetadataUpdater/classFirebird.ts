@@ -85,10 +85,6 @@ export class fbConnection {
             this.db = await this.internalConnect();
         } 
 
-        async startTransaction(aReadOnly){
-            this.tr = await this.internalStartTransaction(aReadOnly);
-        } 
-
         disconnect = function (){
             var def = q.defer();
             
@@ -98,6 +94,10 @@ export class fbConnection {
 
             return def.promise;
         }
+
+        async startTransaction(aReadOnly){
+            this.tr = await this.internalStartTransaction(aReadOnly);
+        } 
 
         commit = function (){
             var def = q.defer();
