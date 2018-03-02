@@ -4,7 +4,7 @@ import * as fbClass from './classFirebird';
 let fb : fbClass.fbConnection;
 
 export async function writeYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string)  {
-    
+    let rs;
 
     fb = new fbClass.fbConnection();    
 
@@ -14,15 +14,32 @@ export async function writeYalm(ahostName:string, aportNumber:number, adatabase:
     fb.hostName = ahostName;
     fb.portNumber = aportNumber;
 
-    await fb.connect();
-    await fb.startTransaction(true);
+    try {
 
-    let rs = await fb.query('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[]);
+        await fb.connect();
+        try {
+            await fb.startTransaction(true);
 
-    await fb.commit();
-    await fb.disconnect();
+            rs = await fb.query('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[]);
+            console.log('r2 %j',rs);    
 
-    console.log('r2 %j',rs);    
+            rs = await fb.query('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[]);
+            console.log('r2 %j',rs);    
+
+            rs = await fb.query('SELECT aaFCODIGO, FDESCRI FROM ART_LIPR',[]);
+            console.log('r2 %j',rs);    
+
+            await fb.commit();
+        }
+        finally {
+            await fb.disconnect();
+        }
+
+    }
+    catch (err) {
+        console.log('Error: ', err.message);
+    }
+
 }
 
 export function readYalm() {

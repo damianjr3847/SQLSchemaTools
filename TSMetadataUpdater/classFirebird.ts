@@ -119,6 +119,7 @@ export class fbConnection {
         } 
 
         async disconnect(){
+            await this.rollback();
             if (this.dbHandle !== undefined) {
                 await this.internalDisconnect();
                 this.dbHandle = undefined;
