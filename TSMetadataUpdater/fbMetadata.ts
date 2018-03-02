@@ -6,7 +6,6 @@ let fb : fbClass.fbConnection;
 export async function writeYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string)  {
     
 
-    let r;    
     fb = new fbClass.fbConnection();    
 
     fb.database = adatabase;
@@ -15,8 +14,15 @@ export async function writeYalm(ahostName:string, aportNumber:number, adatabase:
     fb.hostName = ahostName;
     fb.portNumber = aportNumber;
 
-    r = await fb.selectquery('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[],true);
-    console.log('r2 %j',r);    
+    let db = await fb.connect();
+    let tr = await fb.startTransaction(true);
+
+    let rs = await this.query('SELECT FCODIGO, FDESCRI FROM ART_LIPR',[]);
+
+    await this.commit;
+    await this.disconnect;
+
+    console.log('r2 %j',rs);    
 }
 
 export function readYalm() {

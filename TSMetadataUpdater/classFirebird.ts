@@ -1,12 +1,11 @@
 import * as libfirebird from 'node-firebird';
-
-const {promisify} = require('util');
-const attachAsync = promisify(libfirebird.attach);
-
-//import * as q from 'q';
+import * as q from 'q';
 
 export class fbConnection { 
     private 
+        db: libfirebird.Database;
+        tr: libfirebird.Transaction;
+
         connectionParams : libfirebird.Options;    
         checkConnectionParams() {            
             if (this.hostName === '') {
@@ -34,7 +33,7 @@ export class fbConnection {
                                     role: this.dbrole,
                                     pageSize: this.pageSize};            
         }           
-    public  
+    public
         hostName:string        = '';
         portNumber:number      = 3050;
         database:string        = '';
@@ -48,116 +47,67 @@ export class fbConnection {
             */
         }
 
-        connectToDB = function (acfg){
+        connect = function (){
             var def = q.defer();
          
-            libfirebird.attach( acfg,
+            this.checkConnectionParams();
+
+            libfirebird.attach( this.connectionParams,
                function(err, db){
                   err ? def.reject(err) : def.resolve(db);
                }
             );
+
             return def.promise;
         };
 
-        async selectquery(aQuery:string, aParams: any[], atransactionReadOnly: boolean = true) {
-            let db;
-            let tType : libfirebird.Isolation;              
-            let queryRows;
-        
-            this.checkConnectionParams();
+        disconnect = function (){
+            var def = q.defer();
             
-            if (atransactionReadOnly) {
+            this.tr.detach(function(err) {
+                err ? def.reject(err) : def.resolve(null);
+            });
+
+            return def.promise;
+        }
+
+        startTransaction = function (aReadOnly){
+            var def = q.defer();
+
+            let tType : libfirebird.Isolation;              
+            
+            if (aReadOnly) {
                 tType = libfirebird.ISOLATION_READ_COMMITED_READ_ONLY;        
             }
             else {
                 tType = libfirebird.ISOLATION_READ_COMMITED;
             }            
-            
 
-            db = await attachAsync(this.connectionParams);
-            //db = await this.connectToDB(this.connectionParams);
+            this.db.transaction(tType, function(err, rs){
+                err ? def.reject(err) : def.resolve(rs);
+            });
 
+            return def.promise;
+        }
 
-            libfirebird.attach(this.connectionParams, function(err, db) { 
-                            if (err)                  
-                                throw err;
-                            
-                            db.transaction(tType, function(err, transaction) {
-                                transaction.query(aQuery, aParams, function(err, result) {
-                        
-                                    if (err) {
-                                        transaction.rollback();
-                                        return;
-                                    }
-                                    
-                                    queryRows= result;
+        commit = function (){
+            var def = q.defer();
+            
+            this.tr.commit(function(err) {
+                err ? def.reject(err) : def.resolve(null);
+            });
 
-                                    //return resolve(result);
-                                    //console.log('result transaction: %j',queryRows);
-            
-                                    transaction.commit(function(err) {
-                                        if (err)
-                                            transaction.rollback();
-                                        else
-                                            db.detach();
-                                    });
-                                    return queryRows;    
-                                });
-                                
-                            });
-                            
-                        }); 
-            
-            //console.log('r1 %j',queryRows); 
-            
-        } 
-        /*selectquery(aQuery:string, aParams: any[], atransactionReadOnly: boolean = true) {
-            let pr;
-            let tType : libfirebird.Isolation;              
-            let queryRows;
-        
-            this.checkConnectionParams();
-            
-            if (atransactionReadOnly) {
-                tType = libfirebird.ISOLATION_READ_COMMITED_READ_ONLY;        
-            }
-            else {
-                tType = libfirebird.ISOLATION_READ_COMMITED;
-            }   
+            return def.promise;
+        }
 
-            pr = new //(function(resolve, reject) {
-                let prres; 
-                libfirebird.attach(this.connectionParams, function(err, db) { 
-                    if (err)                  
-                        throw err;
-                    
-                    db.transaction(tType, function(err, transaction) {
-                        transaction.query(aQuery, aParams, function(err, result) {
-                 
-                            if (err) {
-                                transaction.rollback();
-                                return;
-                            }
-    
-                            //queryRows= result;
-                            prres = result;        
-                            //console.log('result transaction: %j',queryRows);
-    
-                            transaction.commit(function(err) {
-                                if (err)
-                                    transaction.rollback();
-                                else
-                                    db.detach();
-                            });
-                        });
-                    });
-                });
-                resolve(prres)
-              });
-            
-          
-            //.resolve().then(function (result) {    
-            console.log('r1 %j',queryRows) }); 
-            //return queryRows;                            
-        }  */  
+        query = function (aQuery, aParams){
+            var def = q.defer();
+
+            this.tr.query(aQuery, aParams, function(err, result) {
+                err ? def.reject(err) : def.resolve(result);
+            });
+
+            return def.promise;
+        }
+
 }
