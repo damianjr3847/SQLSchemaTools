@@ -5,12 +5,23 @@ export class fbConnection {
     private dbHandle: libfirebird.Database | undefined;
     private tr: libfirebird.Transaction | undefined;
   
-    private checkConnection() {
-        if (!this.dbHandle)
-            throw 'conection is closed';
+    hostName:string        = '';
+    portNumber:number      = 3050;
+    database:string        = '';
+    dbUser:string          = 'SYSDBA';
+    dbPassword:string      = 'masterkey';
+    lowercase_keys:boolean = false;
+    dbrole:any             = null;
+    pageSize:number        = 8192;
+
+    constructor(){
     }
 
-    private checkConnectionParams() {            
+    escape = function (value: any){
+        return libfirebird.escape(value);
+    }
+
+    checkConnectionParams() {            
         if (this.hostName === '')
             throw 'Connection error: hostName empty';
         if (this.portNumber === 0)
@@ -23,7 +34,19 @@ export class fbConnection {
             throw 'Connection error: dbPassword Empty';
     }           
 
-    private internalConnect(): Promise<libfirebird.Database> {
+    checkConnection() {
+        if (!this.dbHandle)
+            throw 'conection is closed';
+    }
+
+    checkTransaction() {
+        if (!this.tr)
+            throw 'transaction is closed';
+    }
+    
+    async connect(this: fbConnection){
+        this.checkConnectionParams();
+
         let connectionParams: libfirebird.Options = {
             host: this.hostName,
             port: this.portNumber,
@@ -35,30 +58,32 @@ export class fbConnection {
             pageSize: this.pageSize
         };            
 
-        return new Promise<libfirebird.Database>((resolve, reject) => {
+        if (this.dbHandle)
+            return;
+
+        this.dbHandle = await  new Promise<libfirebird.Database>((resolve, reject) => {
             libfirebird.attach(connectionParams, function(err, db){
                 if (err) return reject(err);
                 resolve(db);
             });
         });
-    }
+    } 
 
-    private internalDisconnect(db: libfirebird.Database){
-        return new Promise<void>((resolve, reject) => {
-            db.detach(function(err) {
+    async disconnect(this: fbConnection){
+        if (!this.dbHandle)
+            return;
+        await this.rollback();
+        await new Promise<void>((resolve, reject) => {
+            this.dbHandle!.detach(function(err) {
                 if (err) return reject(err);
                 resolve();
             });
         });
-    }
-    
-    private checkTransaction() {
-        if (!this.tr)
-            throw 'transaction is closed';
+        this.dbHandle = undefined;
     }
 
-    private internalStartTransaction(db: libfirebird.Database, aReadOnly: boolean){
-        let tType : libfirebird.Isolation;              
+    async startTransaction(this: fbConnection, aReadOnly: boolean){
+        let tType: libfirebird.Isolation;              
         
         if (aReadOnly) {
             tType = libfirebird.ISOLATION_READ_COMMITED_READ_ONLY;        
@@ -67,88 +92,34 @@ export class fbConnection {
             tType = libfirebird.ISOLATION_READ_COMMITED;
         }            
 
-        return new Promise<libfirebird.Transaction>((resolve, reject) => {
-            db.transaction(tType, function(err, rs){
+        this.checkConnection;
+        this.tr = await new Promise<libfirebird.Transaction>((resolve, reject) => {
+            this.dbHandle!.transaction(tType, function(err, rs){
                 if (err) return reject(err);
                 resolve(rs);
             });
         });
-    }
-
-    private internalCommit(tr: libfirebird.Transaction){
-        return new Promise<void>((resolve, reject) => {
-            tr.commit(function(err) {
-                if (err) return reject(err);
-                resolve();
-            });
-        });
-    }
-
-    private internalRollback(tr: libfirebird.Transaction){
-        return new Promise<void>((resolve, reject) => {
-            tr.rollback(function(err) {
-                if (err) return reject(err);
-                resolve();
-            });
-        });
-    }
-
-    /******************************* public ********************************/
-    hostName:string        = '';
-    portNumber:number      = 3050;
-    database:string        = '';
-    dbUser:string          = 'SYSDBA';
-    dbPassword:string      = 'masterkey';
-    lowercase_keys:boolean = false;
-    dbrole:any             = null;
-    pageSize:number        = 8192;
-
-    constructor(){
-        /* 
-        */
-    }
-
-    escape = function (value: any){
-        return libfirebird.escape(value);
-    }
-
-    get db(this: fbConnection){
-        if (!this.dbHandle) 
-            throw 'connection is not active';
-        return this.dbHandle;
-    }
-
-    async connect(this: fbConnection){
-        if (!this.dbHandle) {
-            this.checkConnectionParams();
-            this.dbHandle = await this.internalConnect();
-        }
-    } 
-
-    async disconnect(this: fbConnection){
-        await this.rollback();
-        if (this.dbHandle) {
-            await this.internalDisconnect(this.dbHandle);
-            this.dbHandle = undefined;
-        }
-    }
-
-    async startTransaction(this: fbConnection, aReadOnly: boolean){
-        this.checkConnection;
-        if (!this.tr) {
-            this.tr = await this.internalStartTransaction(this.dbHandle!, aReadOnly);
-        }
     } 
 
     async commit(this: fbConnection){
         this.checkTransaction();
-        await this.internalCommit(this.tr!);
+        await new Promise<void>((resolve, reject) => {
+            this.tr!.commit(function(err) {
+                if (err) return reject(err);
+                resolve();
+            });
+        });
         this.tr = undefined;
     } 
 
     async rollback(this: fbConnection){
         this.checkTransaction();
-        await this.internalRollback(this.tr!);
+        await new Promise<void>((resolve, reject) => {
+            this.tr!.rollback(function(err) {
+                if (err) return reject(err);
+                resolve();
+            });
+        });
         this.tr = undefined;
     } 
 
