@@ -2,10 +2,10 @@ import * as libfirebird from 'node-firebird';
 
 export class fbConnection { 
      
-    private dbHandle: libfirebird.Database | undefined;
+    private db: libfirebird.Database | undefined;
     private tr: libfirebird.Transaction | undefined;
   
-    hostName:string        = '';
+    hostName:string        = 'localhost';
     portNumber:number      = 3050;
     database:string        = '';
     dbUser:string          = 'SYSDBA';
@@ -34,16 +34,24 @@ export class fbConnection {
             throw 'Connection error: dbPassword Empty';
     }           
 
-    checkConnection() {
-        if (!this.dbHandle)
+    checkInConnection() {
+        if (!this.db)
             throw 'conection is closed';
     }
 
-    checkTransaction() {
+    checkInTransaction() {
         if (!this.tr)
             throw 'transaction is closed';
     }
     
+    connected(): boolean {
+        return this.db !== undefined;
+    }
+
+    inTransaction(): boolean {
+        return this.tr !== undefined;
+    }
+
     async connect(this: fbConnection){
         this.checkConnectionParams();
 
@@ -58,10 +66,10 @@ export class fbConnection {
             pageSize: this.pageSize
         };            
 
-        if (this.dbHandle)
+        if (this.db)
             return;
 
-        this.dbHandle = await  new Promise<libfirebird.Database>((resolve, reject) => {
+        this.db = await  new Promise<libfirebird.Database>((resolve, reject) => {
             libfirebird.attach(connectionParams, function(err, db){
                 if (err) return reject(err);
                 resolve(db);
@@ -70,17 +78,17 @@ export class fbConnection {
     } 
 
     async disconnect(this: fbConnection){
-        if (!this.dbHandle)
+        if (!this.db)
             return;
         if (this.tr)         
             await this.rollback();
         await new Promise<void>((resolve, reject) => {
-            this.dbHandle!.detach(function(err) {
+            this.db!.detach(function(err) {
                 if (err) return reject(err);
                 resolve();
             });
         });
-        this.dbHandle = undefined;
+        this.db = undefined;
     }
 
     async startTransaction(this: fbConnection, aReadOnly: boolean){
@@ -93,9 +101,9 @@ export class fbConnection {
             tType = libfirebird.ISOLATION_READ_COMMITED;
         }            
 
-        this.checkConnection;
+        this.checkInConnection;
         this.tr = await new Promise<libfirebird.Transaction>((resolve, reject) => {
-            this.dbHandle!.transaction(tType, function(err, rs){
+            this.db!.transaction(tType, function(err, rs){
                 if (err) return reject(err);
                 resolve(rs);
             });
@@ -103,7 +111,7 @@ export class fbConnection {
     } 
 
     async commit(this: fbConnection){
-        this.checkTransaction();
+        this.checkInTransaction();
         await new Promise<void>((resolve, reject) => {
             this.tr!.commit(function(err) {
                 if (err) return reject(err);
@@ -114,7 +122,7 @@ export class fbConnection {
     } 
 
     async rollback(this: fbConnection){
-        this.checkTransaction();
+        this.checkInTransaction();
         await new Promise<void>((resolve, reject) => {
             this.tr!.rollback(function(err) {
                 if (err) return reject(err);
@@ -125,7 +133,7 @@ export class fbConnection {
     } 
 
     query(this: fbConnection, aQuery: string, aParams: Array<any>){
-        this.checkTransaction();
+        this.checkInTransaction();
         return new Promise<any>((resolve, reject) => {
             this.tr!.query(aQuery, aParams, function(err: any, result: any) {
                 if (err) return reject(err);
@@ -135,7 +143,7 @@ export class fbConnection {
     }
 
     execute(this: fbConnection, aQuery: string, aParams: Array<any>){
-        this.checkTransaction();
+        this.checkInTransaction();
         return new Promise<any>((resolve, reject) => {
             this.tr!.execute(aQuery, aParams, function(err: any, result: any) {
                 if (err) return reject(err);
