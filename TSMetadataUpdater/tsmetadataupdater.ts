@@ -13,7 +13,7 @@ https://github.com/hgourvest/node-firebird
 
 */
 
-import {existsSync as fsexistsSync} from 'fs-extra';
+import * as fsexistsSync from 'fs-extra';
 import * as params from 'commander';
 
 import * as fbMetadata from './fbMetadata';
@@ -82,7 +82,7 @@ else {
 }
 
 if (params.yalm) {
-    if (! fsexistsSync(params.yalm)) {
+    if (! fsexistsSync.existsSync(params.yalm)) {
         console.log('el path %j no existe', params.yalm);
         process.exit();
     }
