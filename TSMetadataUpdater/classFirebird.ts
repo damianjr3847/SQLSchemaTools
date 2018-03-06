@@ -152,4 +152,23 @@ export class fbConnection {
         });
     }
 
+    getBlobAsString(blobField: any) {
+        let value: string = '';
+
+        return new Promise<string>((resolve, reject) => {
+            blobField(async function(err: any, name: string, e: any){
+                if (err) return reject(err);
+
+                await new Promise(function( resolve ){
+                    e.on('data', function(chunk:any) {
+                        value += chunk;
+                        resolve();
+                    });
+                })
+
+                resolve(value);
+            });
+        });  
+    }
+
 }

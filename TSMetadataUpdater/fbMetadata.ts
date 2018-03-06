@@ -105,25 +105,10 @@ export async function writeYalm(ahostName:string, aportNumber:number, adatabase:
                 xProcedure.procedure.input=xProcedureParameterInput;
                 xProcedure.procedure.output=xProcedureParameterOutput;      
                
-                let pepe: string = '';
+                let body = await fb.getBlobAsString(rProcedures[i].SOURCE);
 
-                let valor = await new Promise((resolve, reject) => {
-                    rProcedures[i].SOURCE(async function(err: any, name: string, e: any){
-                        if (err) return reject(err);
-
-                        await new Promise(function( resolve ){
-                            e.on('data', function(chunk:any) {
-                                pepe += chunk;
-                                resolve();
-                            });
-                        })
-
-                        resolve();
-                    });
-                });
-
-                xProcedure.procedure.fb.body=rProcedures[i].SOURCE;
-                xProcedure.procedure.pg.body=rProcedures[i].SOURCE;
+                xProcedure.procedure.fb.body=body;
+                xProcedure.procedure.pg.body=body;
 
                 fs.writeFileSync('./procedures/'+xProcedure.procedure.name+'.yaml',yaml.safeDump(xProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                 
