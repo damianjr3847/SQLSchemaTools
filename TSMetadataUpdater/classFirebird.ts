@@ -162,8 +162,10 @@ export class fbConnection {
                 await new Promise(function( resolve ){
                     e.on('data', function(chunk:any) {
                         value += chunk;
-                        resolve();
                     });
+                    e.on('end', function() {
+                        resolve();    
+                    });                   
                 })
 
                 resolve(value);
