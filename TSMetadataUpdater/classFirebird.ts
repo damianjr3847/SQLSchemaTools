@@ -69,7 +69,7 @@ export class fbConnection {
         if (this.db)
             return;
 
-        this.db = await  new Promise<libfirebird.Database>((resolve, reject) => {
+        this.db = await new Promise<libfirebird.Database>((resolve, reject) => {
             libfirebird.attach(connectionParams, function(err, db){
                 if (err) return reject(err);
                 resolve(db);

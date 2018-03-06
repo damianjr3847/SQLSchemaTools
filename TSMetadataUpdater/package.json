@@ -20,7 +20,7 @@
     "commander": "^2.14.1",
     "fs": "0.0.1-security",
     "js-yaml": "^3.10.0",
-    "node-firebird": "^0.8.4",
+    "node-firebird": "git+https://github.com/kattunga/node-firebird.git",
     "typescript": "^2.7.2"
   },
   "devDependencies": {

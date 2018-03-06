@@ -62,7 +62,7 @@ const queryProcedureParameters:string = 'SELECT ' +
                                     'ORDER BY PRO.RDB$PROCEDURE_NAME, PPA.RDB$PARAMETER_TYPE, PPA.RDB$PARAMETER_NUMBER';
 
 export async function writeYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string)  {
-    let rProcedures, rParamater;    
+    let rProcedures: Array<any>, rParamater;    
     let xProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType;
     let xProcedureParameterInput: GlobalTypes.iProcedureParameter[] = [];
     let xProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];
@@ -105,6 +105,23 @@ export async function writeYalm(ahostName:string, aportNumber:number, adatabase:
                 xProcedure.procedure.input=xProcedureParameterInput;
                 xProcedure.procedure.output=xProcedureParameterOutput;      
                
+                let pepe: string = '';
+
+                let valor = await new Promise((resolve, reject) => {
+                    rProcedures[i].SOURCE(async function(err: any, name: string, e: any){
+                        if (err) return reject(err);
+
+                        await new Promise(function( resolve ){
+                            e.on('data', function(chunk:any) {
+                                pepe += chunk;
+                                resolve();
+                            });
+                        })
+
+                        resolve();
+                    });
+                });
+
                 xProcedure.procedure.fb.body=rProcedures[i].SOURCE;
                 xProcedure.procedure.pg.body=rProcedures[i].SOURCE;
 
