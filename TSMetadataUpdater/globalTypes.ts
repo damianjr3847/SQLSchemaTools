@@ -3,6 +3,23 @@ export const ArrayDbDriver:string[] = ['ps','fb'];
 
 export const ArrayobjectType:string[] = ['procedures','triggers','tables','generators'];
 
+export const yamlExportOptions = {
+	indent: 4,
+	skipInvalid: false,
+	flowLevel: -1,
+	sortKeys: false, 
+	lineWidth:80, 
+	noRefs: false, 
+	noCompatMode: false, 
+	condenseFlow: false
+};
+
+export const yamlFileSaveOptions = {
+	encoding: "utf8"/*,
+	mode:0,
+	flag: "w"*/
+};
+
 export interface iProcedureParameter{
     name?:string,
     type?:string

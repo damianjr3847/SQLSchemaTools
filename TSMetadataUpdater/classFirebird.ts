@@ -72,7 +72,8 @@ export class fbConnection {
     async disconnect(this: fbConnection){
         if (!this.dbHandle)
             return;
-        await this.rollback();
+        if (this.tr)         
+            await this.rollback();
         await new Promise<void>((resolve, reject) => {
             this.dbHandle!.detach(function(err) {
                 if (err) return reject(err);

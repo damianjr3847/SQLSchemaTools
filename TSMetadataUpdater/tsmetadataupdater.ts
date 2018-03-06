@@ -13,7 +13,7 @@ https://github.com/hgourvest/node-firebird
 
 */
 
-import * as fsexistsSync from 'fs-extra';
+import * as fsexistsSync from 'fs';
 import * as params from 'commander';
 
 import * as fbMetadata from './fbMetadata';

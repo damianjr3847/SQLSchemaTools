@@ -27,20 +27,47 @@ procedure:
       fb:
         body: |
 */        
-import * as fs from 'fs-extra';
+import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as fbClass from './classFirebird';
 import * as GlobalTypes from './globalTypes';
 
 
 let fb : fbClass.fbConnection;
+const queryProcedure:string = 'SELECT TRIM(RDB$PROCEDURE_NAME) AS NAME, '+
+                              'RDB$PROCEDURE_SOURCE AS SOURCE, '+
+                              'RDB$DESCRIPTION AS DESCRIPTION ' +
+                              'FROM RDB$PROCEDURES ' +
+                              'WHERE RDB$SYSTEM_FLAG=0 AND (RDB$PROCEDURE_NAME=? OR ? IS NULL) '+
+                              'ORDER BY RDB$PROCEDURE_NAME';
+
+const queryProcedureParameters:string = 'SELECT ' +
+                                    'TRIM(PPA.RDB$PROCEDURE_NAME) AS PROCEDURE_NAME, ' +
+                                    'TRIM(PPA.RDB$PARAMETER_NAME) AS PARAMATER_NAME, ' +
+                                    'FLD.RDB$FIELD_TYPE AS FTYPE, ' +
+                                    'FLD.RDB$FIELD_SUB_TYPE AS FSUB_TYPE, ' +
+                                    'FLD.RDB$FIELD_LENGTH AS FLENGTH, ' +
+                                    'FLD.RDB$FIELD_PRECISION AS FPRECISION, ' +
+                                    'FLD.RDB$FIELD_SCALE AS FSCALE, ' +
+                                    'TRIM(COL.RDB$COLLATION_NAME) AS FCOLLATION_NAME, ' +       // COLLATE
+                                    'CAST(PPA.RDB$DEFAULT_SOURCE AS VARCHAR(3000)) AS FSOURCE, ' +       // DEFAULT
+                                    'PPA.RDB$NULL_FLAG  AS FLAG, ' +            // NULLABLE
+                                    'CAST(FLD.RDB$DESCRIPTION AS VARCHAR(3000)) AS DESCRIPTION, ' +
+                                    'PPA.RDB$PARAMETER_TYPE AS PARAMATER_TYPE ' +        // input / output
+                                    'FROM RDB$PROCEDURES PRO ' +
+                                    'LEFT OUTER JOIN RDB$PROCEDURE_PARAMETERS PPA ON PPA.RDB$PROCEDURE_NAME = PRO.RDB$PROCEDURE_NAME ' +
+                                    'LEFT OUTER JOIN RDB$FIELDS FLD ON FLD.RDB$FIELD_NAME = PPA.RDB$FIELD_SOURCE ' +
+                                    'LEFT OUTER JOIN RDB$COLLATIONS COL ON (PPA.RDB$COLLATION_ID = COL.RDB$COLLATION_ID AND FLD.RDB$CHARACTER_SET_ID = COL.RDB$CHARACTER_SET_ID) ' +
+                                    'WHERE PRO.RDB$PROCEDURE_NAME=? OR ? IS NULL '+
+                                    'ORDER BY PRO.RDB$PROCEDURE_NAME, PPA.RDB$PARAMETER_TYPE, PPA.RDB$PARAMETER_NUMBER';
 
 export async function writeYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string)  {
     let rProcedures, rParamater;    
     let xProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType;
     let xProcedureParameterInput: GlobalTypes.iProcedureParameter[] = [];
     let xProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];
-    let xxx:string="";
+    let j:number = 0;    
+
     fb = new fbClass.fbConnection();    
 
     fb.database = adatabase;
@@ -53,53 +80,47 @@ export async function writeYalm(ahostName:string, aportNumber:number, adatabase:
 
         await fb.connect();
         try {
-            await fb.startTransaction(true);
-
-            rProcedures = await fb.query('SELECT first 1 trim(RDB$PROCEDURE_NAME) AS NAME, RDB$PROCEDURE_INPUTS AS INPUTS, RDB$PROCEDURE_OUTPUTS  AS OUTPUTS, RDB$DESCRIPTION AS DESCRIPTION, CAST(RDB$PROCEDURE_SOURCE AS VARCHAR(8000)) AS CONTENIDO FROM RDB$PROCEDURES',[]);
-            
-            //console.log(rProcedures);
+            await fb.startTransaction(true);        
+            rProcedures = await fb.query(queryProcedure,[null,null]);
+            rParamater = await fb.query(queryProcedureParameters,[null,null]);
+                        
             for (var i=0; i < rProcedures.length; i++){
                 
-                xProcedure.procedure.name  = rProcedures[i].NAME;
+                xProcedure.procedure.name  = rProcedures[i].NAME;              
                 
-                rParamater = await fb.query('select trim(RDB$PARAMETER_NAME) AS NAME, RDB$PARAMETER_TYPE AS XTYPE from RDB$PROCEDURE_PARAMETERS WHERE RDB$PROCEDURE_NAME=? AND RDB$PARAMETER_TYPE=0 ORDER BY RDB$PARAMETER_NUMBER',['XXX_TBL_COMP_NUENUM']);
-                
-                for (var j=0; j < rParamater.length; j++){
-                    xProcedureParameterInput.push({name:"",type:""});
-                    xProcedureParameterInput[j].name = rParamater[j].NAME;
-                    xProcedureParameterInput[j].type = rParamater[j].XTYPE;
-                         
-                };
+                while ((j< rParamater.length) && (rParamater[j].PROCEDURE_NAME == rProcedures[i].NAME)) {
+                    if (rParamater[j].PARAMATER_TYPE == 0) {
+                        xProcedureParameterInput.push({name:"",type:""});
+                        xProcedureParameterInput[xProcedureParameterInput.length-1].name = rParamater[j].PARAMATER_NAME;
+                        xProcedureParameterInput[xProcedureParameterInput.length-1].type = rParamater[j].PARAMATER_TYPE;  
+                    }
+                    else if (rParamater[j].PARAMATER_TYPE == 1) {
+                        xProcedureParameterOutput.push({name:"",type:""});
+                        xProcedureParameterOutput[xProcedureParameterOutput.length-1].name = rParamater[j].PARAMATER_NAME;
+                        xProcedureParameterOutput[xProcedureParameterOutput.length-1].type = rParamater[j].PARAMATER_TYPE;
+                    }           
+                    j++;
+                }
+
                 xProcedure.procedure.input=xProcedureParameterInput;
+                xProcedure.procedure.output=xProcedureParameterOutput;      
+               
+                xProcedure.procedure.fb.body=rProcedures[i].SOURCE;
+                xProcedure.procedure.pg.body=rProcedures[i].SOURCE;
 
-                rParamater = await fb.query('select trim(RDB$PARAMETER_NAME) AS NAME, RDB$PARAMETER_TYPE AS XTYPE from RDB$PROCEDURE_PARAMETERS WHERE RDB$PROCEDURE_NAME=? AND RDB$PARAMETER_TYPE=1 ORDER BY RDB$PARAMETER_NUMBER',['XXX_TBL_COMP_NUENUM']);
+                fs.writeFileSync('./procedures/'+xProcedure.procedure.name+'.yaml',yaml.safeDump(xProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                 
-                for (var j=0; j < rParamater.length; j++){
-                    xProcedureParameterOutput.push({name:"",type:""});
-                    xProcedureParameterOutput[j].name = rParamater[j].NAME;
-                    xProcedureParameterOutput[j].type = rParamater[j].XTYPE;
-                        
-                };
-               xProcedure.procedure.output=xProcedureParameterOutput);      
-               xProcedure.procedure.fb.body=rProcedures[i].CONTENIDO;
-               xProcedure.procedure.pg.body=rProcedures[i].CONTENIDO;
-            }
-            //fs.writeFileSync(yaml.safeDump(xProcedure),'./pepe.yaml');
-           // xxx=xProcedure
-
-           console.log(yaml.safeDump(xProcedure, {indent:4,skipInvalid: false,flowLevel: -1,sortKeys:false,lineWidth:80,noRefs: false,noCompatMode: false,condenseFlow: false}));
+                
+                xProcedure = GlobalTypes.emptyProcedureYamlType;
+                xProcedureParameterInput= [];
+                xProcedureParameterOutput= [];
+            }                       
             
-
-            //console.log(xx.toString);
-           /* rProcedures.forEach( function(row){
-                console.log( ab2str(row.NAME), ab2str(row.INPUTS));
-            });*/      
-            await fb.commit();
+           await fb.commit();
         }
         finally {
             await fb.disconnect();
         }
-
     }
     catch (err) {
         console.log('Error: ', err.message);
