@@ -27,7 +27,7 @@ let dbHost:string       = 'srv-01.sig2k.com';
 let dbPort:number       = 3050;
 let dbUser:string       = 'SYSDBA';
 let dbPass:string       = 'masterkey';
-let objectType:string   = 'procedures';
+let objectType:string   = 'tables';
 //let objectName:string   = 'AFIP_CABECERA_AAAAMM';
 let objectName:string   = '';
 
@@ -165,16 +165,17 @@ console.log('objectName: %j', objectName);*/
     let fbm: fbMetadata.fbExtractMetadata;  
 
     if (dbDriver === 'fb') {
-        fbm = new fbMetadata.fbExtractMetadata;
-        
-        fbm.filesPath = './procedures/';
+        fbm = new fbMetadata.fbExtractMetadata;        
+    
+        fbm.filesPath = './';
 
         if (actionYalm === 'write') {
-            fbm.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
+            await fbm.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
         }
         else if (actionYalm === 'read') {
-            fbm.readYalm();    
-        }
+            await fbm.readYalm();    
+        }      
+        
     }    
 
 })();  

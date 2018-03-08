@@ -61,7 +61,7 @@ const queryProcedureParameters:string =
      ORDER BY PPA.RDB$PROCEDURE_NAME, PPA.RDB$PARAMETER_TYPE, PPA.RDB$PARAMETER_NUMBER`;
 
 const queryTablesView:string = 
-     `SELECT  REL.RDB$RELATION_NAME AS NAME, REL.RDB$VIEW_SOURCE AS SOURCE, REL.RDB$DESCRIPTION AS DESCRIPTION
+     `SELECT  REL.RDB$RELATION_NAME AS NAME, REL.RDB$VIEW_SOURCE AS SOURCE, REL.RDB$DESCRIPTION AS DESCRIPTION, REL.RDB$RELATION_TYPE AS RELTYPE
      FROM RDB$RELATIONS REL
      WHERE REL.RDB$SYSTEM_FLAG=0 AND (REL.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31)))
      ORDER BY REL.RDB$RELATION_NAME`;
@@ -71,9 +71,9 @@ const queryTablesFieldsView:string =
      RFR.RDB$RELATION_NAME AS TABLENAME, RFR.RDB$FIELD_NAME AS FIELDNAME, FLD.RDB$FIELD_TYPE AS FTYPE, 
      FLD.RDB$FIELD_SUB_TYPE AS SUBTYPE, FLD.RDB$CHARACTER_LENGTH AS FLENGTH,
      FLD.RDB$FIELD_PRECISION AS FPRECISION, FLD.RDB$FIELD_SCALE AS SCALE, CHR.RDB$CHARACTER_SET_NAME AS CHARACTERSET,
-     COL.RDB$COLLATION_NAME FCOLLATION, 
-     RFR.RDB$DEFAULT_SOURCE AS DSOURCE, RFR.RDB$NULL_FLAG AS FLAG, FLD.RDB$VALIDATION_SOURCE AS VSOURCE, 
-     FLD.RDB$COMPUTED_SOURCE AS CSOURCE, FLD.RDB$DESCRIPTION AS DESCRIPTION
+     COL.RDB$COLLATION_NAME AS FCOLLATION, 
+     RFR.RDB$DEFAULT_SOURCE AS DEFSOURCE, RFR.RDB$NULL_FLAG AS FLAG, FLD.RDB$VALIDATION_SOURCE AS VALSOURCE, 
+     FLD.RDB$COMPUTED_SOURCE AS COMSOURCE, FLD.RDB$DESCRIPTION AS DESCRIPTION
     FROM RDB$RELATIONS REL
     LEFT OUTER JOIN RDB$RELATION_FIELDS RFR ON RFR.RDB$RELATION_NAME=REL.RDB$RELATION_NAME
     LEFT OUTER JOIN RDB$FIELDS FLD ON FLD.RDB$FIELD_NAME = RFR.RDB$FIELD_SOURCE
@@ -83,17 +83,19 @@ const queryTablesFieldsView:string =
     ORDER BY RFR.RDB$RELATION_NAME, RFR.RDB$FIELD_POSITION, RFR.RDB$FIELD_NAME`
 
 interface iFieldType {
-    AName?:      string  | any;
-    AType?:      number  | any,
-    ASubType?:   number  | any, 
-    ALength?:    number  | any, 
-    APrecision?: number  | any, 
-    AScale?:     number  | any, 
-    ACharSet?:   string  | any, 
-    ACollate?:   string  | any, 
-    ADefault?:   string  | any, 
-    ANotNull?:   boolean | any, 
-    AComputed?:  string  | any
+    AName?:         string  | any;
+    AType?:         number  | any,
+    ASubType?:      number  | any, 
+    ALength?:       number  | any, 
+    APrecision?:    number  | any, 
+    AScale?:        number  | any, 
+    ACharSet?:      string  | any, 
+    ACollate?:      string  | any, 
+    ADefault?:      string  | any, 
+    ANotNull?:      boolean | any, 
+    AComputed?:     string  | any,
+    ADescription?:  string  | any,
+    AValidation?:   string  | any
 };
 
 
@@ -156,25 +158,25 @@ export class fbExtractMetadata {
                 ft = 'UNKNOWN';
         }
       
-        if ( ['',null,'NONE'].indexOf(aParam.ACharSet) == -1)
+        if ( ['',null,'NONE', undefined].indexOf(aParam.ACharSet) == -1)
             ft = ft + ' CHARACTER SET '+aParam.ACharSet;
       
-        if (aParam.ADefault !== '' && aParam.ADefault !== null)
+        if (aParam.ADefault !== '' && aParam.ADefault !== null && aParam.ADefault !== undefined)
             ft = ft + ' ' + aParam.ADefault;
       
-        if (aParam.AComputed !== '' && aParam.AComputed !== null)
+        if (aParam.AComputed !== '' && aParam.AComputed !== null && aParam.AComputed !== undefined)
             ft = ft + ' COMPUTED BY '+aParam.AComputed;
       
         if (aParam.ANotNull) 
             ft = ft + ' NOT NULL';
       
-        if (aParam.ACollate !== '' && aParam.ACollate !== null)
+        if (aParam.ACollate !== '' && aParam.ACollate !== null && aParam.ACollate !== undefined)
             ft = ft + ' COLLATE '+aParam.ACollate;
         
         return ft;      
     }  
 
-    private extractProcedureVariables = function(aBody:string){
+    private extractProcedureVariables(aBody:string){
         let variableName:string = '';
         let variableType:string = '';
         let ret: GlobalTypes.iProcedureParameter[] = [];
@@ -201,7 +203,7 @@ export class fbExtractMetadata {
         return ret;
     }
 
-    private excludeProcedureVariables = function(aBody:string){
+    private excludeProcedureVariables (aBody:string){
         let variableName:string = '';
         let variableType:string = '';
         let ret:string = '';
@@ -283,9 +285,9 @@ export class fbExtractMetadata {
                 if (outProcedureParameterVariable.length > 0) 
                     outProcedure.procedure.variables=outProcedureParameterVariable;
 
-                fs.writeFileSync(this.filesPath+outProcedure.procedure.name+'.yaml',yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                fs.writeFileSync(this.filesPath+'procedures/'+outProcedure.procedure.name+'.yaml',yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                 
-                console.log(('generado '+outProcedure.procedure.name+'.yaml').padEnd(50,'.')+'OK');
+                console.log(('generado procedimiento '+outProcedure.procedure.name+'.yaml').padEnd(50,'.')+'OK');
                 outProcedure = GlobalTypes.emptyProcedureYamlType;
                 outProcedureParameterInput= [];
                 outProcedureParameterOutput= [];
@@ -299,15 +301,16 @@ export class fbExtractMetadata {
     }
 
     private async extractTables(objectName:string) {
-        let rTables: Array<any>;
-        let rFields: Array<any>;
-        let outTables: GlobalTypes.iTablesYamlType = GlobalTypes.emptyTablesYamlType; 
-
-        let outFields: GlobalTypes.iTablesFieldYamlType[] = [];
-        let outFK: GlobalTypes.iTablesFKYamlType[] = [];
-        let outCheck: GlobalTypes.iTablesCheckType[] = [];
-        let outIndexes: GlobalTypes.iTablesIndexesType[] = [];
+        let rTables     : Array<any>;
+        let rFields     : Array<any>;        
+        let outTables   : GlobalTypes.iTablesYamlType = GlobalTypes.emptyTablesYamlType; 
+        let outFields   : GlobalTypes.iTablesFieldYamlType[] = [];
+        let outFK       : GlobalTypes.iTablesFKYamlType[] = [];
+        let outCheck    : GlobalTypes.iTablesCheckType[] = [];
+        let outIndexes  : GlobalTypes.iTablesIndexesType[] = [];
     
+        let j:number = 0;
+
         let ft: iFieldType = {}; // {AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
        
         try {
@@ -317,8 +320,61 @@ export class fbExtractMetadata {
             rFields  = await this.fb.query(queryTablesFieldsView,[objectName,objectName]);
                         
             for (var i=0; i < rTables.length; i++){
-                outTables.table.name= rTables[i].name;
-            
+                if (rTables[i].SOURCE == null) {
+                    /*FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
+                    FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION*/
+                    outTables.table.name= rTables[i].NAME.trim();
+
+                    if (rTables[i].RELTYPE === 5) 
+                        outTables.table.temporaryType= 'DELETE ROWS';
+                    else if (rTables[i].RELTYPE === 4) 
+                        outTables.table.temporaryType= 'PRESERVE ROWS';      
+
+                    while ((j< rFields.length) && (rFields[j].TABLENAME.trim() == rTables[i].NAME.trim())) {
+                        
+                        outFields.push({name: '', nullable: true, primaryKey: false, type: ''});
+
+                        outFields[outFields.length-1].name      = rFields[j].FIELDNAME.trim();
+                        
+                        if (rFields[j].CHARACTERSET !== null && rFields[j].CHARACTERSET.trim() !== 'NONE')
+                            outFields[outFields.length-1].charset   = rFields[j].CHARACTERSET.trim();
+                        
+                        if (rFields[j].FLAG === 1) 
+                            outFields[outFields.length-1].nullable  = true;
+                        else     
+                            outFields[outFields.length-1].nullable  = false;
+
+                        ft.AType        = rFields[j].FTYPE;
+                        ft.ASubType     = rFields[j].SUBTYPE;
+                        ft.ALength      = rFields[j].FLENGTH;
+                        ft.APrecision   = rFields[j].FPRECISION;
+                        ft.AScale       = rFields[j].SCALE;
+                        
+                        outFields[outFields.length-1].type=  this.FieldType(ft); 
+
+                        if (rFields[j].FCOLLATION !== null && rFields[j].FCOLLATION.trim() !== 'NONE')
+                            outFields[outFields.length-1].collate     = rFields[j].FCOLLATION.trim();
+                    
+                        if (rFields[j].DESCRIPTION !== null)
+                            outFields[outFields.length-1].description = rFields[j].DESCRIPTION;                    
+
+                        if (rFields[j].DEFSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
+                            outFields[outFields.length-1].default     = await this.fb.getBlobAsString(rFields[j].DEFSOURCE);
+
+                        if (rFields[j].COMSOURCE !== null)
+                            outFields[outFields.length-1].computed    = await this.fb.getBlobAsString(rFields[j].COMSOURCE);
+                                        
+                        j++;
+                    }
+
+                    outTables.table.fields= outFields; 
+
+                    fs.writeFileSync(this.filesPath+'tables/'+outTables.table.name+'.yaml',yaml.safeDump(outTables, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                    
+                    console.log(('generado tabla '+outTables.table.name+'.yaml').padEnd(50,'.')+'OK');
+                    outTables = GlobalTypes.emptyTablesYamlType
+                    outFields= [];
+                }                                   
             }
             await this.fb.commit();
         } catch(err) {
@@ -356,9 +412,15 @@ export class fbExtractMetadata {
             try {
                 
                 if (objectType === 'procedures' || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+'procedures/')) {
+                        fs.mkdirSync(this.filesPath+'procedures')        
+                    }    
                     await this.extractProcedures(objectName);
                 }
                 if (objectType === 'tables' || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+'tables/')) {
+                        fs.mkdirSync(this.filesPath+'tables')        
+                    } 
                     await this.extractTables(objectName);
                 }
                 if (objectType === 'triggers' || objectType === '') {

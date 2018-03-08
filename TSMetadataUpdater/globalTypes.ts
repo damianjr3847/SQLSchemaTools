@@ -111,31 +111,33 @@ export interface iTablesIndexesType {
 	expresion?: string,
 	fields?: Array<string>,		  
 	name?: string,
-	unique?: boolean
+	unique?: boolean,
+	primaryKey?: boolean;	
 }
 
 export interface iTablesYamlType {
 	table: {
 		name?: string,
-		type?: string,
+		temporaryType?: string,
 		fields: Array<iTablesFieldYamlType>,	
-		constraint: { 
-			foreignkey: Array<iTablesFKYamlType>,
-			check: Array<iTablesCheckType>
+		constraint?: { 
+			foreignkey?: Array<iTablesFKYamlType>,
+			check?: Array<iTablesCheckType>
 		},
-		indexes: Array<iTablesIndexesType>
+		indexes?: Array<iTablesIndexesType>
 	}
 }
 
 export const emptyTablesYamlType = {
 	table: {
 		name: '',
-		type: '',
-		fields: [],		
-		constraint: { 
-			foreignkey: [],
-			check: []
-		},
-		indexes: []
+		fields: []		
 	}	
+};
+
+export const emptyTablesFieldYamlType = {	
+	name: '',
+	nullable: true,
+	primaryKey: false,
+	type: ''	
 };
