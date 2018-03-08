@@ -3,6 +3,8 @@ export const ArrayDbDriver:string[] = ['ps','fb'];
 
 export const ArrayobjectType:string[] = ['procedures','triggers','tables','generators'];
 
+export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
+
 export const yamlExportOptions = {
 	indent: 4,
 	skipInvalid: false,
@@ -20,6 +22,10 @@ export const yamlFileSaveOptions = {
 	flag: "w"*/
 };
 
+/**************************************************************************************** */
+/**********             P R O C E D U R E     I N T E R F A C E                           */
+/***************************************************************************************** */
+
 export interface iProcedureParameter{
     name?:string,
     type?:string
@@ -28,14 +34,15 @@ export interface iProcedureParameter{
 export interface iProcedureYamlType {
     procedure: {
         name?:string,
-        input: iProcedureParameter[],    
-		output: iProcedureParameter[],
+        input: Array<iProcedureParameter>,    
+		output: Array<iProcedureParameter>,
+		variables: Array<iProcedureParameter>,
 		pg: { 
         	language?: string,
         	resultType?: string,
         	options: {
           		optimization:{
-            		type?: string;
+            		type?: string,
 					returnNullonNullInput?: boolean
 				  }	
 			},	
@@ -50,8 +57,9 @@ export interface iProcedureYamlType {
 export const emptyProcedureYamlType = {
 	procedure:{
 		name:"",
-		input:[],
-		output:[],
+		input: [],
+		output: [],
+		variables: [],
 		pg: {
 			language:"plpgsql",
 			resultType:"TABLE",
@@ -69,4 +77,66 @@ export const emptyProcedureYamlType = {
 			body:""
 		}
 	}
+};
+
+/**************************************************************************************** */
+/**********             T A B L E      I N T E R F A C E                                  */
+/***************************************************************************************** */
+export interface iTablesFieldYamlType {
+	charset: string,
+	collate: string,
+	computed: string,
+	description: string,
+	name?: string,
+	nullable?: boolean,
+	primaryKey?: boolean,
+	type?: string,
+};
+
+export interface iTablesFKYamlType {
+	name?: string,
+	onField?: string,
+	toTable?: string,
+	toTield?: string,
+	updateRole?: string,
+	deleteRole?: string
+};
+
+export interface iTablesCheckType {
+	name?:string,
+	expresion?: string
+}
+
+export interface iTablesIndexesType {
+	active?: boolean,
+	expresion?: string,
+	fields?: Array<string>,		  
+	name?: string,
+	unique?: boolean
+}
+
+export interface iTablesYamlType {
+	table: {
+		name?: string,
+		type?: string,
+		fields: Array<iTablesFieldYamlType>,	
+		constraint: { 
+			foreignkey: Array<iTablesFKYamlType>,
+			check: Array<iTablesCheckType>
+		},
+		indexes: Array<iTablesIndexesType>
+	}
+}
+
+export const emptyTablesYamlType = {
+	table: {
+		name: '',
+		type: '',
+		fields: [],		
+		constraint: { 
+			foreignkey: [],
+			check: []
+		},
+		indexes: []
+	}	
 };

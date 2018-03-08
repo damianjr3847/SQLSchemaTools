@@ -19,16 +19,17 @@ import * as params from 'commander';
 import * as fbMetadata from './fbMetadata';
 import * as GlobalTypes from './globalTypes';
 
-let actionYalm:string = 'write';
-let pathYalm:string = '';
-let dbDriver:string = 'fb';
-let dbPath:string = '/pool/testing/demo.gdb';
-let dbHost:string = 'srv-01.sig2k.com';
-let dbPort:number = 3050;
-let dbUser:string = 'SYSDBA';
-let dbPass:string = 'masterkey';
-let objectType:string = '';
-let objectName:string = '';
+let actionYalm:string   = 'write';
+let pathYalm:string     = '';
+let dbDriver:string     = 'fb';
+let dbPath:string       = '/pool/testing/demo.gdb';
+let dbHost:string       = 'srv-01.sig2k.com';
+let dbPort:number       = 3050;
+let dbUser:string       = 'SYSDBA';
+let dbPass:string       = 'masterkey';
+let objectType:string   = 'procedures';
+//let objectName:string   = 'AFIP_CABECERA_AAAAMM';
+let objectName:string   = '';
 
 /*params.version('1.0.0');
 
@@ -161,9 +162,20 @@ console.log('objectType: %j', objectType);
 console.log('objectName: %j', objectName);*/
 
 (async () => {
-  if (actionYalm === 'write') {
-    fbMetadata.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass);    
-  }
+    let fbm: fbMetadata.fbExtractMetadata;  
+
+    if (dbDriver === 'fb') {
+        fbm = new fbMetadata.fbExtractMetadata;
+        
+        fbm.filesPath = './procedures/';
+
+        if (actionYalm === 'write') {
+            fbm.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
+        }
+        else if (actionYalm === 'read') {
+            fbm.readYalm();    
+        }
+    }    
 
 })();  
 
