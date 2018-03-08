@@ -40,8 +40,6 @@ const queryProcedure:string =
      WHERE RDB$SYSTEM_FLAG=0 AND (RDB$PROCEDURE_NAME=? OR ?=CAST('' AS CHAR(31)))
      ORDER BY RDB$PROCEDURE_NAME`;
 
-const queryTables:string = '';
-
 const queryProcedureParameters:string = 
     `SELECT 
      TRIM(PPA.RDB$PROCEDURE_NAME) AS PROCEDURE_NAME, 
@@ -62,18 +60,40 @@ const queryProcedureParameters:string =
      WHERE PPA.RDB$PROCEDURE_NAME=? OR ?=CAST('' AS CHAR(31))
      ORDER BY PPA.RDB$PROCEDURE_NAME, PPA.RDB$PARAMETER_TYPE, PPA.RDB$PARAMETER_NUMBER`;
 
+const queryTablesView:string = 
+     `SELECT  REL.RDB$RELATION_NAME AS NAME, REL.RDB$VIEW_SOURCE AS SOURCE, REL.RDB$DESCRIPTION AS DESCRIPTION
+     FROM RDB$RELATIONS REL
+     WHERE REL.RDB$SYSTEM_FLAG=0 AND (REL.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31)))
+     ORDER BY REL.RDB$RELATION_NAME`;
+
+const queryTablesFieldsView:string =
+    `SELECT  
+     RFR.RDB$RELATION_NAME AS TABLENAME, RFR.RDB$FIELD_NAME AS FIELDNAME, FLD.RDB$FIELD_TYPE AS FTYPE, 
+     FLD.RDB$FIELD_SUB_TYPE AS SUBTYPE, FLD.RDB$CHARACTER_LENGTH AS FLENGTH,
+     FLD.RDB$FIELD_PRECISION AS FPRECISION, FLD.RDB$FIELD_SCALE AS SCALE, CHR.RDB$CHARACTER_SET_NAME AS CHARACTERSET,
+     COL.RDB$COLLATION_NAME FCOLLATION, 
+     RFR.RDB$DEFAULT_SOURCE AS DSOURCE, RFR.RDB$NULL_FLAG AS FLAG, FLD.RDB$VALIDATION_SOURCE AS VSOURCE, 
+     FLD.RDB$COMPUTED_SOURCE AS CSOURCE, FLD.RDB$DESCRIPTION AS DESCRIPTION
+    FROM RDB$RELATIONS REL
+    LEFT OUTER JOIN RDB$RELATION_FIELDS RFR ON RFR.RDB$RELATION_NAME=REL.RDB$RELATION_NAME
+    LEFT OUTER JOIN RDB$FIELDS FLD ON FLD.RDB$FIELD_NAME = RFR.RDB$FIELD_SOURCE
+    LEFT OUTER JOIN RDB$CHARACTER_SETS CHR ON CHR.RDB$CHARACTER_SET_ID = FLD.RDB$CHARACTER_SET_ID  
+    LEFT OUTER JOIN RDB$COLLATIONS COL ON COL.RDB$COLLATION_ID = COALESCE(RFR.RDB$COLLATION_ID, FLD.RDB$COLLATION_ID) AND COL.RDB$CHARACTER_SET_ID = FLD.RDB$CHARACTER_SET_ID
+    WHERE REL.RDB$SYSTEM_FLAG=0 AND (REL.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31)))
+    ORDER BY RFR.RDB$RELATION_NAME, RFR.RDB$FIELD_POSITION, RFR.RDB$FIELD_NAME`
+
 interface iFieldType {
-    AName:      string  | any;
-    AType:      number  | any,
-    ASubType:   number  | any, 
-    ALength:    number  | any, 
-    APrecision: number  | any, 
-    AScale:     number  | any, 
-    ACharSet:   string  | any, 
-    ACollate:   string  | any, 
-    ADefault:   string  | any, 
-    ANotNull:   boolean | any, 
-    AComputed:  string  | any
+    AName?:      string  | any;
+    AType?:      number  | any,
+    ASubType?:   number  | any, 
+    ALength?:    number  | any, 
+    APrecision?: number  | any, 
+    AScale?:     number  | any, 
+    ACharSet?:   string  | any, 
+    ACollate?:   string  | any, 
+    ADefault?:   string  | any, 
+    ANotNull?:   boolean | any, 
+    AComputed?:  string  | any
 };
 
 
@@ -165,6 +185,7 @@ export class fbExtractMetadata {
             if (line.toUpperCase().trim().startsWith('DECLARE VARIABLE')) {
                 variableName = '';
                 variableType = '';
+                //reveer esto por tema de cursores
                 line.toUpperCase().trim().split(' ').forEach(function(word) {
                     if (['DECLARE','VARIABLE'].indexOf(word) === -1) { //si no es
                         if (variableName === '') 
@@ -185,7 +206,6 @@ export class fbExtractMetadata {
         let variableType:string = '';
         let ret:string = '';
         let j: number = 0;        
-//   /\r?*\n/
         aBody.split(/\r?\n/).forEach(function(line) {
             j++;
             if  (! line.toUpperCase().trim().startsWith('DECLARE VARIABLE')) {
@@ -198,13 +218,13 @@ export class fbExtractMetadata {
     private async extractProcedures(objectName:string) {
         let rProcedures: Array<any>;
         let rParamater: Array<any>;
-        let xProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType;
-        let xProcedureParameterInput: GlobalTypes.iProcedureParameter[] = [];
-        let xProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];
-        let xProcedureParameterVariable: GlobalTypes.iProcedureParameter[] = [];
+        let outProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType; 
+        let outProcedureParameterInput: GlobalTypes.iProcedureParameter[] = [];
+        let outProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];
+        let outProcedureParameterVariable: GlobalTypes.iProcedureParameter[] = [];
         let j: number = 0; 
         let body: string = '';
-        let ft: iFieldType = {AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
+        let ft: iFieldType = {}; //AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
        
         try {
             await this.fb.startTransaction(true);
@@ -214,7 +234,7 @@ export class fbExtractMetadata {
                         
             for (var i=0; i < rProcedures.length; i++){
                 
-                xProcedure.procedure.name  = rProcedures[i].NAME;              
+                outProcedure.procedure.name  = rProcedures[i].NAME;              
 
                 while ((j< rParamater.length) && (rParamater[j].PROCEDURE_NAME == rProcedures[i].NAME)) {
                     ft.AName        = rParamater[j].PARAMATER_NAME;
@@ -233,38 +253,43 @@ export class fbExtractMetadata {
                     ft.AComputed    = null;
 
                     if (rParamater[j].PARAMATER_TYPE == 0) {
-                        xProcedureParameterInput.push({name:"",type:""});
-                        xProcedureParameterInput[xProcedureParameterInput.length-1].name = rParamater[j].PARAMATER_NAME;                        
-                        xProcedureParameterInput[xProcedureParameterInput.length-1].type = this.FieldType(ft);  
+                        outProcedureParameterInput.push({name:"",type:""});
+                        outProcedureParameterInput[outProcedureParameterInput.length-1].name = rParamater[j].PARAMATER_NAME;                        
+                        outProcedureParameterInput[outProcedureParameterInput.length-1].type = this.FieldType(ft);  
                     }
                     else if (rParamater[j].PARAMATER_TYPE == 1) {
-                        xProcedureParameterOutput.push({name:"",type:""});
-                        xProcedureParameterOutput[xProcedureParameterOutput.length-1].name = rParamater[j].PARAMATER_NAME;
-                        xProcedureParameterOutput[xProcedureParameterOutput.length-1].type = this.FieldType(ft);
+                        outProcedureParameterOutput.push({name:"",type:""});
+                        outProcedureParameterOutput[outProcedureParameterOutput.length-1].name = rParamater[j].PARAMATER_NAME;
+                        outProcedureParameterOutput[outProcedureParameterOutput.length-1].type = this.FieldType(ft);
                     }           
                     j++;
                 }                     
                             
                 body = await this.fb.getBlobAsString(rProcedures[i].SOURCE);
 
-                xProcedureParameterVariable= this.extractProcedureVariables(body);
+                outProcedureParameterVariable= this.extractProcedureVariables(body);
                 
                 body= this.excludeProcedureVariables(body); 
 
-                xProcedure.procedure.fb.body= body;
-                xProcedure.procedure.pg.body= body;
+                outProcedure.procedure.fb.body= body;
+                outProcedure.procedure.pg.body= body;
 
-                xProcedure.procedure.input=xProcedureParameterInput;
-                xProcedure.procedure.output=xProcedureParameterOutput; 
-                xProcedure.procedure.variables=xProcedureParameterVariable; 
+                if (outProcedureParameterInput.length > 0) 
+                    outProcedure.procedure.input=outProcedureParameterInput;
 
-                fs.writeFileSync(this.filesPath+xProcedure.procedure.name+'.yaml',yaml.safeDump(xProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                if (outProcedureParameterOutput.length > 0)     
+                    outProcedure.procedure.output=outProcedureParameterOutput; 
+
+                if (outProcedureParameterVariable.length > 0) 
+                    outProcedure.procedure.variables=outProcedureParameterVariable;
+
+                fs.writeFileSync(this.filesPath+outProcedure.procedure.name+'.yaml',yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                 
-                console.log(('generado '+xProcedure.procedure.name+'.yaml').padEnd(50,'.')+'OK');
-                xProcedure = GlobalTypes.emptyProcedureYamlType;
-                xProcedureParameterInput= [];
-                xProcedureParameterOutput= [];
-                xProcedureParameterVariable= [];               
+                console.log(('generado '+outProcedure.procedure.name+'.yaml').padEnd(50,'.')+'OK');
+                outProcedure = GlobalTypes.emptyProcedureYamlType;
+                outProcedureParameterInput= [];
+                outProcedureParameterOutput= [];
+                outProcedureParameterVariable= [];               
             }
             await this.fb.commit();
         }
@@ -274,6 +299,32 @@ export class fbExtractMetadata {
     }
 
     private async extractTables(objectName:string) {
+        let rTables: Array<any>;
+        let rFields: Array<any>;
+        let outTables: GlobalTypes.iTablesYamlType = GlobalTypes.emptyTablesYamlType; 
+
+        let outFields: GlobalTypes.iTablesFieldYamlType[] = [];
+        let outFK: GlobalTypes.iTablesFKYamlType[] = [];
+        let outCheck: GlobalTypes.iTablesCheckType[] = [];
+        let outIndexes: GlobalTypes.iTablesIndexesType[] = [];
+    
+        let ft: iFieldType = {}; // {AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
+       
+        try {
+            await this.fb.startTransaction(true);
+
+            rTables = await this.fb.query(queryTablesView,[objectName,objectName]);
+            rFields  = await this.fb.query(queryTablesFieldsView,[objectName,objectName]);
+                        
+            for (var i=0; i < rTables.length; i++){
+                outTables.table.name= rTables[i].name;
+            
+            }
+            await this.fb.commit();
+        } catch(err) {
+            console.log('Error generando tablas: ', err.message);   
+        }        
+        
     }
     
     private async extractTriggers(objectName:string) {

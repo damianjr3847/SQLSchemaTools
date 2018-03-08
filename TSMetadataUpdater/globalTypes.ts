@@ -27,21 +27,21 @@ export const yamlFileSaveOptions = {
 /***************************************************************************************** */
 
 export interface iProcedureParameter{
-    name?:string,
-    type?:string
+    name:string,
+    type:string
 };
 
 export interface iProcedureYamlType {
     procedure: {
-        name?:string,
-        input: Array<iProcedureParameter>,    
-		output: Array<iProcedureParameter>,
-		variables: Array<iProcedureParameter>,
+        name:string,
+        input?: Array<iProcedureParameter>,    
+		output?: Array<iProcedureParameter>,
+		variables?: Array<iProcedureParameter>,
 		pg: { 
         	language?: string,
         	resultType?: string,
         	options: {
-          		optimization:{
+          		optimization?:{
             		type?: string,
 					returnNullonNullInput?: boolean
 				  }	
@@ -57,16 +57,13 @@ export interface iProcedureYamlType {
 export const emptyProcedureYamlType = {
 	procedure:{
 		name:"",
-		input: [],
-		output: [],
-		variables: [],
 		pg: {
 			language:"plpgsql",
 			resultType:"TABLE",
 			options: {
 				optimization:{
-				type:"STABLE",
-				returnNullonNullInput:false
+					type:"STABLE",
+					returnNullonNullInput:false
 				}	
 			},	
 			executionCost:100,
@@ -83,14 +80,16 @@ export const emptyProcedureYamlType = {
 /**********             T A B L E      I N T E R F A C E                                  */
 /***************************************************************************************** */
 export interface iTablesFieldYamlType {
-	charset: string,
-	collate: string,
-	computed: string,
-	description: string,
-	name?: string,
-	nullable?: boolean,
-	primaryKey?: boolean,
-	type?: string,
+	charset?: string,
+	collate?: string,
+	computed?: string,
+	description?: string,
+	default?:string,
+	name: string,
+	nullable: boolean,
+	primaryKey: boolean,
+	type: string,
+	present?: boolean
 };
 
 export interface iTablesFKYamlType {
