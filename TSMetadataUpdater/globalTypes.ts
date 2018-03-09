@@ -54,7 +54,8 @@ export interface iProcedureYamlType {
     }
 };
  
-export const emptyProcedureYamlType = {
+export function emptyProcedureYamlType () {
+	return { 
 	procedure:{
 		name:"",
 		pg: {
@@ -74,6 +75,7 @@ export const emptyProcedureYamlType = {
 			body:""
 		}
 	}
+	}
 };
 
 /**************************************************************************************** */
@@ -86,8 +88,7 @@ export interface iTablesFieldYamlType {
 	description?: string,
 	default?:string,
 	name: string,
-	nullable: boolean,
-	primaryKey: boolean,
+	nullable: boolean,	
 	type: string,
 	present?: boolean
 };
@@ -107,37 +108,49 @@ export interface iTablesCheckType {
 }
 
 export interface iTablesIndexesType {
-	active?: boolean,
-	expresion?: string,
-	fields?: Array<string>,		  
-	name?: string,
-	unique?: boolean,
+	active: boolean,
+	computedBy?: string,
+	fields: Array<string>,		  
+	name: string,
+	unique: boolean,
 	primaryKey?: boolean;	
-}
+};
 
 export interface iTablesYamlType {
 	table: {
-		name?: string,
+		name: string,
 		temporaryType?: string,
-		fields: Array<iTablesFieldYamlType>,	
+		fields: Array<iTablesFieldYamlType>,
+		description?: string,	
 		constraint?: { 
 			foreignkey?: Array<iTablesFKYamlType>,
 			check?: Array<iTablesCheckType>
 		},
 		indexes?: Array<iTablesIndexesType>
 	}
-}
-
-export const emptyTablesYamlType = {
-	table: {
-		name: '',
-		fields: []		
-	}	
 };
 
-export const emptyTablesFieldYamlType = {	
-	name: '',
-	nullable: true,
-	primaryKey: false,
-	type: ''	
+export function emptyTablesYamlType() {
+	return {table: {
+					name: '',
+					fields: []		
+					}
+			}
+};
+
+export function emptyTablesFieldYamlType() {	
+	return {name: '',
+			nullable: true,
+			primaryKey: false	
+			}
+};
+
+export function emptyTablesIndexesType() {
+	return {
+		active: true,
+		fields: [],		  
+		name: '',
+		unique: false,
+		primaryKey: false	
+	};
 };

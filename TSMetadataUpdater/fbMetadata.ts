@@ -63,10 +63,10 @@ const queryProcedureParameters:string =
 const queryTablesView:string = 
      `SELECT  REL.RDB$RELATION_NAME AS NAME, REL.RDB$VIEW_SOURCE AS SOURCE, REL.RDB$DESCRIPTION AS DESCRIPTION, REL.RDB$RELATION_TYPE AS RELTYPE
      FROM RDB$RELATIONS REL
-     WHERE REL.RDB$SYSTEM_FLAG=0 AND (REL.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31)))
+     WHERE REL.RDB$SYSTEM_FLAG=0 AND (REL.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31))) AND REL.RDB$RELATION_NAME NOT STARTING 'IBE$' AND {$$RELTYPE} 
      ORDER BY REL.RDB$RELATION_NAME`;
 
-const queryTablesFieldsView:string =
+const queryTablesViewFields:string =
     `SELECT  
      RFR.RDB$RELATION_NAME AS TABLENAME, RFR.RDB$FIELD_NAME AS FIELDNAME, FLD.RDB$FIELD_TYPE AS FTYPE, 
      FLD.RDB$FIELD_SUB_TYPE AS SUBTYPE, FLD.RDB$CHARACTER_LENGTH AS FLENGTH,
@@ -79,8 +79,24 @@ const queryTablesFieldsView:string =
     LEFT OUTER JOIN RDB$FIELDS FLD ON FLD.RDB$FIELD_NAME = RFR.RDB$FIELD_SOURCE
     LEFT OUTER JOIN RDB$CHARACTER_SETS CHR ON CHR.RDB$CHARACTER_SET_ID = FLD.RDB$CHARACTER_SET_ID  
     LEFT OUTER JOIN RDB$COLLATIONS COL ON COL.RDB$COLLATION_ID = COALESCE(RFR.RDB$COLLATION_ID, FLD.RDB$COLLATION_ID) AND COL.RDB$CHARACTER_SET_ID = FLD.RDB$CHARACTER_SET_ID
-    WHERE REL.RDB$SYSTEM_FLAG=0 AND (REL.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31)))
-    ORDER BY RFR.RDB$RELATION_NAME, RFR.RDB$FIELD_POSITION, RFR.RDB$FIELD_NAME`
+    WHERE REL.RDB$SYSTEM_FLAG=0 AND (REL.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31))) AND REL.RDB$RELATION_NAME NOT STARTING 'IBE$' AND {$$RELTYPE} 
+    ORDER BY RFR.RDB$RELATION_NAME, RFR.RDB$FIELD_POSITION, RFR.RDB$FIELD_NAME`    
+
+const queryTablesIndexes:string =
+    `SELECT  IDX.RDB$RELATION_NAME AS TABLENAME, IDX.RDB$INDEX_NAME AS INDEXNAME, IDX.RDB$UNIQUE_FLAG AS FUNIQUE, 
+             IDX.RDB$INDEX_INACTIVE AS INACTIVE,
+             IDX.RDB$INDEX_TYPE AS TYPE,IDX.RDB$EXPRESSION_SOURCE AS SOURCE, IDX.RDB$DESCRIPTION AS DESCRIPTION
+    FROM RDB$INDICES IDX
+    LEFT OUTER JOIN RDB$RELATION_CONSTRAINTS CON ON CON.RDB$INDEX_NAME = IDX.RDB$INDEX_NAME
+    WHERE IDX.RDB$SYSTEM_FLAG=0 AND CON.RDB$INDEX_NAME IS NULL AND (IDX.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31))) AND IDX.RDB$RELATION_NAME NOT STARTING 'IBE$' 
+    ORDER BY IDX.RDB$RELATION_NAME, IDX.RDB$INDEX_NAME`;
+
+const queryTableIndexesField:string =
+    `SELECT IDX.RDB$RELATION_NAME AS TABLENAME, IDX.RDB$INDEX_NAME AS INDEXNAME, SEG.RDB$FIELD_POSITION AS FPOSITION, SEG.RDB$FIELD_NAME FLDNAME
+     FROM RDB$INDICES IDX
+     INNER JOIN RDB$INDEX_SEGMENTS SEG ON SEG.RDB$INDEX_NAME=IDX.RDB$INDEX_NAME
+     WHERE IDX.RDB$SYSTEM_FLAG=0 AND (IDX.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31))) AND IDX.RDB$RELATION_NAME NOT STARTING 'IBE$'
+     ORDER BY SEG.RDB$INDEX_NAME, SEG.RDB$FIELD_POSITION`;
 
 interface iFieldType {
     AName?:         string  | any;
@@ -220,14 +236,14 @@ export class fbExtractMetadata {
     private async extractProcedures(objectName:string) {
         let rProcedures: Array<any>;
         let rParamater: Array<any>;
-        let outProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType; 
+        let outProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType(); 
         let outProcedureParameterInput: GlobalTypes.iProcedureParameter[] = [];
         let outProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];
         let outProcedureParameterVariable: GlobalTypes.iProcedureParameter[] = [];
         let j: number = 0; 
         let body: string = '';
         let ft: iFieldType = {}; //AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
-       
+    
         try {
             await this.fb.startTransaction(true);
 
@@ -288,10 +304,10 @@ export class fbExtractMetadata {
                 fs.writeFileSync(this.filesPath+'procedures/'+outProcedure.procedure.name+'.yaml',yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                 
                 console.log(('generado procedimiento '+outProcedure.procedure.name+'.yaml').padEnd(50,'.')+'OK');
-                outProcedure = GlobalTypes.emptyProcedureYamlType;
-                outProcedureParameterInput= [];
-                outProcedureParameterOutput= [];
-                outProcedureParameterVariable= [];               
+                outProcedure = GlobalTypes.emptyProcedureYamlType();
+                outProcedureParameterInput    = [];
+                outProcedureParameterOutput   = [];
+                outProcedureParameterVariable = [];               
             }
             await this.fb.commit();
         }
@@ -302,79 +318,121 @@ export class fbExtractMetadata {
 
     private async extractTables(objectName:string) {
         let rTables     : Array<any>;
-        let rFields     : Array<any>;        
-        let outTables   : GlobalTypes.iTablesYamlType = GlobalTypes.emptyTablesYamlType; 
+        let rFields     : Array<any>;
+        let rIndexes    : Array<any>;
+        let rIndexesFld : Array<any>;
+
+        let outTables   : GlobalTypes.iTablesYamlType = GlobalTypes.emptyTablesYamlType(); 
         let outFields   : GlobalTypes.iTablesFieldYamlType[] = [];
         let outFK       : GlobalTypes.iTablesFKYamlType[] = [];
         let outCheck    : GlobalTypes.iTablesCheckType[] = [];
         let outIndexes  : GlobalTypes.iTablesIndexesType[] = [];
     
-        let j:number = 0;
+        let j_fld:number = 0;
+        let j_idx:number = 0;
+        let j_idx_fld:number = 0;
 
         let ft: iFieldType = {}; // {AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
        
         try {
             await this.fb.startTransaction(true);
 
-            rTables = await this.fb.query(queryTablesView,[objectName,objectName]);
-            rFields  = await this.fb.query(queryTablesFieldsView,[objectName,objectName]);
-                        
+            rTables  = await this.fb.query(queryTablesView.replace('{$$RELTYPE}','(REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL)') ,[objectName,objectName]);
+            rFields  = await this.fb.query(queryTablesViewFields.replace('{$$RELTYPE}','(REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL)'),[objectName,objectName]);
+            rIndexes = await this.fb.query(queryTablesIndexes,[objectName,objectName]);
+            rIndexesFld = await this.fb.query(queryTableIndexesField,[objectName,objectName]);
+
+            queryTableIndexesField
             for (var i=0; i < rTables.length; i++){
-                if (rTables[i].SOURCE == null) {
                     /*FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
                     FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION*/
                     outTables.table.name= rTables[i].NAME.trim();
-
+                                        
                     if (rTables[i].RELTYPE === 5) 
                         outTables.table.temporaryType= 'DELETE ROWS';
                     else if (rTables[i].RELTYPE === 4) 
                         outTables.table.temporaryType= 'PRESERVE ROWS';      
+                    
+                    if (rTables[i].DESCRIPTION !== null)
+                        outTables.table.description = await this.fb.getBlobAsString(rTables[i].DESCRIPTION);                    
 
-                    while ((j< rFields.length) && (rFields[j].TABLENAME.trim() == rTables[i].NAME.trim())) {
+                    //fields
+                    while ((j_fld< rFields.length) && (rFields[j_fld].TABLENAME.trim() == rTables[i].NAME.trim())) {
                         
-                        outFields.push({name: '', nullable: true, primaryKey: false, type: ''});
+                        outFields.push({name: '', nullable: true, type: ''});
 
-                        outFields[outFields.length-1].name      = rFields[j].FIELDNAME.trim();
+                        outFields[outFields.length-1].name      = rFields[j_fld].FIELDNAME.trim();
                         
-                        if (rFields[j].CHARACTERSET !== null && rFields[j].CHARACTERSET.trim() !== 'NONE')
-                            outFields[outFields.length-1].charset   = rFields[j].CHARACTERSET.trim();
+                        if (rFields[j_fld].CHARACTERSET !== null && rFields[j_fld].CHARACTERSET.trim() !== 'NONE')
+                            outFields[outFields.length-1].charset   = rFields[j_fld].CHARACTERSET.trim();
                         
-                        if (rFields[j].FLAG === 1) 
+                        if (rFields[j_fld].FLAG === 1) 
                             outFields[outFields.length-1].nullable  = true;
                         else     
                             outFields[outFields.length-1].nullable  = false;
 
-                        ft.AType        = rFields[j].FTYPE;
-                        ft.ASubType     = rFields[j].SUBTYPE;
-                        ft.ALength      = rFields[j].FLENGTH;
-                        ft.APrecision   = rFields[j].FPRECISION;
-                        ft.AScale       = rFields[j].SCALE;
+                        ft.AType        = rFields[j_fld].FTYPE;
+                        ft.ASubType     = rFields[j_fld].SUBTYPE;
+                        ft.ALength      = rFields[j_fld].FLENGTH;
+                        ft.APrecision   = rFields[j_fld].FPRECISION;
+                        ft.AScale       = rFields[j_fld].SCALE;
                         
                         outFields[outFields.length-1].type=  this.FieldType(ft); 
 
-                        if (rFields[j].FCOLLATION !== null && rFields[j].FCOLLATION.trim() !== 'NONE')
-                            outFields[outFields.length-1].collate     = rFields[j].FCOLLATION.trim();
+                        if (rFields[j_fld].FCOLLATION !== null && rFields[j_fld].FCOLLATION.trim() !== 'NONE')
+                            outFields[outFields.length-1].collate     = rFields[j_fld].FCOLLATION.trim();
                     
-                        if (rFields[j].DESCRIPTION !== null)
-                            outFields[outFields.length-1].description = rFields[j].DESCRIPTION;                    
+                        if (rFields[j_fld].DESCRIPTION !== null)
+                            outFields[outFields.length-1].description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);                    
 
-                        if (rFields[j].DEFSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
-                            outFields[outFields.length-1].default     = await this.fb.getBlobAsString(rFields[j].DEFSOURCE);
+                        if (rFields[j_fld].DEFSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
+                            outFields[outFields.length-1].default     = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
 
-                        if (rFields[j].COMSOURCE !== null)
-                            outFields[outFields.length-1].computed    = await this.fb.getBlobAsString(rFields[j].COMSOURCE);
+                        if (rFields[j_fld].COMSOURCE !== null)
+                            outFields[outFields.length-1].computed    = await this.fb.getBlobAsString(rFields[j_fld].COMSOURCE);
                                         
-                        j++;
+                        j_fld++;
+                    }
+                    //indices
+                    while ((j_idx< rIndexes.length) && (rIndexes[j_idx].TABLENAME.trim() == rTables[i].NAME.trim())) {
+                        /*TABLENAME, INDEXNAME,  FUNIQUE, INACTIVE, TYPE, SOURCE,  DESCRIPTION*/    
+                        outIndexes.push(GlobalTypes.emptyTablesIndexesType());
+                        
+                        outIndexes[outIndexes.length-1].name= rIndexes[j_idx].INDEXNAME.trim();
+
+                        if (rIndexes[j_idx].INACTIVE === 1) 
+                            outIndexes[outIndexes.length-1].active= false;
+                        else     
+                            outIndexes[outIndexes.length-1].active= true;
+                        
+                        if (rIndexes[j_idx].SOURCE !== null) 
+                            outIndexes[outIndexes.length-1].computedBy= await this.fb.getBlobAsString(rIndexes[j_idx].SOURCE);
+                        
+                        if (rIndexes[j_idx].FUNIQUE === 1) 
+                            outIndexes[outIndexes.length-1].unique= true;
+                        else     
+                            outIndexes[outIndexes.length-1].unique= false;
+
+                        while ((j_idx_fld < rIndexesFld.length) && (rIndexesFld[j_idx_fld].TABLENAME.trim() == rIndexes[j_idx].TABLENAME.trim()) && (rIndexesFld[j_idx_fld].INDEXNAME.trim() == rIndexes[j_idx].INDEXNAME.trim())) {    
+                            /*TABLENAME, INDEXNAME, FPOSITION, FLDNAME*/
+                            outIndexes[outIndexes.length-1].fields.push(rIndexesFld[j_idx_fld].FLDNAME.trim());
+                            j_idx_fld++;
+                        }                                
+                        
+                        //outIndexes[outIndexes.length-1].primaryKey
+                        
+                        j_idx++;
                     }
 
                     outTables.table.fields= outFields; 
-
+                    outTables.table.indexes= outIndexes;
+                    
                     fs.writeFileSync(this.filesPath+'tables/'+outTables.table.name+'.yaml',yaml.safeDump(outTables, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                     
                     console.log(('generado tabla '+outTables.table.name+'.yaml').padEnd(50,'.')+'OK');
-                    outTables = GlobalTypes.emptyTablesYamlType
+                    outTables = GlobalTypes.emptyTablesYamlType();
                     outFields= [];
-                }                                   
+                    outIndexes= [];                
             }
             await this.fb.commit();
         } catch(err) {
@@ -392,6 +450,7 @@ export class fbExtractMetadata {
     //****************************************************************** */
     //        D E C L A R A C I O N E S    P U B L I C A S
     //******************************************************************* */
+    
     filesPath:string    = '';
 
     constructor() {
