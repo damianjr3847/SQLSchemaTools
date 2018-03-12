@@ -94,7 +94,7 @@ export interface iTablesFieldYamlType {
 };
 
 export interface iTablesFKYamlType {
-	name?: string,
+	name: string,
 	onField?: string,
 	toTable?: string,
 	toTield?: string,
@@ -122,9 +122,13 @@ export interface iTablesYamlType {
 		temporaryType?: string,
 		fields: Array<iTablesFieldYamlType>,
 		description?: string,	
-		constraint?: { 
+		constraint: { 
 			foreignkey?: Array<iTablesFKYamlType>,
 			check?: Array<iTablesCheckType>
+			primaryKey: {
+				name?: string,
+				fields: Array<string>
+			}
 		},
 		indexes?: Array<iTablesIndexesType>
 	}
@@ -133,15 +137,15 @@ export interface iTablesYamlType {
 export function emptyTablesYamlType() {
 	return {table: {
 					name: '',
-					fields: []		
+					fields: [],
+					constraint: {primaryKey:{fields:[]}}		
 					}
 			}
 };
 
 export function emptyTablesFieldYamlType() {	
 	return {name: '',
-			nullable: true,
-			primaryKey: false	
+			nullable: true
 			}
 };
 
@@ -150,7 +154,6 @@ export function emptyTablesIndexesType() {
 		active: true,
 		fields: [],		  
 		name: '',
-		unique: false,
-		primaryKey: false	
+		unique: false	
 	};
 };
