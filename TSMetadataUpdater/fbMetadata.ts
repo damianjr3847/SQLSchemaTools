@@ -394,12 +394,7 @@ export class fbExtractMetadata {
                         
                         if (rFields[j_fld].CHARACTERSET !== null && rFields[j_fld].CHARACTERSET.trim() !== 'NONE')
                             outFields[outFields.length-1].charset   = rFields[j_fld].CHARACTERSET.trim();
-                        
-                        /*if (rFields[j_fld].FLAG === 1) 
-                            outFields[outFields.length-1].nullable  = false;
-                        else     
-                            outFields[outFields.length-1].nullable  = true;
-                        */
+                                               
                         outFields[outFields.length-1].nullable  = rFields[j_fld].FLAG !== 1;
 
                         ft.AType        = rFields[j_fld].FTYPE;
@@ -430,22 +425,13 @@ export class fbExtractMetadata {
                         outIndexes.push(GlobalTypes.emptyTablesIndexesType());
                         
                         outIndexes[outIndexes.length-1].name= rIndexes[j_idx].INDEXNAME.trim();
-
-                        /*if (rIndexes[j_idx].INACTIVE === 1) 
-                            outIndexes[outIndexes.length-1].active= false;
-                        else     
-                            outIndexes[outIndexes.length-1].active= true;
-                        */
-
+                        
                         outIndexes[outIndexes.length-1].active= rIndexes[j_idx].INACTIVE !== 1;
 
                         if (rIndexes[j_idx].SOURCE !== null) 
                             outIndexes[outIndexes.length-1].computedBy= await this.fb.getBlobAsString(rIndexes[j_idx].SOURCE);
-                        
-                        if (rIndexes[j_idx].FUNIQUE === 1) 
-                            outIndexes[outIndexes.length-1].unique= true;
-                        else     
-                            outIndexes[outIndexes.length-1].unique= false;
+                                                
+                        outIndexes[outIndexes.length-1].unique= rIndexes[j_idx].FUNIQUE === 1;
                         
                         j_idx_fld = rIndexesFld.findIndex(aItem => (aItem.TABLENAME.trim() == rIndexes[j_idx].TABLENAME.trim()) && (aItem.INDEXNAME.trim() == rIndexes[j_idx].INDEXNAME.trim()));
                         if (j_idx_fld > -1) {
