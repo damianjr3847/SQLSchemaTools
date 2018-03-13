@@ -85,7 +85,7 @@ const queryTablesViewFields:string =
 const queryTablesIndexes:string =
     `SELECT  IDX.RDB$RELATION_NAME AS TABLENAME, IDX.RDB$INDEX_NAME AS INDEXNAME, IDX.RDB$UNIQUE_FLAG AS FUNIQUE, 
              IDX.RDB$INDEX_INACTIVE AS INACTIVE,
-             IDX.RDB$INDEX_TYPE AS TYPE,IDX.RDB$EXPRESSION_SOURCE AS SOURCE, IDX.RDB$DESCRIPTION AS DESCRIPTION
+             IDX.RDB$INDEX_TYPE AS FTYPE,IDX.RDB$EXPRESSION_SOURCE AS SOURCE, IDX.RDB$DESCRIPTION AS DESCRIPTION
     FROM RDB$INDICES IDX
     LEFT OUTER JOIN RDB$RELATION_CONSTRAINTS CON ON CON.RDB$INDEX_NAME = IDX.RDB$INDEX_NAME
     WHERE IDX.RDB$SYSTEM_FLAG=0 AND CON.RDB$INDEX_NAME IS NULL AND (IDX.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31))) AND IDX.RDB$RELATION_NAME NOT STARTING 'IBE$' 
@@ -218,7 +218,7 @@ export class fbExtractMetadata {
     private extractProcedureVariables(aBody:string){
         let variableName:string = '';
         let variableType:string = '';
-        let ret: GlobalTypes.iProcedureParameter[] = [];
+        let ret: GlobalTypes.iProcedureVariable[] = [];
         let j: number = 0;        
 
         aBody.split(/\r?\n/).forEach(function(line) {
@@ -236,7 +236,7 @@ export class fbExtractMetadata {
                     }         
                 });
                 //console.log('linea :'+j.toString()+' Name: '+variableName+ ' Type: '+variableType);
-                ret.push({name:variableName,type:variableType});                           
+                ret.push({var:{name:variableName,type:variableType}});                           
             };
         });    
         return ret;
@@ -262,9 +262,10 @@ export class fbExtractMetadata {
         let outProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType(); 
         let outProcedureParameterInput: GlobalTypes.iProcedureParameter[] = [];
         let outProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];
-        let outProcedureParameterVariable: GlobalTypes.iProcedureParameter[] = [];
+        let outProcedureParameterVariable: GlobalTypes.iProcedureVariable[] = [];
         let j: number = 0; 
         let body: string = '';
+        let procedureName: string = '';
         let ft: iFieldType = {}; //AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
     
         try {
@@ -275,7 +276,8 @@ export class fbExtractMetadata {
                         
             for (var i=0; i < rProcedures.length; i++){
                 
-                outProcedure.procedure.name  = rProcedures[i].NAME;              
+                procedureName= rProcedures[i].NAME; 
+                outProcedure.procedure.name= procedureName; 
 
                 while ((j< rParamater.length) && (rParamater[j].PROCEDURE_NAME == rProcedures[i].NAME)) {
                     ft.AName        = rParamater[j].PARAMATER_NAME;
@@ -294,14 +296,14 @@ export class fbExtractMetadata {
                     ft.AComputed    = null;
 
                     if (rParamater[j].PARAMATER_TYPE == 0) {
-                        outProcedureParameterInput.push({name:"",type:""});
-                        outProcedureParameterInput[outProcedureParameterInput.length-1].name = rParamater[j].PARAMATER_NAME;                        
-                        outProcedureParameterInput[outProcedureParameterInput.length-1].type = this.FieldType(ft);  
+                        outProcedureParameterInput.push({param:{name:"",type:""}});
+                        outProcedureParameterInput[outProcedureParameterInput.length-1].param.name = rParamater[j].PARAMATER_NAME;                        
+                        outProcedureParameterInput[outProcedureParameterInput.length-1].param.type = this.FieldType(ft);  
                     }
                     else if (rParamater[j].PARAMATER_TYPE == 1) {
-                        outProcedureParameterOutput.push({name:"",type:""});
-                        outProcedureParameterOutput[outProcedureParameterOutput.length-1].name = rParamater[j].PARAMATER_NAME;
-                        outProcedureParameterOutput[outProcedureParameterOutput.length-1].type = this.FieldType(ft);
+                        outProcedureParameterOutput.push({param:{name:"",type:""}});
+                        outProcedureParameterOutput[outProcedureParameterOutput.length-1].param.name = rParamater[j].PARAMATER_NAME;
+                        outProcedureParameterOutput[outProcedureParameterOutput.length-1].param.type = this.FieldType(ft);
                     }           
                     j++;
                 }                     
@@ -316,17 +318,17 @@ export class fbExtractMetadata {
                 outProcedure.procedure.pg.body= body;
 
                 if (outProcedureParameterInput.length > 0) 
-                    outProcedure.procedure.input=outProcedureParameterInput;
+                    outProcedure.procedure.inputs=outProcedureParameterInput;
 
                 if (outProcedureParameterOutput.length > 0)     
-                    outProcedure.procedure.output=outProcedureParameterOutput; 
+                    outProcedure.procedure.outputs=outProcedureParameterOutput; 
 
                 if (outProcedureParameterVariable.length > 0) 
                     outProcedure.procedure.variables=outProcedureParameterVariable;
 
                 fs.writeFileSync(this.filesPath+'procedures/'+outProcedure.procedure.name+'.yaml',yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                 
-                console.log(('generado procedimiento '+outProcedure.procedure.name+'.yaml').padEnd(50,'.')+'OK');
+                console.log(('generado procedimiento '+outProcedure.procedure.name+'.yaml').padEnd(70,'.')+'OK');
                 outProcedure = GlobalTypes.emptyProcedureYamlType();
                 outProcedureParameterInput    = [];
                 outProcedureParameterOutput   = [];
@@ -335,7 +337,7 @@ export class fbExtractMetadata {
             await this.fb.commit();
         }
         catch (err) {
-            console.log('Error generando procedimientos: ', err.message);
+            console.log('Error generando procedimiento '+procedureName+'. ', err.message);
         }  
     }
 
@@ -360,6 +362,8 @@ export class fbExtractMetadata {
         let j_const     : number = 0;
         let j_fkf       : number = 0;
 
+        let tableName   : string = '';
+
         let ft: iFieldType = {}; // {AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
        
         try {
@@ -375,7 +379,8 @@ export class fbExtractMetadata {
             for (var i=0; i < rTables.length; i++){
                     /*FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
                     FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION*/
-                    outTables.table.name= rTables[i].NAME.trim();
+                    tableName= rTables[i].NAME.trim();
+                    outTables.table.name= tableName;
                                         
                     if (rTables[i].RELTYPE === 5) 
                         outTables.table.temporaryType= 'DELETE ROWS';
@@ -388,14 +393,14 @@ export class fbExtractMetadata {
                     //fields
                     while ((j_fld< rFields.length) && (rFields[j_fld].TABLENAME.trim() == rTables[i].NAME.trim())) {
                         
-                        outFields.push({name: '', nullable: true, type: ''});
+                        outFields.push({column:{name: '', nullable: true, type: ''}});
 
-                        outFields[outFields.length-1].name      = rFields[j_fld].FIELDNAME.trim();
+                        outFields[outFields.length-1].column.name      = rFields[j_fld].FIELDNAME.trim();
                         
                         if (rFields[j_fld].CHARACTERSET !== null && rFields[j_fld].CHARACTERSET.trim() !== 'NONE')
-                            outFields[outFields.length-1].charset   = rFields[j_fld].CHARACTERSET.trim();
+                            outFields[outFields.length-1].column.charset   = rFields[j_fld].CHARACTERSET.trim();
                                                
-                        outFields[outFields.length-1].nullable  = rFields[j_fld].FLAG !== 1;
+                        outFields[outFields.length-1].column.nullable  = rFields[j_fld].FLAG !== 1;
 
                         ft.AType        = rFields[j_fld].FTYPE;
                         ft.ASubType     = rFields[j_fld].SUBTYPE;
@@ -403,19 +408,19 @@ export class fbExtractMetadata {
                         ft.APrecision   = rFields[j_fld].FPRECISION;
                         ft.AScale       = rFields[j_fld].SCALE;
                         
-                        outFields[outFields.length-1].type=  this.FieldType(ft); 
+                        outFields[outFields.length-1].column.type=  this.FieldType(ft); 
 
                         if (rFields[j_fld].FCOLLATION !== null && rFields[j_fld].FCOLLATION.trim() !== 'NONE')
-                            outFields[outFields.length-1].collate     = rFields[j_fld].FCOLLATION.trim();
+                            outFields[outFields.length-1].column.collate     = rFields[j_fld].FCOLLATION.trim();
                     
                         if (rFields[j_fld].DESCRIPTION !== null)
-                            outFields[outFields.length-1].description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);                    
+                            outFields[outFields.length-1].column.description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);                    
 
                         if (rFields[j_fld].DEFSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
-                            outFields[outFields.length-1].default     = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
+                            outFields[outFields.length-1].column.default     = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
 
                         if (rFields[j_fld].COMSOURCE !== null)
-                            outFields[outFields.length-1].computed    = await this.fb.getBlobAsString(rFields[j_fld].COMSOURCE);
+                            outFields[outFields.length-1].column.computed    = await this.fb.getBlobAsString(rFields[j_fld].COMSOURCE);
                                         
                         j_fld++;
                     }
@@ -424,24 +429,25 @@ export class fbExtractMetadata {
                         /*TABLENAME, INDEXNAME,  FUNIQUE, INACTIVE, TYPE, SOURCE,  DESCRIPTION*/    
                         outIndexes.push(GlobalTypes.emptyTablesIndexesType());
                         
-                        outIndexes[outIndexes.length-1].name= rIndexes[j_idx].INDEXNAME.trim();
+                        outIndexes[outIndexes.length-1].index.name= rIndexes[j_idx].INDEXNAME.trim();
                         
-                        outIndexes[outIndexes.length-1].active= rIndexes[j_idx].INACTIVE !== 1;
+                        outIndexes[outIndexes.length-1].index.active= rIndexes[j_idx].INACTIVE !== 1;
 
                         if (rIndexes[j_idx].SOURCE !== null) 
-                            outIndexes[outIndexes.length-1].computedBy= await this.fb.getBlobAsString(rIndexes[j_idx].SOURCE);
+                            outIndexes[outIndexes.length-1].index.computedBy= await this.fb.getBlobAsString(rIndexes[j_idx].SOURCE);
                                                 
-                        outIndexes[outIndexes.length-1].unique= rIndexes[j_idx].FUNIQUE === 1;
+                        outIndexes[outIndexes.length-1].index.unique= rIndexes[j_idx].FUNIQUE === 1;
                         
+                        outIndexes[outIndexes.length-1].index.descending= rIndexes[j_idx].FTYPE === 1;
+
                         j_idx_fld = rIndexesFld.findIndex(aItem => (aItem.TABLENAME.trim() == rIndexes[j_idx].TABLENAME.trim()) && (aItem.INDEXNAME.trim() == rIndexes[j_idx].INDEXNAME.trim()));
                         if (j_idx_fld > -1) {
                             while ((j_idx_fld < rIndexesFld.length) && (rIndexesFld[j_idx_fld].TABLENAME.trim() == rIndexes[j_idx].TABLENAME.trim()) && (rIndexesFld[j_idx_fld].INDEXNAME.trim() == rIndexes[j_idx].INDEXNAME.trim())) {    
                                 /*TABLENAME, INDEXNAME, FPOSITION, FLDNAME*/
-                                outIndexes[outIndexes.length-1].fields.push(rIndexesFld[j_idx_fld].FLDNAME.trim());
+                                outIndexes[outIndexes.length-1].index.columns.push(rIndexesFld[j_idx_fld].FLDNAME.trim());
                                 j_idx_fld++;
                             }    
-                        }
-                        //outIndexes[outIndexes.length-1].primaryKey
+                        }                        
                         
                         j_idx++;
                     }
@@ -451,33 +457,34 @@ export class fbExtractMetadata {
                     */    
                     while ((j_const< rCheckConst.length) && (rCheckConst[j_const].TABLENAME.trim() == rTables[i].NAME.trim())) {
                         if (rCheckConst[j_const].CONST_TYPE.toString().trim().toUpperCase() === 'CHECK') {
-                            outcheck.push({name:'', expresion:''});
-                            outcheck[outcheck.length-1].name = rCheckConst[j_const].CONST_NAME.trim();
-                            outcheck[outcheck.length-1].expresion = await this.fb.getBlobAsString(rCheckConst[j_const].CHECK_SOURCE);
+                            outcheck.push({check:{name:'', expresion:''}});
+
+                            outcheck[outcheck.length-1].check.name = rCheckConst[j_const].CONST_NAME.trim();
+                            outcheck[outcheck.length-1].check.expresion = await this.fb.getBlobAsString(rCheckConst[j_const].CHECK_SOURCE);
                         }
                         else if (rCheckConst[j_const].CONST_TYPE.toString().trim().toUpperCase() === 'FOREIGN KEY') {
-                            outforeignk.push({name:''});
-                            outforeignk[outforeignk.length-1].name= rCheckConst[j_const].CONST_NAME.trim();
+                            outforeignk.push({foreignkey:{name:''}});
+                            outforeignk[outforeignk.length-1].foreignkey.name= rCheckConst[j_const].CONST_NAME.trim();
                             
                             //busco el campo del indice de la FK en la tabla origen 
                             j_fkf= rIndexesFld.findIndex(aItem => (aItem.TABLENAME.trim()==rCheckConst[j_const].TABLENAME.trim()) && (aItem.INDEXNAME.trim() == rCheckConst[j_const].INDEXNAME.trim()));
                             if (j_fkf > -1) {
-                                outforeignk[outforeignk.length-1].onField= rIndexesFld[j_fkf].FLDNAME.trim();
+                                outforeignk[outforeignk.length-1].foreignkey.onColumn= rIndexesFld[j_fkf].FLDNAME.trim();
                             } 
 
-                            outforeignk[outforeignk.length-1].toTable= rCheckConst[j_const].REF_TABLE.trim();
+                            outforeignk[outforeignk.length-1].foreignkey.toTable= rCheckConst[j_const].REF_TABLE.trim();
 
                             //busco el campo del indice de la FK en la tabla destino
                             j_fkf= rIndexesFld.findIndex(aItem => (aItem.TABLENAME.trim()==rCheckConst[j_const].REF_TABLE.trim()) && (aItem.INDEXNAME.trim() == rCheckConst[j_const].REF_INDEX.trim()));
                             if (j_fkf > -1) {
-                                outforeignk[outforeignk.length-1].toTield= rIndexesFld[j_fkf].FLDNAME.trim();
+                                outforeignk[outforeignk.length-1].foreignkey.toColumn= rIndexesFld[j_fkf].FLDNAME.trim();
                             } 
                             
                             if (rCheckConst[j_const].REF_UPDATE.toString().trim() !== 'RESTRICT') { 
-                                outforeignk[outforeignk.length-1].updateRole= rCheckConst[j_const].REF_UPDATE.toString().trim();
+                                outforeignk[outforeignk.length-1].foreignkey.updateRole= rCheckConst[j_const].REF_UPDATE.toString().trim();
                             } 
                             if (rCheckConst[j_const].REF_DELETE.toString().trim() !== 'RESTRICT') {
-                                outforeignk[outforeignk.length-1].deleteRole= rCheckConst[j_const].REF_DELETE.toString().trim();
+                                outforeignk[outforeignk.length-1].foreignkey.deleteRole= rCheckConst[j_const].REF_DELETE.toString().trim();
                             }    
                         }
                         else if (rCheckConst[j_const].CONST_TYPE.toString().trim().toUpperCase() === 'PRIMARY KEY') {
@@ -488,7 +495,7 @@ export class fbExtractMetadata {
                             if (j_fkf > -1) {
                                 while ((j_fkf < rIndexesFld.length) && (rIndexesFld[j_fkf].TABLENAME.trim() == rCheckConst[j_const].TABLENAME.trim()) && (rIndexesFld[j_fkf].INDEXNAME.trim() == rCheckConst[j_const].INDEXNAME.trim())) {    
                                     /*TABLENAME, INDEXNAME, FPOSITION, FLDNAME*/
-                                    outTables.table.constraint.primaryKey.fields.push(rIndexesFld[j_fkf].FLDNAME.trim())
+                                    outTables.table.constraint.primaryKey.columns.push(rIndexesFld[j_fkf].FLDNAME.trim())
                                     j_fkf++;
                                 }      
                             }                              
@@ -496,21 +503,30 @@ export class fbExtractMetadata {
                         j_const++;
                     }
 
-                    outTables.table.fields= outFields; 
-                    outTables.table.indexes= outIndexes;
-                    outTables.table.constraint.foreignkey= outforeignk;
-                    outTables.table.constraint.check= outcheck; 
+                    outTables.table.columns= outFields; 
+                    if (outIndexes.length > 0) {
+                        outTables.table.indexes= outIndexes;
+                    }
+                    if (outforeignk.length > 0) {   
+                        outTables.table.constraint.foreignkeys= outforeignk;
+                    }
+                    if (outcheck.length > 0) {    
+                        outTables.table.constraint.checks= outcheck; 
+                    }    
                     
                     fs.writeFileSync(this.filesPath+'tables/'+outTables.table.name+'.yaml',yaml.safeDump(outTables, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                     
-                    console.log(('generado tabla '+outTables.table.name+'.yaml').padEnd(50,'.')+'OK');
+                    console.log(('generado tabla '+outTables.table.name+'.yaml').padEnd(70,'.')+'OK');
                     outTables = GlobalTypes.emptyTablesYamlType();
                     outFields= [];
-                    outIndexes= [];                
+                    outIndexes= [];
+                    outcheck=[];
+                    outforeignk=[];
+
             }
             await this.fb.commit();
         } catch(err) {
-            console.log('Error generando tablas: ', err.message);   
+            console.log('Error generando tabla '+tableName+'.', err.message);   
         }        
         
     }

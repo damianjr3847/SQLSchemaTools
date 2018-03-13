@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
 /*
+https://codeburst.io/how-to-build-a-command-line-app-in-node-js-using-typescript-google-cloud-functions-and-firebase-4c13b1699a27
+https://developer.atlassian.com/blog/2015/11/scripting-with-node/
+
+
 ******** M A N U A L E S   ***********
 https://www.typescriptlang.org/
 
@@ -27,16 +31,16 @@ let dbHost:string       = 'srv-01.sig2k.com';
 let dbPort:number       = 3050;
 let dbUser:string       = 'SYSDBA';
 let dbPass:string       = 'masterkey';
-let objectType:string   = 'tables';
-//let objectName:string   = 'AFIP_CABECERA_AAAAMM';
-let objectName:string   = '';
+let objectType:string   = 'procedures';
+let objectName:string   = 'AAAA_PRUEBA_DAMIAN';
+//let objectName:string   = '';
 
 /*params.version('1.0.0');
 
 params.option('-r, --readyalm', 'Lee el directorio o archivo en el parametro -yalm para aplicar cambios');
 params.option('-w, --writeyalm', 'Genera los archivos yalm en el directorio especificado -yalm');
 
-params.option('-y, --yalm <pathyalm>', 'Path del directorio o archivo Yalm a leer');
+params.option('-y, --yalm <pathyalm>', 'Path del directorio o archivo Yalm a leer o escribir');
 
 params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB ps=PostgreSql fb=Firebird');
 params.option('-h, --dbhost <dbhost>', 'Host DB');
@@ -167,7 +171,7 @@ console.log('objectName: %j', objectName);*/
     if (dbDriver === 'fb') {
         fbm = new fbMetadata.fbExtractMetadata;        
     
-        fbm.filesPath = './';
+        fbm.filesPath = pathYalm;
 
         if (actionYalm === 'write') {
             await fbm.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
