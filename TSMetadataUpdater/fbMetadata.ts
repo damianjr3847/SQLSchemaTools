@@ -219,7 +219,9 @@ export class fbExtractMetadata {
         let variableName:string = '';
         let variableType:string = '';
         let ret: GlobalTypes.iProcedureVariable[] = [];
-        let j: number = 0;        
+        let j: number = 0;
+        let inCursor:boolean = false;        
+        let cursorString:string = '';
 
         aBody.split(/\r?\n/).forEach(function(line) {
             j++;
@@ -237,7 +239,26 @@ export class fbExtractMetadata {
                 });
                 //console.log('linea :'+j.toString()+' Name: '+variableName+ ' Type: '+variableType);
                 ret.push({var:{name:variableName,type:variableType}});                           
-            };
+            }
+            else if ((line.toUpperCase().trim().search(' CURSOR FOR ') > 1) || inCursor) {
+                
+                if (! inCursor) {
+                    variableType= 'CURSOR';                    
+                    variableName= line.toUpperCase().trim().split(' ')[1];
+                    inCursor= true;                    
+                } else {     
+                    
+                    if (line.trim().endsWith(');')) {
+                        cursorString += line.trim().substr(0,line.trim().length-2);
+                        ret.push({var:{name:variableName,type:variableType,cursor:cursorString}});
+                        inCursor=false;
+                        cursorString='';
+                    }
+                    else {
+                        cursorString += line.trim() + String.fromCharCode(10);
+                    }
+                };   
+            }    
         });    
         return ret;
     }
@@ -266,7 +287,7 @@ export class fbExtractMetadata {
         let j: number = 0; 
         let body: string = '';
         let procedureName: string = '';
-        let ft: iFieldType = {}; //AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
+        let ft: iFieldType = {}; 
     
         try {
             await this.fb.startTransaction(true);

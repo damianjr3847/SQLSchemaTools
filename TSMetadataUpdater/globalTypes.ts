@@ -36,7 +36,8 @@ export interface iProcedureParameter{
 export interface iProcedureVariable{
 	var:{
 		name:string,
-		type:string
+		type:string,
+		cursor?:string
 	}
 };
 
