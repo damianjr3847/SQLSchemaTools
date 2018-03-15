@@ -23,6 +23,67 @@ export const yamlFileSaveOptions = {
 };
 
 /**************************************************************************************** */
+/**********             T R I G G E R S      I N T E R F A C E                           */
+/***************************************************************************************** */
+
+export interface iTriggerYamlType {
+    trigger: {
+		name:string,
+		onTables: Array<string>,        
+		fires:string,
+		events:Array<string>,
+		active:boolean,
+		description?:string,
+		variables?: Array<iProcedureVariable>,
+		pg: { 
+        	language?: string,
+        	resultType?: string,
+        	options: {
+          		optimization?:{
+            		type?: string,
+					returnNullonNullInput?: boolean
+				  }	
+			},	
+          	executionCost?:number,
+			resultRows?:number,
+			body?:string
+		}
+		fb: {
+			position:number,
+			body?:string
+		}
+    }
+};
+
+export function emptyTriggerYamlType () {
+	return { 
+		trigger: {
+			name:'', 
+			onTables: [],       
+			fires: '',
+			events:[],
+			active:true,
+			pg: { 
+				language:"plpgsql",
+				resultType:"TRIGGER",
+				options: {
+					optimization:{
+						type:"STABLE",
+						returnNullonNullInput:false
+					}	
+				},	
+			executionCost:100,
+			resultRows:1000,
+			body:""
+			},
+			fb: {
+				position:0
+			}
+		}
+	}
+};
+
+/**************************************************************************************** */
 /**********             P R O C E D U R E     I N T E R F A C E                           */
 /***************************************************************************************** */
 

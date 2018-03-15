@@ -127,6 +127,14 @@ const queryGenerator:string =
      WHERE RDB$SYSTEM_FLAG = 0 AND (RDB$GENERATOR_NAME=? OR ?=CAST('' AS CHAR(31)))
      ORDER BY RDB$GENERATOR_NAME `;
 
+const queryTrigger:string = 
+    `SELECT  TRG.RDB$TRIGGER_NAME AS NAME, TRG.RDB$RELATION_NAME AS TABLENAME, TRG.RDB$TRIGGER_SOURCE AS SOURCE, 
+             TRG.RDB$TRIGGER_SEQUENCE AS SEQUENCE,
+             TRG.RDB$TRIGGER_TYPE AS TTYPE, TRG.RDB$TRIGGER_INACTIVE AS INACTIVE, TRG.RDB$DESCRIPTION AS DESCRIPTION
+     FROM RDB$TRIGGERS TRG
+     LEFT OUTER JOIN RDB$CHECK_CONSTRAINTS CON ON (CON.RDB$TRIGGER_NAME = TRG.RDB$TRIGGER_NAME)
+     WHERE ((TRG.RDB$SYSTEM_FLAG = 0) OR (TRG.RDB$SYSTEM_FLAG IS NULL)) AND (CON.RDB$TRIGGER_NAME IS NULL)
+     ORDER BY TRG.RDB$TRIGGER_NAME`;
 
 interface iFieldType {
     AName?:         string  | any;
@@ -222,7 +230,7 @@ export class fbExtractMetadata {
         return ft;      
     }  
 
-    private extractProcedureVariables(aBody:string){
+    private extractVariablesForBody (aBody:string){
         let variableName:string = '';
         let variableType:string = '';
         let ret: GlobalTypes.iProcedureVariable[] = [];
@@ -231,38 +239,42 @@ export class fbExtractMetadata {
         let cursorString:string = '';
 
         aBody.split(/\r?\n/).forEach(function(line) {
+            let txt:string = line.toUpperCase().trim(); 
             j++;
-            if (line.toUpperCase().trim().startsWith('DECLARE VARIABLE')) {
+            if (txt.startsWith('DECLARE VARIABLE')) {
                 variableName = '';
                 variableType = '';
                 //reveer esto por tema de cursores
-                line.toUpperCase().trim().split(' ').forEach(function(word) {
+                txt.split(' ').forEach(function(word) {
                     if (['DECLARE','VARIABLE'].indexOf(word) === -1) { //si no es
                         if (variableName === '') 
                             variableName = word;
                         else    
-                            variableType = word.substr(0,word.length-1);
+                            variableType += word + ' ';
                     }         
                 });
                 //console.log('linea :'+j.toString()+' Name: '+variableName+ ' Type: '+variableType);
-                ret.push({var:{name:variableName,type:variableType}});                           
+                ret.push({var:{name:variableName,type:variableType.substr(0,variableType.length-2)}});                           
             }
-            else if ((line.toUpperCase().trim().search(' CURSOR FOR ') > 1) || inCursor) {
+            else if ((txt.search(' CURSOR FOR ') > 1) || inCursor) {
                 
                 if (! inCursor) {
                     variableType= 'CURSOR';                    
-                    variableName= line.toUpperCase().trim().split(' ')[1];
-                    inCursor= true;                    
+                    variableName= txt.split(' ')[1];
+                    inCursor= true;
+                    if (txt.search('SELECT ') !== -1) {
+                        cursorString += txt.substring(txt.search('SELECT '));
+                    }                    
                 } else {     
                     
-                    if (line.trim().endsWith(');')) {
-                        cursorString += line.trim().substr(0,line.trim().length-2);
+                    if (txt.endsWith(');')) {
+                        cursorString += txt.substr(0,line.trim().length-2);
                         ret.push({var:{name:variableName,type:variableType,cursor:cursorString}});
                         inCursor=false;
                         cursorString='';
                     }
                     else {
-                        cursorString += line.trim() + String.fromCharCode(10);
+                        cursorString += txt + String.fromCharCode(10);
                     }
                 };   
             }    
@@ -270,15 +282,17 @@ export class fbExtractMetadata {
         return ret;
     }
 
-    private excludeProcedureVariables (aBody:string){
+    private excludeVariablesForBody (aType:string, aBody:string){
         let variableName:string = '';
         let variableType:string = '';
         let ret:string = '';
         let j: number = 0;        
         aBody.split(/\r?\n/).forEach(function(line) {
-            j++;
+            j++;            
             if  (! line.toUpperCase().trim().startsWith('DECLARE VARIABLE')) {
-                ret += line + String.fromCharCode(10);                             
+                if (!(aType === 'T'  && line.toUpperCase().trim() === 'AS')) {
+                    ret += line + String.fromCharCode(10);                             
+                }    
             };
         });    
         return ret;
@@ -338,9 +352,9 @@ export class fbExtractMetadata {
                             
                 body = await this.fb.getBlobAsString(rProcedures[i].SOURCE);
 
-                outProcedureParameterVariable= this.extractProcedureVariables(body);
+                outProcedureParameterVariable= this.extractVariablesForBody(body);
                 
-                body= this.excludeProcedureVariables(body); 
+                body= this.excludeVariablesForBody('P',body); 
 
                 outProcedure.procedure.fb.body= body;
                 outProcedure.procedure.pg.body= body;
@@ -560,6 +574,74 @@ export class fbExtractMetadata {
     }
     
     private async extractTriggers(objectName:string) {
+        /*NAME, TABLENAME, SOURCE, SEQUENCE, TTYPE, INACTIVE,  DESCRIPTION */
+        let rTrigger: Array<any>;        
+        let outTrigger: GlobalTypes.iTriggerYamlType = GlobalTypes.emptyTriggerYamlType(); 
+        let outTriggerVariables: GlobalTypes.iProcedureVariable[] = [];
+        let j: number = 0; 
+        let body: string = '';
+        let triggerName: string = '';        
+    
+        try {
+            await this.fb.startTransaction(true);
+
+            rTrigger = await this.fb.query(queryTrigger,[objectName,objectName]);            
+                        
+            for (var i=0; i < rTrigger.length; i++){
+                
+                triggerName= rTrigger[i].NAME.trim(); 
+                outTrigger.trigger.name= triggerName; 
+                outTrigger.trigger.onTables.push(rTrigger[i].TABLENAME.trim());
+                outTrigger.trigger.active=  rTrigger[i].INACTIVE === 0;
+                
+                if (triggerName === 'T_FAC_PEDI_U') {
+                    triggerName=triggerName;        
+                }
+                if ([1,3,5,17,25,27,113].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                    outTrigger.trigger.fires= 'BEFORE';
+                }
+                else if ([2,4,6,18,26,28,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                    outTrigger.trigger.fires= 'AFTER';
+                }
+                if ([1,2,17,18,25,26,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                    outTrigger.trigger.events.push('INSERT');
+                }
+                if ([3,4,17,18,27,28,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                    outTrigger.trigger.events.push('UPDATE');
+                }
+                if ([5,6,25,26,27,28,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                    outTrigger.trigger.events.push('DELETE');
+                }       
+
+                if (rTrigger[i].DESCRIPTION !== null) {
+                    outTrigger.trigger.description= await this.fb.getBlobAsString(rTrigger[i].DESCRIPTION);        
+                }
+
+                body = await this.fb.getBlobAsString(rTrigger[i].SOURCE);
+
+                outTriggerVariables= this.extractVariablesForBody(body);
+                
+                body= this.excludeVariablesForBody('T',body); 
+
+                outTrigger.trigger.fb.position= rTrigger[i].SEQUENCE;
+                outTrigger.trigger.fb.body= body;
+                
+                outTrigger.trigger.pg.body= body;
+
+                if (outTriggerVariables.length > 0) 
+                    outTrigger.trigger.variables=outTriggerVariables;
+
+                fs.writeFileSync(this.filesPath+'triggers/'+triggerName+'.yaml',yaml.safeDump(outTrigger, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                
+                console.log(('generado trigger '+triggerName+'.yaml').padEnd(70,'.')+'OK');
+                outTrigger = GlobalTypes.emptyTriggerYamlType();               
+                outTriggerVariables = [];               
+            }
+            await this.fb.commit();
+        }
+        catch (err) {
+            console.log('Error generando trigger '+triggerName+'. ', err.message);
+        }      
     }
 
     private async extractViews(objectName:string) {
@@ -681,6 +763,9 @@ export class fbExtractMetadata {
                     await this.extractTables(objectName);
                 }
                 if (objectType === 'triggers' || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+'triggers/')) {
+                        fs.mkdirSync(this.filesPath+'triggers')        
+                    } 
                     await this.extractTriggers(objectName);
                 }
                 if (objectType === 'generator' || objectType === '') {
