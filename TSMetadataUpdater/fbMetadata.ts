@@ -121,6 +121,13 @@ const queryTableCheckConstraint:string =
            AND (CON.RDB$RELATION_NAME=? OR ?=CAST('' AS CHAR(31)))
      ORDER BY CON.RDB$RELATION_NAME, CON.RDB$CONSTRAINT_TYPE, CON.RDB$CONSTRAINT_NAME;`;
 
+const queryGenerator:string = 
+    `SELECT RDB$GENERATOR_NAME AS GNAME, RDB$DESCRIPTION AS DESCRIPTION
+     FROM RDB$GENERATORS 
+     WHERE RDB$SYSTEM_FLAG = 0 AND (RDB$GENERATOR_NAME=? OR ?=CAST('' AS CHAR(31)))
+     ORDER BY RDB$GENERATOR_NAME `;
+
+
 interface iFieldType {
     AName?:         string  | any;
     AType?:         number  | any,
@@ -555,7 +562,87 @@ export class fbExtractMetadata {
     private async extractTriggers(objectName:string) {
     }
 
+    private async extractViews(objectName:string) {
+        let rViews      : Array<any>;
+        let rFields     : Array<any>;        
+
+        let outViews    : GlobalTypes.iViewYamlType = GlobalTypes.emptyViewYamlType(); 
+
+        let j_fld       : number = 0;
+        
+        let viewName    : string = '';
+        let body        : string = '';
+       
+        try {
+            await this.fb.startTransaction(true);
+
+            rViews  = await this.fb.query(queryTablesView.replace('{$$RELTYPE}','(REL.RDB$RELATION_TYPE=1)') ,[objectName,objectName]);
+            rFields  = await this.fb.query(queryTablesViewFields.replace('{$$RELTYPE}','(REL.RDB$RELATION_TYPE=1)'),[objectName,objectName]);           
+            
+            
+            for (var i=0; i < rViews.length; i++){
+                    /*FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
+                    FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION*/
+                    viewName= rViews[i].NAME.trim();
+                    outViews.view.name= viewName;                                                                
+                    
+                    if (rViews[i].DESCRIPTION !== null)
+                        outViews.view.description = await this.fb.getBlobAsString(rViews[i].DESCRIPTION);                    
+
+                    if (rViews[i].SOURCE !== null)
+                        body = await this.fb.getBlobAsString(rViews[i].SOURCE);
+                    
+                    outViews.view.body= body.replace(/\r/g,'');
+                    //fields
+                    while ((j_fld< rFields.length) && (rFields[j_fld].TABLENAME.trim() == rViews[i].NAME.trim())) {
+                        outViews.view.columns.push(rFields[j_fld].FIELDNAME.trim());                                
+                        j_fld++;
+                    }
+                    
+                    fs.writeFileSync(this.filesPath+'views/'+viewName+'.yaml',yaml.safeDump(outViews, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                    
+                    console.log(('generado view '+viewName+'.yaml').padEnd(70,'.')+'OK');
+                    outViews = GlobalTypes.emptyViewYamlType();                    
+
+            }
+            await this.fb.commit();
+        } catch(err) {
+            console.log('Error generando view '+viewName+'.', err.message);   
+        } 
+
+    }
+
     private async extractGenerators(objectName:string) {
+        let rGenerator: Array<any>;        
+        let outGenerator: GlobalTypes.iGeneratorYamlType = {generator:{name:''}}; 
+        let genName:string= '';
+        
+        let j: number = 0; 
+    
+        try {
+            await this.fb.startTransaction(true);
+
+            rGenerator = await this.fb.query(queryGenerator,[objectName,objectName]);            
+                        
+            for (var i=0; i < rGenerator.length; i++){
+                
+                genName= rGenerator[i].GNAME.trim(); 
+                outGenerator.generator.name= genName;                                   
+                            
+                if (rGenerator[i].DESCRIPTION !== null) {
+                    outGenerator.generator.description = await this.fb.getBlobAsString(rGenerator[i].DESCRIPTION);
+                }
+                
+                fs.writeFileSync(this.filesPath+'generators/'+genName+'.yaml',yaml.safeDump(outGenerator, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                
+                console.log(('generado generator '+genName+'.yaml').padEnd(70,'.')+'OK');
+                outGenerator = {generator:{name:''}};                          
+            }
+            await this.fb.commit();
+        }
+        catch (err) {
+            console.log('Error generando procedimiento '+genName+'. ', err.message);
+        }  
     }
 
     //****************************************************************** */
@@ -597,8 +684,17 @@ export class fbExtractMetadata {
                     await this.extractTriggers(objectName);
                 }
                 if (objectType === 'generator' || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+'generators/')) {
+                        fs.mkdirSync(this.filesPath+'generators')        
+                    } 
                     await this.extractGenerators(objectName);
-                }                                  
+                }
+                if (objectType === 'views' || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+'views/')) {
+                        fs.mkdirSync(this.filesPath+'views')        
+                    } 
+                    await this.extractViews(objectName);
+                }                                       
                
             }
             finally {

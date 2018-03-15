@@ -1,9 +1,9 @@
 
 export const ArrayDbDriver:string[] = ['ps','fb'];
 
-export const ArrayobjectType:string[] = ['procedures','triggers','tables','generators'];
+export const ArrayobjectType:string[] = ['procedures','triggers','tables','generators','views'];
 
-export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
+//export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 
 export const yamlExportOptions = {
 	indent: 2,
@@ -90,7 +90,7 @@ export function emptyProcedureYamlType () {
 
 /**************************************************************************************** */
 /**********             T A B L E      I N T E R F A C E                                  */
-/***************************************************************************************** */
+/******************************************************************************************/
 export interface iTablesFieldYamlType {
 	column: {
 		charset?: string,
@@ -177,5 +177,38 @@ export function emptyTablesIndexesType() {
 			name: '',
 			unique: false	
 		}	
+	};
+};
+
+/**************************************************************************************** */
+/**********                          G E N E R A T O R S                                  */
+/**************************************************************************************** */
+
+export interface iGeneratorYamlType {
+	generator: {						
+		name: string,
+		description?: string
+	}	
+};
+
+/**************************************************************************************** */
+/**********                              V I E W S                                        */
+/**************************************************************************************** */
+
+export interface iViewYamlType {
+	view: {
+		name: string,		
+		columns: Array<string>,
+		description?: string,			
+		body?: string
+	}
+};
+
+export function emptyViewYamlType() {
+	return {
+		view: {
+			name: '',		
+			columns: []
+		}
 	};
 };

@@ -31,8 +31,8 @@ let dbHost:string       = 'srv-01.sig2k.com';
 let dbPort:number       = 3050;
 let dbUser:string       = 'SYSDBA';
 let dbPass:string       = 'masterkey';
-let objectType:string   = 'procedures';
-let objectName:string   = 'AAAA_PRUEBA_DAMIAN';
+let objectType:string   = 'views';
+let objectName:string   = '';
 //let objectName:string   = '';
 
 /*params.version('1.0.0');
