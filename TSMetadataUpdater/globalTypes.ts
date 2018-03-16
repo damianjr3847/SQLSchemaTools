@@ -17,25 +17,32 @@ export const yamlExportOptions = {
 };
 
 export const yamlFileSaveOptions = {
-	encoding: "utf8"/*,
+	encoding: 'utf8'/*,
 	mode:0,
-	flag: "w"*/
+	flag: 'w'*/
 };
 
 /**************************************************************************************** */
 /**********             T R I G G E R S      I N T E R F A C E                           */
 /***************************************************************************************** */
 
-export interface iTriggerYamlType {
-    trigger: {
+export interface iTriggerTable {
+	trigger: {
 		name:string,
-		onTables: Array<string>,        
-		fires:string,
-		events:Array<string>,
-		active:boolean,
-		description?:string,
-		variables?: Array<iProcedureVariable>,
-		pg: { 
+		table?:string,
+		fires?:string,
+		events:Array<string>,			
+		active?:boolean,
+		position?:number,
+		description?:string
+	}	
+};
+			  
+export interface iTriggerYamlType {
+    triggerFunction: {
+		name:string,
+		triggers: Array<iTriggerTable>,		
+		function: { 
         	language?: string,
         	resultType?: string,
         	options: {
@@ -47,38 +54,28 @@ export interface iTriggerYamlType {
           	executionCost?:number,
 			resultRows?:number,
 			body?:string
-		}
-		fb: {
-			position:number,
-			body?:string
-		}
+		}		
     }
 };
 
 export function emptyTriggerYamlType () {
 	return { 
-		trigger: {
-			name:'', 
-			onTables: [],       
-			fires: '',
-			events:[],
-			active:true,
-			pg: { 
-				language:"plpgsql",
-				resultType:"TRIGGER",
+		triggerFunction: {
+			name:'',
+			triggers: [],		
+			function: {
+				language:'plpgsql',
+				resultType:'TABLE',
 				options: {
 					optimization:{
-						type:"STABLE",
+						type:'STABLE',
 						returnNullonNullInput:false
 					}	
 				},	
-			executionCost:100,
-			resultRows:1000,
-			body:""
-			},
-			fb: {
-				position:0
-			}
+				executionCost:100,
+				resultRows:1000,
+				body:''			
+			}		
 		}
 	}
 };
@@ -107,7 +104,6 @@ export interface iProcedureYamlType {
         name:string,
         inputs?: Array<iProcedureParameter>,    
 		outputs?: Array<iProcedureParameter>,
-		variables?: Array<iProcedureVariable>,
 		pg: { 
         	language?: string,
         	resultType?: string,
@@ -118,34 +114,30 @@ export interface iProcedureYamlType {
 				  }	
 			},	
           	executionCost?:number,
-			resultRows?:number,
-			body?:string
-		}	  
-		fb:{body:string}
+			resultRows?:number,			
+		},	  		
+		body?:string
     }
 };
  
 export function emptyProcedureYamlType () {
 	return { 
-	procedure:{
-		name:"",
-		pg: {
-			language:"plpgsql",
-			resultType:"TABLE",
-			options: {
-				optimization:{
-					type:"STABLE",
-					returnNullonNullInput:false
-				}	
-			},	
-			executionCost:100,
-			resultRows:1000,
-			body:""
-		},
-		fb:{
-			body:""
+		procedure:{
+			name:'',
+			pg: {
+				language:'plpgsql',
+				resultType:'TABLE',
+				options: {
+					optimization:{
+						type:'STABLE',
+						returnNullonNullInput:false
+					}	
+				},	
+				executionCost:100,
+				resultRows:1000			
+			},
+			body:''
 		}
-	}
 	}
 };
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+//SQL schema declarative manager
+
 /*
 https://codeburst.io/how-to-build-a-command-line-app-in-node-js-using-typescript-google-cloud-functions-and-firebase-4c13b1699a27
 https://developer.atlassian.com/blog/2015/11/scripting-with-node/
@@ -20,18 +22,20 @@ https://github.com/hgourvest/node-firebird
 import * as fsexistsSync from 'fs';
 import * as params from 'commander';
 
-import * as fbMetadata from './fbMetadata';
+import * as fbExtractMetadata from './fbExtractMetadata';
+import * as fbApplyMetadata from './fbApplyMetadata';
+
 import * as GlobalTypes from './globalTypes';
 
-let actionYalm:string   = 'write';
-let pathYalm:string     = '';
+let actionYalm:string   = 'read';
+let pathYalm:string     = './export/';
 let dbDriver:string     = 'fb';
 let dbPath:string       = '/pool/testing/demo.gdb';
 let dbHost:string       = 'srv-01.sig2k.com';
 let dbPort:number       = 3050;
 let dbUser:string       = 'SYSDBA';
 let dbPass:string       = 'masterkey';
-let objectType:string   = '';
+let objectType:string   = 'procedures';
 let objectName:string   = '';
 //let objectName:string   = '';
 
@@ -49,8 +53,8 @@ params.option('-c, --dbpath <dbpath>', 'path DB');
 params.option('-u, --dbuser <dbuser>', 'User DB');
 params.option('-p, --dbpass <dbpass>', 'Password DB');
 
-params.option('-t, --objecttype <objecttype>', 'especifica que tipo de cambios se aplican (procedures,triggers,tables,generators');
-params.option('-n, --objectname <objectname>', 'nombre particular del ObjectType (ot) que se desea aplicar');
+params.option('-t, --objecttype <objecttype>', 'opcional, especifica que tipo de cambios se aplican (procedures,triggers,tables,generators');
+params.option('-n, --objectname <objectname>', 'opcional, nombre particular del ObjectType (ot) que se desea aplicar');
 //console.log(process.argv);
 
 params.parse(process.argv);
@@ -166,18 +170,20 @@ console.log('objectType: %j', objectType);
 console.log('objectName: %j', objectName);*/
 
 (async () => {
-    let fbm: fbMetadata.fbExtractMetadata;  
+    let fbem: fbExtractMetadata.fbExtractMetadata;  
+    let fbam: fbApplyMetadata.fbApplyMetadata;
 
-    if (dbDriver === 'fb') {
-        fbm = new fbMetadata.fbExtractMetadata;        
-    
-        fbm.filesPath = pathYalm;
+    if (dbDriver === 'fb') {                
 
         if (actionYalm === 'write') {
-            await fbm.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
+            fbem = new fbExtractMetadata.fbExtractMetadata;
+            fbem.filesPath = pathYalm;
+            await fbem.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
         }
         else if (actionYalm === 'read') {
-            await fbm.readYalm();    
+            fbam = new fbApplyMetadata.fbApplyMetadata;
+            fbam.filesPath = pathYalm;
+            await fbam.applyYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
         }      
         
     }    

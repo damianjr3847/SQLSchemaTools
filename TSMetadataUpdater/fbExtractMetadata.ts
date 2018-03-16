@@ -1,32 +1,3 @@
-/*
-******* E X A M P L E   P R O C E D U R E    Y A M L  *******
-procedure:
-      name: WEB_QGET
-      input:
-        - parameter:
-          name: QSTRING 
-          type: VARCHAR(100)
-        - parameter:
-          name: PARAME 
-          type: VARCHAR(100)
-      output:
-        - parameter:
-          name: VALOR
-          type: VARCHAR(100)   
-      pg:
-        language: plpgsql
-        resultType: Table
-        options:
-          optimization:
-            type: STABLE
-            returnNullonNullInput: false
-          executionCost: 100
-          resultRows: 1000
-        body: |
-          
-      fb:
-        body: |
-*/        
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as fbClass from './classFirebird';
@@ -276,7 +247,7 @@ export class fbExtractMetadata {
                     else {
                         cursorString += txt + String.fromCharCode(10);
                     }
-                };   
+                }   
             }    
         });    
         return ret;
@@ -303,8 +274,7 @@ export class fbExtractMetadata {
         let rParamater: Array<any>;
         let outProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType(); 
         let outProcedureParameterInput: GlobalTypes.iProcedureParameter[] = [];
-        let outProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];
-        let outProcedureParameterVariable: GlobalTypes.iProcedureVariable[] = [];
+        let outProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];        
         let j: number = 0; 
         let body: string = '';
         let procedureName: string = '';
@@ -350,31 +320,22 @@ export class fbExtractMetadata {
                     j++;
                 }                     
                             
-                body = await this.fb.getBlobAsString(rProcedures[i].SOURCE);
-
-                outProcedureParameterVariable= this.extractVariablesForBody(body);
+                body = await this.fb.getBlobAsString(rProcedures[i].SOURCE);                                            
                 
-                body= this.excludeVariablesForBody('P',body); 
-
-                outProcedure.procedure.fb.body= body;
-                outProcedure.procedure.pg.body= body;
+                outProcedure.procedure.body= body.replace(/\r/g,'');;
 
                 if (outProcedureParameterInput.length > 0) 
                     outProcedure.procedure.inputs=outProcedureParameterInput;
 
                 if (outProcedureParameterOutput.length > 0)     
                     outProcedure.procedure.outputs=outProcedureParameterOutput; 
-
-                if (outProcedureParameterVariable.length > 0) 
-                    outProcedure.procedure.variables=outProcedureParameterVariable;
-
+               
                 fs.writeFileSync(this.filesPath+'procedures/'+outProcedure.procedure.name+'.yaml',yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                 
                 console.log(('generado procedimiento '+outProcedure.procedure.name+'.yaml').padEnd(70,'.')+'OK');
                 outProcedure = GlobalTypes.emptyProcedureYamlType();
                 outProcedureParameterInput    = [];
-                outProcedureParameterOutput   = [];
-                outProcedureParameterVariable = [];               
+                outProcedureParameterOutput   = [];                
             }
             await this.fb.commit();
         }
@@ -577,7 +538,7 @@ export class fbExtractMetadata {
         /*NAME, TABLENAME, SOURCE, SEQUENCE, TTYPE, INACTIVE,  DESCRIPTION */
         let rTrigger: Array<any>;        
         let outTrigger: GlobalTypes.iTriggerYamlType = GlobalTypes.emptyTriggerYamlType(); 
-        let outTriggerVariables: GlobalTypes.iProcedureVariable[] = [];
+        let outTriggerTables: GlobalTypes.iTriggerTable[] = [];
         let j: number = 0; 
         let body: string = '';
         let triggerName: string = '';        
@@ -590,52 +551,50 @@ export class fbExtractMetadata {
             for (var i=0; i < rTrigger.length; i++){
                 
                 triggerName= rTrigger[i].NAME.trim(); 
-                outTrigger.trigger.name= triggerName; 
-                outTrigger.trigger.onTables.push(rTrigger[i].TABLENAME.trim());
-                outTrigger.trigger.active=  rTrigger[i].INACTIVE === 0;
+                outTrigger.triggerFunction.name= triggerName; 
                 
-                if (triggerName === 'T_FAC_PEDI_U') {
-                    triggerName=triggerName;        
-                }
+                outTriggerTables.push({trigger:{name:'',events:[]}});
+
+                outTriggerTables[outTriggerTables.length-1].trigger.name=triggerName;
+                outTriggerTables[outTriggerTables.length-1].trigger.table= rTrigger[i].TABLENAME.trim();                
+                
+                
+
+                outTriggerTables[outTriggerTables.length-1].trigger.active=  rTrigger[i].INACTIVE === 0;
+                               
                 if ([1,3,5,17,25,27,113].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTrigger.trigger.fires= 'BEFORE';
+                    outTriggerTables[outTriggerTables.length-1].trigger.fires= 'BEFORE';
                 }
                 else if ([2,4,6,18,26,28,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTrigger.trigger.fires= 'AFTER';
+                    outTriggerTables[outTriggerTables.length-1].trigger.fires= 'AFTER';
                 }
                 if ([1,2,17,18,25,26,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTrigger.trigger.events.push('INSERT');
+                    outTriggerTables[outTriggerTables.length-1].trigger.events.push('INSERT');
                 }
                 if ([3,4,17,18,27,28,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTrigger.trigger.events.push('UPDATE');
+                    outTriggerTables[outTriggerTables.length-1].trigger.events.push('UPDATE');
                 }
                 if ([5,6,25,26,27,28,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTrigger.trigger.events.push('DELETE');
+                    outTriggerTables[outTriggerTables.length-1].trigger.events.push('DELETE');
                 }       
 
                 if (rTrigger[i].DESCRIPTION !== null) {
-                    outTrigger.trigger.description= await this.fb.getBlobAsString(rTrigger[i].DESCRIPTION);        
+                    outTriggerTables[outTriggerTables.length-1].trigger.description= await this.fb.getBlobAsString(rTrigger[i].DESCRIPTION);        
                 }
 
+                outTriggerTables[outTriggerTables.length-1].trigger.position= rTrigger[i].SEQUENCE;
+
                 body = await this.fb.getBlobAsString(rTrigger[i].SOURCE);
-
-                outTriggerVariables= this.extractVariablesForBody(body);
                 
-                body= this.excludeVariablesForBody('T',body); 
-
-                outTrigger.trigger.fb.position= rTrigger[i].SEQUENCE;
-                outTrigger.trigger.fb.body= body;
-                
-                outTrigger.trigger.pg.body= body;
-
-                if (outTriggerVariables.length > 0) 
-                    outTrigger.trigger.variables=outTriggerVariables;
+                outTrigger.triggerFunction.function.body= body.replace(/\r/g,'');;
+                                
+                outTrigger.triggerFunction.triggers= outTriggerTables;
 
                 fs.writeFileSync(this.filesPath+'triggers/'+triggerName+'.yaml',yaml.safeDump(outTrigger, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                 
                 console.log(('generado trigger '+triggerName+'.yaml').padEnd(70,'.')+'OK');
                 outTrigger = GlobalTypes.emptyTriggerYamlType();               
-                outTriggerVariables = [];               
+                outTriggerTables = [];               
             }
             await this.fb.commit();
         }
@@ -790,10 +749,5 @@ export class fbExtractMetadata {
             console.log('Error: ', err.message);
         }
     
-    }
-    
-    public async readYalm() {
-    
-    }
-
+    }    
 }
