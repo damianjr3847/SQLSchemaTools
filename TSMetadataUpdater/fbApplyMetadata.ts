@@ -29,6 +29,16 @@ export class fbApplyMetadata {
 
     private  fb : fbClass.fbConnection;
     
+   /* private async validate(aQuery:string, aParam:Array<any>) {
+        let res:any;
+        try {
+            res= this.fb.query(aQuery, aParam);
+            return (res.length > 0);
+        }
+        catch(err) {
+            throw err.message;
+        }    
+    };*/
 
     private async applyProcedures(files: Array<string>) {
         let paramString = (param:any, aExtra:string) => {
@@ -93,22 +103,73 @@ export class fbApplyMetadata {
     private async applyTriggers(files: Array<string>) {
         let triggerName:string = '';
 
-        try {
-            await this.fb.startTransaction(true);
-            await this.fb.commit();
-        }
+        let fileYaml: any;
+        let triggerBody: string = '';        
+
+        try {           
+            await this.fb.startTransaction(false);
+            for (var i in files) {
+                
+                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/triggers/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+                triggerName= fileYaml.triggerFunction.name;
+                triggerBody= 'CREATE OR ALTER TRIGGER ' + fileYaml.triggerFunction.name+ ' FOR ';                  
+                
+                triggerBody+= fileYaml.triggerFunction.triggers[0].trigger.table;
+                if (fileYaml.triggerFunction.triggers[0].trigger.active) {
+                    triggerBody+= ' ACTIVE ';
+                }
+                else {
+                    triggerBody+= ' INACTIVE ';
+                }
+
+                triggerBody+= fileYaml.triggerFunction.triggers[0].trigger.fires+' ';
+                triggerBody+= fileYaml.triggerFunction.triggers[0].trigger.events[0];
+                for (var j=1; j < fileYaml.triggerFunction.triggers[0].trigger.events.length; j++){
+                    triggerBody+= ' OR ' + fileYaml.triggerFunction.triggers[0].trigger.events[j];
+                };
+                triggerBody+= ' POSITION '+ fileYaml.triggerFunction.triggers[0].trigger.position;
+
+                triggerBody += charCode +fileYaml.triggerFunction.function.body;
+                
+                await this.fb.execute(triggerBody,[]);
+
+                triggerBody= '';
+                
+                console.log(('Aplicando trigger '+triggerName).padEnd(70,'.')+'OK');
+            }
+            await this.fb.commit();  
+        }    
         catch (err) {
             console.log('Error generando trigger '+triggerName+'. ', err.message);
         }      
     }
 
     private async applyViews(files: Array<string>) {
-        let viewName:string = '';
+        let viewName:string = '';    
 
-        try {
-            await this.fb.startTransaction(true);
+        let fileYaml: any;
+        let viewBody: string = '';        
 
-            
+        try {           
+            await this.fb.startTransaction(false);
+            for (var i in files) {               
+                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/views/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+                viewName= fileYaml.view.name;
+                viewBody= 'CREATE OR ALTER VIEW ' + fileYaml.view.name + '(' + charCode ;                  
+                                
+                for (var j=0; j < fileYaml.view.columns.length-1; j++){
+                    viewBody+= fileYaml.view.columns[j]+','+charCode;
+                };
+                viewBody+= fileYaml.view.columns[fileYaml.view.columns.length-1]+')'+charCode;
+
+                viewBody += 'AS'+charCode +fileYaml.view.body;
+                
+                await this.fb.execute(viewBody,[]);
+
+                viewBody= '';
+                
+                console.log(('Aplicando view '+viewName).padEnd(70,'.')+'OK');
+            } 
             await this.fb.commit();
         } catch(err) {
             console.log('Error generando view '+viewName+'.', err.message);   
@@ -118,11 +179,21 @@ export class fbApplyMetadata {
 
     private async applyGenerators(files: Array<string>) {
         let genName:string = '';
+        let genBody: string = ''; 
 
-    
         try {
-            await this.fb.startTransaction(true);
-            
+            await this.fb.startTransaction(false);
+            for (var i in files) {               
+                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/generators/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+                genName= fileYaml.generator.name;
+                genBody= 'CREATE SEQUENCE ' + fileYaml.generator.name;  
+                                    
+                if (!(await this.fb.validate('SELECT 1 FROM RDB$GENERATORS WHERE RDB$GENERATOR_NAME=?',[genName]))) {
+                    await this.fb.execute(genBody,[]);
+                    console.log(('Aplicando Generator '+genName).padEnd(70,'.')+'OK');
+                }    
+                
+            }    
             await this.fb.commit();
         }
         catch (err) {

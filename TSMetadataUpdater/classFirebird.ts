@@ -173,4 +173,27 @@ export class fbConnection {
         });  
     }
 
+    /*async validate(aQuery:string, aParams:Array<any>) {
+        let res:any;
+        try {
+            res= await this.query(aQuery, aParams);            
+            return (res.length > 0);
+        }
+        catch(err) {
+            throw err.message;
+        }    
+    };*/
+
+    validate(aQuery:string, aParams:Array<any>) {
+        let res:any;
+        this.checkInTransaction();
+        return new Promise<boolean>((resolve, reject) => {
+            this.tr!.query(aQuery, aParams, function(err: any, result: any) {
+                if (err) return reject(err);
+                resolve(result.length>0);
+            });
+        });   
+        
+    };
+
 }
