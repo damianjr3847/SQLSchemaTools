@@ -2,8 +2,7 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as fbClass from './classFirebird';
 import * as GlobalTypes from './globalTypes';
-
-const charCode:any = String.fromCharCode(10);
+import * as fbExtractMetadata from './fbExtractMetadata';
 
 interface iFieldType {
     AName?:         string  | any;
@@ -27,115 +26,137 @@ export class fbApplyMetadata {
     //        D E C L A R A C I O N E S    P R I V A D A S
     //******************************************************************* */
 
-    private  fb : fbClass.fbConnection;
-    
-   /* private async validate(aQuery:string, aParam:Array<any>) {
-        let res:any;
-        try {
-            res= this.fb.query(aQuery, aParam);
-            return (res.length > 0);
-        }
-        catch(err) {
-            throw err.message;
-        }    
-    };*/
+    private fb : fbClass.fbConnection;
+    private fbExMe: fbExtractMetadata.fbExtractMetadata;   
 
     private async applyProcedures(files: Array<string>) {
-        let paramString = (param:any, aExtra:string) => {
-            let aText:string='';
-
-            if (param.length > 0) {
-                for (var j=0; j < param.length-1; j++){                    
-                    aText += param[j].param.name +' '+ param[j].param.type + ',' + charCode;
-                }
-                aText += param[j].param.name +' '+ param[j].param.type;
-                aText = aExtra + '(' + charCode + aText + ')' + charCode;                        
+        let procedureYamltoString = (aYaml: any) => {
+            let paramString = (param:any, aExtra:string) => {
+                let aText:string='';
+    
+                if (param.length > 0) {
+                    for (let j=0; j < param.length-1; j++){                    
+                        aText += param[j].param.name +' '+ param[j].param.type + ',' + GlobalTypes.charCode;
+                    }
+                    aText += param[j].param.name +' '+ param[j].param.type;
+                    aText = aExtra + '(' + GlobalTypes.charCode + aText + ')';                        
+                };
+                return aText;
             };
-            return aText;
-        };
+    
+            let aProc:string= '';
+    
+            aProc= 'CREATE OR ALTER PROCEDURE ' + aYaml.procedure.name;                                             
+                    
+            if ('inputs' in aYaml.procedure)
+                aProc += paramString(aYaml.procedure.inputs,'');
+            if ('outputs' in aYaml.procedure)    
+                aProc += paramString(aYaml.procedure.outputs,'RETURNS');               
+            
+            aProc += GlobalTypes.charCode + 'AS' + GlobalTypes.charCode +aYaml.procedure.body;
+            return aProc;        
+        }
 
         let procedureName:string = '';        
         let fileYaml: any;
+        let dbYaml: Array<any> = [];
         let procedureBody: string = '';
         let procedureParams: string = '';
+        let procedureInDB: any;    
+        let j:number = 0;
+
+        
+
         try {           
             await this.fb.startTransaction(false);
-            for (var i in files) {
+
+            dbYaml = await this.fbExMe.extractMetadataProcedures('',true,false);
+            
+            for (let i in files) {
                 
                 const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/procedures/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
-                procedureBody= 'CREATE OR ALTER PROCEDURE ' + fileYaml.procedure.name;                
                 
-                procedureParams= '';                  
+                procedureName= fileYaml.procedure.name;
+     
+                j= dbYaml.findIndex(aItem => (aItem.procedure.name === procedureName));
                 
-                if ('inputs' in fileYaml.procedure)
-                    procedureBody += paramString(fileYaml.procedure.inputs,'');
-                if ('outputs' in fileYaml.procedure)    
-                    procedureBody += paramString(fileYaml.procedure.outputs,'RETURNS ');               
-                
-                procedureBody += charCode + 'AS' + charCode +fileYaml.procedure.body;
-                
-                await this.fb.execute(procedureBody,[]);
+                procedureBody= procedureYamltoString(fileYaml);
+                if (j !== -1) {
+                    procedureInDB= procedureYamltoString(dbYaml[j]);
+                }    
+
+                if (procedureInDB !== procedureBody) {
+                    await this.fb.execute(procedureBody,[]);
+                    console.log(('Aplicando procedure '+fileYaml.procedure.name).padEnd(70,'.')+'OK');
+                }    
 
                 procedureBody= '';
-                
-                console.log(('Aplicando procedure '+fileYaml.procedure.name).padEnd(70,'.')+'OK');
             }
-            await this.fb.commit();                
+            await this.fb.commit(); 
+            console.log(Date.now());               
         }
         catch (err) {
-            console.log('Error grabando procedimiento '+procedureName+'. ', err.message+charCode+procedureBody);
+            console.log('Error grabando procedimiento '+procedureName+'. ', err.message+GlobalTypes.charCode+procedureBody);
         }  
-    }
+    }        
 
-    private async applyTables(files: Array<string>) {
-        let tableName:string = '';
-
-        try {
-            await this.fb.startTransaction(true);
-
-            await this.fb.commit();
-        } catch(err) {
-            console.log('Error generando tabla '+tableName+'.', err.message);   
-        }        
-        
-    }
-    
     private async applyTriggers(files: Array<string>) {
-        let triggerName:string = '';
+        let triggerYamltoString = (aYaml: any) => {
+            let aProc:string= '';
+    
+            aProc= 'CREATE OR ALTER TRIGGER ' + aYaml.triggerFunction.name+ ' FOR ';                  
+                    
+            aProc+= aYaml.triggerFunction.triggers[0].trigger.table;
+            if (aYaml.triggerFunction.triggers[0].trigger.active) {
+                aProc+= ' ACTIVE ';
+            }
+            else {
+                aProc+= ' INACTIVE ';
+            }
+    
+            aProc+= aYaml.triggerFunction.triggers[0].trigger.fires+' ';
+            aProc+= aYaml.triggerFunction.triggers[0].trigger.events[0];
+            for (let j=1; j < aYaml.triggerFunction.triggers[0].trigger.events.length; j++){
+                aProc+= ' OR ' + aYaml.triggerFunction.triggers[0].trigger.events[j];
+            };
+            aProc+= ' POSITION '+ aYaml.triggerFunction.triggers[0].trigger.position;
+    
+            aProc += GlobalTypes.charCode +aYaml.triggerFunction.function.body;
+            return aProc;        
+        };
 
+        let triggerName:string = '';
+        let dbYaml: Array<any> = [];
         let fileYaml: any;
         let triggerBody: string = '';        
+        let triggerInDb: string = '';        
+        let j:number = 0;
 
-        try {           
+        try { 
             await this.fb.startTransaction(false);
-            for (var i in files) {
+
+            dbYaml = await this.fbExMe.extractMetadataTriggers('',true,false);
+            
+            for (let i in files) {
                 
                 const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/triggers/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
                 triggerName= fileYaml.triggerFunction.name;
-                triggerBody= 'CREATE OR ALTER TRIGGER ' + fileYaml.triggerFunction.name+ ' FOR ';                  
                 
-                triggerBody+= fileYaml.triggerFunction.triggers[0].trigger.table;
-                if (fileYaml.triggerFunction.triggers[0].trigger.active) {
-                    triggerBody+= ' ACTIVE ';
-                }
-                else {
-                    triggerBody+= ' INACTIVE ';
-                }
+                j= dbYaml.findIndex(aItem => (aItem.triggerFunction.name === triggerName));
 
-                triggerBody+= fileYaml.triggerFunction.triggers[0].trigger.fires+' ';
-                triggerBody+= fileYaml.triggerFunction.triggers[0].trigger.events[0];
-                for (var j=1; j < fileYaml.triggerFunction.triggers[0].trigger.events.length; j++){
-                    triggerBody+= ' OR ' + fileYaml.triggerFunction.triggers[0].trigger.events[j];
-                };
-                triggerBody+= ' POSITION '+ fileYaml.triggerFunction.triggers[0].trigger.position;
-
-                triggerBody += charCode +fileYaml.triggerFunction.function.body;
+                triggerBody= triggerYamltoString(fileYaml);
+                if (j !== -1) {
+                    triggerInDb= triggerYamltoString(dbYaml[j]);
+                }    
                 
-                await this.fb.execute(triggerBody,[]);
+                if (triggerBody !== triggerInDb) {
+                    await this.fb.execute(triggerBody,[]);
+                    console.log(('Aplicando trigger '+triggerName).padEnd(70,'.')+'OK');
+                }    
 
                 triggerBody= '';
+                triggerInDb= '';               
                 
-                console.log(('Aplicando trigger '+triggerName).padEnd(70,'.')+'OK');
             }
             await this.fb.commit();  
         }    
@@ -145,30 +166,49 @@ export class fbApplyMetadata {
     }
 
     private async applyViews(files: Array<string>) {
-        let viewName:string = '';    
+        let triggerYamltoString = (aYaml:any) => {
+            let aView:string = '';
+            
+            aView= 'CREATE OR ALTER VIEW ' + aYaml.view.name + '(' + GlobalTypes.charCode ;                  
+                                
+            for (let j=0; j < aYaml.view.columns.length-1; j++){
+                aView+= aYaml.view.columns[j]+','+GlobalTypes.charCode;
+            };
+            aView+= aYaml.view.columns[aYaml.view.columns.length-1]+')'+GlobalTypes.charCode;
 
+            aView += 'AS'+GlobalTypes.charCode +aYaml.view.body;
+            
+            return aView;
+        };
+
+        let dbYaml: Array<any> = [];
+        let viewName:string = '';    
+        let viewInDb:string = '';
+        let j:number = 0;
         let fileYaml: any;
         let viewBody: string = '';        
 
         try {           
             await this.fb.startTransaction(false);
-            for (var i in files) {               
+            dbYaml = await this.fbExMe.extractMetadataViews('',true,false);
+
+            for (let i in files) {               
                 const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/views/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
                 viewName= fileYaml.view.name;
-                viewBody= 'CREATE OR ALTER VIEW ' + fileYaml.view.name + '(' + charCode ;                  
-                                
-                for (var j=0; j < fileYaml.view.columns.length-1; j++){
-                    viewBody+= fileYaml.view.columns[j]+','+charCode;
-                };
-                viewBody+= fileYaml.view.columns[fileYaml.view.columns.length-1]+')'+charCode;
-
-                viewBody += 'AS'+charCode +fileYaml.view.body;
                 
-                await this.fb.execute(viewBody,[]);
-
-                viewBody= '';
+                j= dbYaml.findIndex(aItem => (aItem.view.name === viewName));
                 
-                console.log(('Aplicando view '+viewName).padEnd(70,'.')+'OK');
+                viewBody= triggerYamltoString(fileYaml);     
+                if (j !== -1) {
+                    viewInDb= triggerYamltoString(dbYaml[j]);
+                }    
+
+                if (viewBody !== viewInDb) {
+                    await this.fb.execute(viewBody,[]);
+                    console.log(('Aplicando view '+viewName).padEnd(70,'.')+'OK');
+                }    
+                viewBody='';                
+                viewInDb='';
             } 
             await this.fb.commit();
         } catch(err) {
@@ -183,7 +223,7 @@ export class fbApplyMetadata {
 
         try {
             await this.fb.startTransaction(false);
-            for (var i in files) {               
+            for (let i in files) {               
                 const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/generators/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
                 genName= fileYaml.generator.name;
                 genBody= 'CREATE SEQUENCE ' + fileYaml.generator.name;  
@@ -212,6 +252,19 @@ export class fbApplyMetadata {
             return [objectName+'.yaml'];
         }        
     }
+
+    private async applyTables(files: Array<string>) {
+        let tableName:string = '';
+
+        try {
+            await this.fb.startTransaction(true);
+
+            await this.fb.commit();
+        } catch(err) {
+            console.log('Error generando tabla '+tableName+'.', err.message);   
+        }        
+        
+    }
     //****************************************************************** */
     //        D E C L A R A C I O N E S    P U B L I C A S
     //******************************************************************* */
@@ -219,7 +272,8 @@ export class fbApplyMetadata {
     filesPath:string    = '';
 
     constructor() {
-        this.fb = new fbClass.fbConnection;    
+        this.fb = new fbClass.fbConnection;
+        this.fbExMe= new fbExtractMetadata.fbExtractMetadata(this.fb);    
     }
 
     public async applyYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string, objectType:string, objectName:string)  {                
