@@ -35,7 +35,7 @@ let dbHost:string       = 'srv-01.sig2k.com';
 let dbPort:number       = 3050;
 let dbUser:string       = 'SYSDBA';
 let dbPass:string       = 'masterkey';
-let objectType:string   = 'views';
+let objectType:string   = 'tables';
 let objectName:string   = '';
 //let objectName:string   = '';
 

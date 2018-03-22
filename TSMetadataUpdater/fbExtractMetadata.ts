@@ -222,33 +222,37 @@ export class fbExtractMetadata {
         }  
     }
 
-    private async extractMetadataTables(objectName:string) {
-        let rTables     : Array<any>;
-        let rFields     : Array<any>;
-        let rIndexes    : Array<any>;
-        let rIndexesFld : Array<any>;
-        let rCheckConst : Array<any>;
+    async extractMetadataTables(objectName:string, aRetYaml:boolean=false, openTr:boolean=true):Promise<any> {
+        let rTables      : Array<any>;
+        let rFields      : Array<any>;
+        let rIndexes     : Array<any>;
+        let rIndexesFld  : Array<any>;
+        let rCheckConst  : Array<any>;
 
-        let outTables   : GlobalTypes.iTablesYamlType = GlobalTypes.emptyTablesYamlType(); 
-        let outFields   : GlobalTypes.iTablesFieldYamlType[] = [];
-        let outFK       : GlobalTypes.iTablesFKYamlType[] = [];
-        let outCheck    : GlobalTypes.iTablesCheckType[] = [];
-        let outIndexes  : GlobalTypes.iTablesIndexesType[] = [];
-        let outforeignk : GlobalTypes.iTablesFKYamlType[] = [];
-		let outcheck    : GlobalTypes.iTablesCheckType[] = [];
+        let outTables    : GlobalTypes.iTablesYamlType = GlobalTypes.emptyTablesYamlType(); 
+        let outFields    : GlobalTypes.iTablesFieldYamlType[] = [];
+        let outFK        : GlobalTypes.iTablesFKYamlType[] = [];
+        let outCheck     : GlobalTypes.iTablesCheckType[] = [];
+        let outIndexes   : GlobalTypes.iTablesIndexesType[] = [];
+        let outforeignk  : GlobalTypes.iTablesFKYamlType[] = [];
+		let outcheck     : GlobalTypes.iTablesCheckType[] = [];
+        let outReturnYaml: Array<any> = [];
 
-        let j_fld       : number = 0;
-        let j_idx       : number = 0;
-        let j_idx_fld   : number = 0;
-        let j_const     : number = 0;
-        let j_fkf       : number = 0;
+        let j_fld        : number = 0;
+        let j_idx        : number = 0;
+        let j_idx_fld    : number = 0;
+        let j_const      : number = 0;
+        let j_fkf        : number = 0;
 
         let tableName   : string = '';
+        let txtAux      : string = '';
 
         let ft: iFieldType = {}; // {AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
        
         try {
-            await this.fb.startTransaction(true);
+            if (openTr) {   
+                await this.fb.startTransaction(true);
+            }    
 
             rTables  = await this.fb.query(queryTablesView.replace('{$$RELTYPE}','(REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL)') ,[objectName,objectName]);
             rFields  = await this.fb.query(queryTablesViewFields.replace('{$$RELTYPE}','(REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL)'),[objectName,objectName]);
@@ -297,8 +301,10 @@ export class fbExtractMetadata {
                         if (rFields[j_fld].DESCRIPTION !== null)
                             outFields[outFields.length-1].column.description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);                    
 
-                        if (rFields[j_fld].DEFSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
-                            outFields[outFields.length-1].column.default     = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
+                        if (rFields[j_fld].DEFSOURCE !== null) {// al ser blob si es nulo no devuelve una funcion si no null
+                            txtAux  = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
+                            outFields[outFields.length-1].column.default = txtAux.replace('DEFAULT','');                           
+                        }
 
                         if (rFields[j_fld].COMSOURCE !== null)
                             outFields[outFields.length-1].column.computed    = await this.fb.getBlobAsString(rFields[j_fld].COMSOURCE);
@@ -395,9 +401,13 @@ export class fbExtractMetadata {
                         outTables.table.constraint.checks= outcheck; 
                     }    
                     
-                    fs.writeFileSync(this.filesPath+'tables/'+outTables.table.name+'.yaml',yaml.safeDump(outTables, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
-                    
-                    console.log(('generado tabla '+outTables.table.name+'.yaml').padEnd(70,'.')+'OK');
+                    if (aRetYaml) {
+                        outReturnYaml.push(outTables);
+                    }
+                    else {
+                        fs.writeFileSync(this.filesPath+'tables/'+outTables.table.name+'.yaml',yaml.safeDump(outTables, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                        console.log(('generado tabla '+outTables.table.name+'.yaml').padEnd(70,'.')+'OK');
+                    }                    
                     outTables = GlobalTypes.emptyTablesYamlType();
                     outFields= [];
                     outIndexes= [];
@@ -405,7 +415,13 @@ export class fbExtractMetadata {
                     outforeignk=[];
 
             }
-            await this.fb.commit();
+            if (openTr) {
+             await this.fb.commit();
+            }
+            if (aRetYaml) {
+                return outReturnYaml;
+            } 
+
         } catch(err) {
             console.log('Error generando tabla '+tableName+'.', err.message);   
         }        

@@ -3,6 +3,7 @@ import * as yaml from 'js-yaml';
 import * as fbClass from './classFirebird';
 import * as GlobalTypes from './globalTypes';
 import * as fbExtractMetadata from './fbExtractMetadata';
+import { globalAgent } from 'http';
 
 interface iFieldType {
     AName?:         string  | any;
@@ -20,15 +21,25 @@ interface iFieldType {
     AValidation?:   string  | any
 };
 
+function readDirectory(aPath:string, objectType: string, objectName:string) {
+    if (objectName === '') {
+        return fs.readdirSync(aPath+'/'+objectType+'/');
+    }
+    else {
+        if (! fs.existsSync(aPath+'/'+objectType+'/'+objectName+'.yaml')) {
+            throw 'el archivo '+objectName+', no existe';                            
+        }    
+        return [objectName+'.yaml'];
+    }        
+}
 
-export class fbApplyMetadata {
-    //****************************************************************** */
-    //        D E C L A R A C I O N E S    P R I V A D A S
-    //******************************************************************* */
-
+export class fbApplyMetadata {   
     private fb : fbClass.fbConnection;
     private fbExMe: fbExtractMetadata.fbExtractMetadata;   
 
+    //****************************************************************** */
+    //        P R O C E D U R E S
+    //******************************************************************* */
     private async applyProcedures(files: Array<string>) {
         let procedureYamltoString = (aYaml: any) => {
             let paramString = (param:any, aExtra:string) => {
@@ -96,9 +107,13 @@ export class fbApplyMetadata {
             console.log(Date.now());               
         }
         catch (err) {
-            console.log('Error grabando procedimiento '+procedureName+'. ', err.message+GlobalTypes.charCode+procedureBody);
+            console.log('Error aplicando procedimiento '+procedureName+'. ', err.message+GlobalTypes.charCode+procedureBody);
         }  
     }        
+
+    //****************************************************************** */
+    //        T R I G G E R S
+    //******************************************************************* */
 
     private async applyTriggers(files: Array<string>) {
         let triggerYamltoString = (aYaml: any) => {
@@ -161,12 +176,15 @@ export class fbApplyMetadata {
             await this.fb.commit();  
         }    
         catch (err) {
-            console.log('Error generando trigger '+triggerName+'. ', err.message);
+            console.log('Error aplicando trigger '+triggerName+'. ', err.message);
         }      
     }
 
+    //****************************************************************** */
+    //        V I E W S
+    //******************************************************************* */
     private async applyViews(files: Array<string>) {
-        let triggerYamltoString = (aYaml:any) => {
+        let viewYamltoString = (aYaml:any) => {
             let aView:string = '';
             
             aView= 'CREATE OR ALTER VIEW ' + aYaml.view.name + '(' + GlobalTypes.charCode ;                  
@@ -198,9 +216,9 @@ export class fbApplyMetadata {
                 
                 j= dbYaml.findIndex(aItem => (aItem.view.name === viewName));
                 
-                viewBody= triggerYamltoString(fileYaml);     
+                viewBody= viewYamltoString(fileYaml);     
                 if (j !== -1) {
-                    viewInDb= triggerYamltoString(dbYaml[j]);
+                    viewInDb= viewYamltoString(dbYaml[j]);
                 }    
 
                 if (viewBody !== viewInDb) {
@@ -212,10 +230,14 @@ export class fbApplyMetadata {
             } 
             await this.fb.commit();
         } catch(err) {
-            console.log('Error generando view '+viewName+'.', err.message);   
+            console.log('Error aplicando view '+viewName+'.', err.message);   
         } 
 
     }
+
+    //****************************************************************** */
+    //        G E N E R A T O R S
+    //******************************************************************* */
 
     private async applyGenerators(files: Array<string>) {
         let genName:string = '';
@@ -237,34 +259,130 @@ export class fbApplyMetadata {
             await this.fb.commit();
         }
         catch (err) {
-            console.log('Error generando procedimiento '+genName+'. ', err.message);
+            console.log('Error aplicando procedimiento '+genName+'. ', err.message);
         }  
     }
-
-    private readDirectory(objectType: string, objectName:string) {
-        if (objectName === '') {
-            return fs.readdirSync(this.filesPath+'/'+objectType+'/');
-        }
-        else {
-            if (! fs.existsSync(this.filesPath+'/'+objectType+'/'+objectName+'.yaml')) {
-                throw 'el archivo '+objectName+', no existe';                            
-            }    
-            return [objectName+'.yaml'];
-        }        
-    }
-
+   
+    //****************************************************************** */
+    //        T A B L E S
+    //******************************************************************* */
     private async applyTables(files: Array<string>) {
         let tableName:string = '';
+        let dbYaml: Array<any> = [];
+        let tableScript: string = '';
+        let j:number = 0;
+
 
         try {
-            await this.fb.startTransaction(true);
+            await this.fb.startTransaction(false);
 
+            dbYaml= await this.fbExMe.extractMetadataTables('',true,false);
+            for (let i in files) {               
+                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/tables/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+                tableName= fileYaml.table.name;
+                
+                j= dbYaml.findIndex(aItem => (aItem.table.name === tableName));
+
+                if (j === -1) { //NO EXISTE TABLA
+                    tableScript= this.newTableYamltoString(fileYaml.table);
+                    /*
+                    DESCRIPCIONES EN PROC APARTE
+                    if (aFileColumnsYaml[j].column.description !== aDbColumnsYaml[i].column.description) {
+                    retText += 'COMMENT ON COLUMN '+aTableName + '.' + aFileColumnsYaml[j].column.name +' IS '+aFileColumnsYaml[j].column.description+';'+GlobalTypes.charCode;
+                    }
+                    */
+                }
+                else {    
+                    tableScript= this.getTableColumnDiferences(tableName,fileYaml.table.columns,dbYaml[j].table.columns)
+                }    
+            }
             await this.fb.commit();
         } catch(err) {
-            console.log('Error generando tabla '+tableName+'.', err.message);   
+            console.log('Error aplicando tabla '+tableName+'.', err.message);   
         }        
         
     }
+
+    newTableYamltoString(aYaml:any){ 
+        let fieldCreate = (aField:any) => {       
+            let retFld:string= '';
+            retFld = aField.name + ' ' + aField.type;
+            if ('default' in aField) {
+                retFld += ' DEFAULT ' + aField.default;   
+            }
+            if ('computed' in aField) {
+                retFld += ' COMPUTED BY ' + aField.computed;
+            }
+            if ('charset' in aField) {
+                retFld += ' CHARACTER SET ' + aField.charset;
+            }     
+            if (aField.nullable === false) {
+                aTable += ' NOT NULL';    
+            }    
+            return retFld;           
+        }   
+
+        let aTable:string = '';
+
+        aTable= 'CREATE TABLE '+ aYaml.name+' ('+GlobalTypes.charCode;
+        for (let j=0; j < aYaml.columns.length-1; j++){
+            aTable += fieldCreate(aYaml.columns[j].column) + ',' + GlobalTypes.charCode;
+        }
+
+        aTable += fieldCreate(aYaml.columns[aYaml.columns.length-1].column) + ',' + GlobalTypes.charCode;
+        
+        aTable += GlobalTypes.charCode + ')';
+        return aTable;
+    }  
+
+    getTableColumnDiferences(aTableName:string, aFileColumnsYaml: Array<any>, aDbColumnsYaml: Array<any>) {
+        let i:number = 0;
+        let retText:string = '';
+        let retCmd:string = '';
+        let retAux:string = '';
+        
+        for (let j=0; j < aFileColumnsYaml.length; j++){
+            i= aDbColumnsYaml.findIndex(aItem => (aItem.column.name === aFileColumnsYaml[j].column.name));
+            
+            if (i === -1) { //no existe campo
+                retText += 'ALTER TABLE ' + aTableName + ' ADD ' + aFileColumnsYaml[j].column.name + ' ' + aFileColumnsYaml[j].column.type;
+                if (aFileColumnsYaml[j].column.nullable === false) {
+                    retText += ' NOT NULL;';    
+                }
+                retText += GlobalTypes.charCode;       
+            }
+            else { //existe campo                 
+                if (aFileColumnsYaml[j].column.type !== aDbColumnsYaml[i].column.type) {
+                    retText += 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' TYPE ' + aFileColumnsYaml[j].column.type + ';' + GlobalTypes.charCode;
+                }
+                if (aFileColumnsYaml[j].column.default !== aDbColumnsYaml[i].column.default) {
+                    retAux = 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' SET DEFAULT '+ aFileColumnsYaml[j].column.default+';'+GlobalTypes.charCode;
+                }    
+                if (aFileColumnsYaml[j].column.nullable !== aDbColumnsYaml[i].column.nullable) {                    
+                    retAux = 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name;
+                    retCmd = '';
+
+                    if (aFileColumnsYaml[j].column.nullable === false && aDbColumnsYaml[i].column.nullable === true) {
+                        retCmd = 'UPDATE '+ aTableName +' SET ' +  aFileColumnsYaml[j].column.name + "='" + aFileColumnsYaml[j].column.nullableToNotNullValue + "' WHERE " + aFileColumnsYaml[j].column.name + ' IS NOT NULL;' + GlobalTypes.charCode; 
+                        retAux +=  ' SET NOT NULL;'; //ver con que lo lleno al campo que seteo asi   
+                    } 
+                    else if (aFileColumnsYaml[j].column.nullable === true && aDbColumnsYaml[i].column.nullable === false) {
+                        retAux += ' DROP NOT NULL;';
+                    }
+                    retText += retCmd + retAux + GlobalTypes.charCode;                    
+                }
+                if (aFileColumnsYaml[j].column.computed !== aDbColumnsYaml[i].column.computed) {
+                    retText += 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' COMPUTED BY ' + aFileColumnsYaml[j].column.computed + ';' + GlobalTypes.charCode;
+                }                		
+		//present?: boolean
+                if (i !== j) { //difiere posicion del campo
+                    retText += 'ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + aFileColumnsYaml[j].column.name + ' POSITION ' + (j+1) + ';' + GlobalTypes.charCode;
+                }
+            }
+        }
+        return retText;    
+    }
+
     //****************************************************************** */
     //        D E C L A R A C I O N E S    P U B L I C A S
     //******************************************************************* */
@@ -290,19 +408,19 @@ export class fbApplyMetadata {
             try {
                 
                 if (objectType === 'procedures' || objectType === '') {
-                    await this.applyProcedures(this.readDirectory('procedures',objectName));
+                    await this.applyProcedures(readDirectory(this.filesPath,'procedures',objectName));
                 }
                 if (objectType === 'tables' || objectType === '') {                                                 
-                    await this.applyTables(this.readDirectory('tables',objectName));
+                    await this.applyTables(readDirectory(this.filesPath,'tables',objectName));
                 }
                 if (objectType === 'triggers' || objectType === '') {                                             
-                    await this.applyTriggers(this.readDirectory('triggers',objectName));
+                    await this.applyTriggers(readDirectory(this.filesPath,'triggers',objectName));
                 }
                 if (objectType === 'generators' || objectType === '') {                                              
-                    await this.applyGenerators(this.readDirectory('generators',objectName));
+                    await this.applyGenerators(readDirectory(this.filesPath,'generators',objectName));
                 }
                 if (objectType === 'views' || objectType === '') {                     
-                    await this.applyViews(this.readDirectory('views',objectName));
+                    await this.applyViews(readDirectory(this.filesPath,'views',objectName));
                 }                                       
                
             }
