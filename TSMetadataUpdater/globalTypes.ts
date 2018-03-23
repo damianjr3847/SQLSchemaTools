@@ -154,8 +154,8 @@ export interface iTablesFieldYamlType {
 		description?: string,
 		default?:string,
 		name: string,
-		nullable: boolean,	
-		type: string,
+		nullable?: boolean,	
+		type?: string,
 		present?: boolean
 	}	
 };
@@ -218,8 +218,7 @@ export function emptyTablesYamlType() {
 
 export function emptyTablesFieldYamlType() {	
 	return { column:{
-				name: '',
-				nullable: true
+				name: ''
 				}
 			}
 };

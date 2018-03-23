@@ -269,22 +269,29 @@ export class fbApplyMetadata {
     private async applyTables(files: Array<string>) {
         let tableName:string = '';
         let dbYaml: Array<any> = [];
-        let tableScript: string = '';
+        let tableScript: Array<string> = [];
         let j:number = 0;
 
 
         try {
-            await this.fb.startTransaction(false);
+            await this.fb.startTransaction(true);
 
             dbYaml= await this.fbExMe.extractMetadataTables('',true,false);
+            
+            if (dbYaml === undefined) {
+                throw 'no se pudo extraer el metadata de la base';
+            }
+            await this.fb.commit();
+
             for (let i in files) {               
                 const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/tables/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
                 tableName= fileYaml.table.name;
                 
                 j= dbYaml.findIndex(aItem => (aItem.table.name === tableName));
-
+                tableScript= [];
+                
                 if (j === -1) { //NO EXISTE TABLA
-                    tableScript= this.newTableYamltoString(fileYaml.table);
+                    tableScript.push(this.newTableYamltoString(fileYaml.table));
                     /*
                     DESCRIPCIONES EN PROC APARTE
                     if (aFileColumnsYaml[j].column.description !== aDbColumnsYaml[i].column.description) {
@@ -293,51 +300,40 @@ export class fbApplyMetadata {
                     */
                 }
                 else {    
-                    tableScript= this.getTableColumnDiferences(tableName,fileYaml.table.columns,dbYaml[j].table.columns)
-                }    
-            }
-            await this.fb.commit();
+                    tableScript= tableScript.concat(this.getTableColumnDiferences(tableName,fileYaml.table.columns,dbYaml[j].table.columns));
+                }
+        
+                await this.fb.startTransaction(false);
+                for (let i in tableScript) {                
+                    await this.fb.execute(tableScript[i],[]);
+                }
+                await this.fb.commit();    
+            }            
+
         } catch(err) {
             console.log('Error aplicando tabla '+tableName+'.', err.message);   
         }        
         
     }
 
-    newTableYamltoString(aYaml:any){ 
-        let fieldCreate = (aField:any) => {       
-            let retFld:string= '';
-            retFld = aField.name + ' ' + aField.type;
-            if ('default' in aField) {
-                retFld += ' DEFAULT ' + aField.default;   
-            }
-            if ('computed' in aField) {
-                retFld += ' COMPUTED BY ' + aField.computed;
-            }
-            if ('charset' in aField) {
-                retFld += ' CHARACTER SET ' + aField.charset;
-            }     
-            if (aField.nullable === false) {
-                aTable += ' NOT NULL';    
-            }    
-            return retFld;           
-        }   
+    newTableYamltoString(aYaml:any){         
 
         let aTable:string = '';
 
         aTable= 'CREATE TABLE '+ aYaml.name+' ('+GlobalTypes.charCode;
         for (let j=0; j < aYaml.columns.length-1; j++){
-            aTable += fieldCreate(aYaml.columns[j].column) + ',' + GlobalTypes.charCode;
+            aTable += 'ADD ' +fieldToSql(aYaml.columns[j].column) + ',' + GlobalTypes.charCode;
         }
 
-        aTable += fieldCreate(aYaml.columns[aYaml.columns.length-1].column) + ',' + GlobalTypes.charCode;
-        
-        aTable += GlobalTypes.charCode + ')';
+        aTable += 'ADD ' +fieldToSql(aYaml.columns[aYaml.columns.length-1].column) + ')' + GlobalTypes.charCode;
+    
         return aTable;
     }  
 
-    getTableColumnDiferences(aTableName:string, aFileColumnsYaml: Array<any>, aDbColumnsYaml: Array<any>) {
+    getTableColumnDiferences(aTableName:string, aFileColumnsYaml: Array<any>, aDbColumnsYaml: Array<any>):Array<string> {
         let i:number = 0;
         let retText:string = '';
+        let retArray: Array<string> = [];
         let retCmd:string = '';
         let retAux:string = '';
         
@@ -345,42 +341,42 @@ export class fbApplyMetadata {
             i= aDbColumnsYaml.findIndex(aItem => (aItem.column.name === aFileColumnsYaml[j].column.name));
             
             if (i === -1) { //no existe campo
-                retText += 'ALTER TABLE ' + aTableName + ' ADD ' + aFileColumnsYaml[j].column.name + ' ' + aFileColumnsYaml[j].column.type;
-                if (aFileColumnsYaml[j].column.nullable === false) {
-                    retText += ' NOT NULL;';    
-                }
-                retText += GlobalTypes.charCode;       
+                retArray.push('ALTER TABLE ' + aTableName + ' ADD ' + fieldToSql(aFileColumnsYaml[j].column));
             }
             else { //existe campo                 
                 if (aFileColumnsYaml[j].column.type !== aDbColumnsYaml[i].column.type) {
-                    retText += 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' TYPE ' + aFileColumnsYaml[j].column.type + ';' + GlobalTypes.charCode;
+                    retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' TYPE ' + aFileColumnsYaml[j].column.type + ';');
                 }
                 if (aFileColumnsYaml[j].column.default !== aDbColumnsYaml[i].column.default) {
-                    retAux = 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' SET DEFAULT '+ aFileColumnsYaml[j].column.default+';'+GlobalTypes.charCode;
+                    if (aFileColumnsYaml[j].column.default !== '') 
+                        retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' SET DEFAULT '+ aFileColumnsYaml[j].column.default+';');
+                    else
+                        retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' DROP DEFAULT;');     
                 }    
                 if (aFileColumnsYaml[j].column.nullable !== aDbColumnsYaml[i].column.nullable) {                    
                     retAux = 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name;
                     retCmd = '';
 
                     if (aFileColumnsYaml[j].column.nullable === false && aDbColumnsYaml[i].column.nullable === true) {
-                        retCmd = 'UPDATE '+ aTableName +' SET ' +  aFileColumnsYaml[j].column.name + "='" + aFileColumnsYaml[j].column.nullableToNotNullValue + "' WHERE " + aFileColumnsYaml[j].column.name + ' IS NOT NULL;' + GlobalTypes.charCode; 
+                        retCmd = 'UPDATE '+ aTableName +' SET ' +  aFileColumnsYaml[j].column.name + "='" + aFileColumnsYaml[j].column.nullableToNotNullValue + "' WHERE " + aFileColumnsYaml[j].column.name + ' IS NOT NULL;'; 
                         retAux +=  ' SET NOT NULL;'; //ver con que lo lleno al campo que seteo asi   
                     } 
                     else if (aFileColumnsYaml[j].column.nullable === true && aDbColumnsYaml[i].column.nullable === false) {
                         retAux += ' DROP NOT NULL;';
                     }
-                    retText += retCmd + retAux + GlobalTypes.charCode;                    
-                }
+                    retArray.push(retCmd);
+                    retArray.push(retAux);
+                }                
                 if (aFileColumnsYaml[j].column.computed !== aDbColumnsYaml[i].column.computed) {
-                    retText += 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' COMPUTED BY ' + aFileColumnsYaml[j].column.computed + ';' + GlobalTypes.charCode;
+                    retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' COMPUTED BY ' + aFileColumnsYaml[j].column.computed + ';');
                 }                		
 		//present?: boolean
                 if (i !== j) { //difiere posicion del campo
-                    retText += 'ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + aFileColumnsYaml[j].column.name + ' POSITION ' + (j+1) + ';' + GlobalTypes.charCode;
+                    retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + aFileColumnsYaml[j].column.name + ' POSITION ' + (j+1) + ';');
                 }
             }
         }
-        return retText;    
+        return retArray;    
     }
 
     //****************************************************************** */
@@ -435,4 +431,30 @@ export class fbApplyMetadata {
     }
     
     
+}
+
+
+function fieldToSql(aField:any) {
+    let retFld:string = '';
+
+    retFld = aField.name + ' ' ;
+    if ('computed' in aField) {
+        retFld += ' COMPUTED BY ' + aField.computed;
+    }
+    else {
+        retFld += aField.type;
+        if ('default' in aField) {
+            if (!String(aField.default).toUpperCase().startsWith('DEFAULT')) 
+                retFld += ' DEFAULT ' + aField.default;
+            else 
+                retFld += ' ' + aField.default;    
+        }                
+        if ('charset' in aField) {
+            retFld += ' CHARACTER SET ' + aField.charset;
+        }     
+        if (aField.nullable === false) {
+            retFld += ' NOT NULL';    
+        }
+    }
+    return retFld;        
 }

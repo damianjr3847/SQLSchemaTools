@@ -278,37 +278,38 @@ export class fbExtractMetadata {
                     //fields
                     while ((j_fld< rFields.length) && (rFields[j_fld].TABLENAME.trim() == rTables[i].NAME.trim())) {
                         
-                        outFields.push({column:{name: '', nullable: true, type: ''}});
+                        outFields.push(GlobalTypes.emptyTablesFieldYamlType());
 
                         outFields[outFields.length-1].column.name      = rFields[j_fld].FIELDNAME.trim();
                         
-                        if (rFields[j_fld].CHARACTERSET !== null && rFields[j_fld].CHARACTERSET.trim() !== 'NONE')
-                            outFields[outFields.length-1].column.charset   = rFields[j_fld].CHARACTERSET.trim();
-                                               
-                        outFields[outFields.length-1].column.nullable  = rFields[j_fld].FLAG !== 1;
-
-                        ft.AType        = rFields[j_fld].FTYPE;
-                        ft.ASubType     = rFields[j_fld].SUBTYPE;
-                        ft.ALength      = rFields[j_fld].FLENGTH;
-                        ft.APrecision   = rFields[j_fld].FPRECISION;
-                        ft.AScale       = rFields[j_fld].SCALE;
-                        
-                        outFields[outFields.length-1].column.type=  FieldType(ft); 
-
-                        if (rFields[j_fld].FCOLLATION !== null && rFields[j_fld].FCOLLATION.trim() !== 'NONE')
-                            outFields[outFields.length-1].column.collate     = rFields[j_fld].FCOLLATION.trim();
-                    
-                        if (rFields[j_fld].DESCRIPTION !== null)
-                            outFields[outFields.length-1].column.description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);                    
-
-                        if (rFields[j_fld].DEFSOURCE !== null) {// al ser blob si es nulo no devuelve una funcion si no null
-                            txtAux  = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
-                            outFields[outFields.length-1].column.default = txtAux.replace('DEFAULT','');                           
-                        }
-
                         if (rFields[j_fld].COMSOURCE !== null)
                             outFields[outFields.length-1].column.computed    = await this.fb.getBlobAsString(rFields[j_fld].COMSOURCE);
-                                        
+                        else {
+                            if (rFields[j_fld].CHARACTERSET !== null && rFields[j_fld].CHARACTERSET.trim() !== 'NONE')
+                                outFields[outFields.length-1].column.charset   = rFields[j_fld].CHARACTERSET.trim();
+                                                
+                            outFields[outFields.length-1].column.nullable  = rFields[j_fld].FLAG !== 1;
+
+                            ft.AType        = rFields[j_fld].FTYPE;
+                            ft.ASubType     = rFields[j_fld].SUBTYPE;
+                            ft.ALength      = rFields[j_fld].FLENGTH;
+                            ft.APrecision   = rFields[j_fld].FPRECISION;
+                            ft.AScale       = rFields[j_fld].SCALE;                                             
+
+                            if (rFields[j_fld].FCOLLATION !== null && rFields[j_fld].FCOLLATION.trim() !== 'NONE')
+                                outFields[outFields.length-1].column.collate     = rFields[j_fld].FCOLLATION.trim();
+                        
+                            if (rFields[j_fld].DESCRIPTION !== null)
+                                outFields[outFields.length-1].column.description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);                    
+
+                            if (rFields[j_fld].DEFSOURCE !== null) {// al ser blob si es nulo no devuelve una funcion si no null
+                                outFields[outFields.length-1].column.default  = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
+                                //outFields[outFields.length-1].column.default = txtAux.trim();//.replace('DEFAULT','');                           
+                            }
+                            
+                            outFields[outFields.length-1].column.type=  FieldType(ft);
+                        }    
+
                         j_fld++;
                     }
                     //indices                    
@@ -416,7 +417,7 @@ export class fbExtractMetadata {
 
             }
             if (openTr) {
-             await this.fb.commit();
+                await this.fb.commit();
             }
             if (aRetYaml) {
                 return outReturnYaml;
