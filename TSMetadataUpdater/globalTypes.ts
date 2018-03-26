@@ -22,7 +22,8 @@ export const yamlFileSaveOptions = {
 	flag: 'w'*/
 };
 
-export const charCode:any = String.fromCharCode(10);
+export const CR:any = String.fromCharCode(10);
+export const TAB:any = String.fromCharCode(9);
 
 /**************************************************************************************** */
 /**********             T R I G G E R S      I N T E R F A C E                           */

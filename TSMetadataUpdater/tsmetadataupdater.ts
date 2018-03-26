@@ -19,7 +19,7 @@ https://github.com/hgourvest/node-firebird
 
 */
 
-import * as fsexistsSync from 'fs';
+import * as fs from 'fs';
 import * as params from 'commander';
 
 import * as fbExtractMetadata from './fbExtractMetadata';
@@ -35,9 +35,9 @@ let dbHost:string       = 'srv-01.sig2k.com';
 let dbPort:number       = 3050;
 let dbUser:string       = 'SYSDBA';
 let dbPass:string       = 'masterkey';
-let objectType:string   = 'tables';
+let objectType:string   = '';
 let objectName:string   = '';
-//let objectName:string   = '';
+let pathfilescript:string   = './export/script.sql';
 
 /*params.version('1.0.0');
 
@@ -55,6 +55,8 @@ params.option('-p, --dbpass <dbpass>', 'Password DB');
 
 params.option('-t, --objecttype <objecttype>', 'opcional, especifica que tipo de cambios se aplican (procedures,triggers,tables,generators');
 params.option('-n, --objectname <objectname>', 'opcional, nombre particular del ObjectType (ot) que se desea aplicar');
+params.option('--outscript <pathfilescript>', 'opcional, devuelve un archivo con las sentencias sql');
+
 //console.log(process.argv);
 
 params.parse(process.argv);
@@ -91,7 +93,7 @@ else {
 }
 
 if (params.yalm) {
-    if (! fsexistsSync.existsSync(params.yalm)) {
+    if (! fs.existsSync(params.yalm)) {
         console.log('el path %j no existe', params.yalm);
         process.exit();
     }
@@ -159,6 +161,10 @@ if (params.objectname) {
     }
 }
 
+if (params.pathfilescript) {
+    pathfilescript= params.pathfilescript;
+}
+
 /*console.log('actionYalm: %j',actionYalm);
 console.log('pathYalm: %j',pathYalm);
 console.log('dbDriver: %j', dbDriver);
@@ -183,6 +189,11 @@ console.log('objectName: %j', objectName);*/
         else if (actionYalm === 'read') {
             fbam = new fbApplyMetadata.fbApplyMetadata;
             fbam.filesPath = pathYalm;
+            fbam.pathFileScript= pathfilescript;
+            if (pathfilescript !== '')
+                if (fs.existsSync(pathfilescript)) {
+                    fs.unlinkSync(pathfilescript);
+                }
             await fbam.applyYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
         }      
         

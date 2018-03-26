@@ -3,7 +3,6 @@ import * as yaml from 'js-yaml';
 import * as fbClass from './classFirebird';
 import * as GlobalTypes from './globalTypes';
 import * as fbExtractMetadata from './fbExtractMetadata';
-import { globalAgent } from 'http';
 
 interface iFieldType {
     AName?:         string  | any;
@@ -36,6 +35,32 @@ function readDirectory(aPath:string, objectType: string, objectName:string) {
 export class fbApplyMetadata {   
     private fb : fbClass.fbConnection;
     private fbExMe: fbExtractMetadata.fbExtractMetadata;   
+    public pathFileScript: string = '';
+
+    
+    outFileScript(aType:string, aScript:Array<any> | string) {        
+        switch (aType) {
+            case 'tables':
+                if (aScript.length>0) {
+                    fs.appendFileSync(this.pathFileScript, GlobalTypes.CR , 'utf8'); 
+                    for (let i=0; i < aScript.length; i++){
+                        fs.appendFileSync(this.pathFileScript, aScript[i] + GlobalTypes.CR, 'utf8');
+                    }
+                }
+                break;
+            case 'procedures':
+            case 'triggers':
+            case 'views':
+                fs.appendFileSync(this.pathFileScript, GlobalTypes.CR + 'SET TERM ^;' + GlobalTypes.CR, 'utf8');                    
+                fs.appendFileSync(this.pathFileScript,  aScript, 'utf8');    
+                fs.appendFileSync(this.pathFileScript, GlobalTypes.CR + 'SET TERM ;^' + GlobalTypes.CR, 'utf8');                
+                break;
+            case 'generators':
+                fs.appendFileSync(this.pathFileScript, GlobalTypes.CR , 'utf8'); 
+                fs.appendFileSync(this.pathFileScript,  aScript, 'utf8'); 
+                break;
+        }    
+    }
 
     //****************************************************************** */
     //        P R O C E D U R E S
@@ -47,10 +72,10 @@ export class fbApplyMetadata {
     
                 if (param.length > 0) {
                     for (let j=0; j < param.length-1; j++){                    
-                        aText += param[j].param.name +' '+ param[j].param.type + ',' + GlobalTypes.charCode;
+                        aText += param[j].param.name +' '+ param[j].param.type + ',' + GlobalTypes.CR;
                     }
-                    aText += param[j].param.name +' '+ param[j].param.type;
-                    aText = aExtra + '(' + GlobalTypes.charCode + aText + ')';                        
+                    aText += param[param.length-1].param.name +' '+ param[param.length-1].param.type;
+                    aText = aExtra + '(' + GlobalTypes.CR + aText + ')';                        
                 };
                 return aText;
             };
@@ -64,7 +89,7 @@ export class fbApplyMetadata {
             if ('outputs' in aYaml.procedure)    
                 aProc += paramString(aYaml.procedure.outputs,'RETURNS');               
             
-            aProc += GlobalTypes.charCode + 'AS' + GlobalTypes.charCode +aYaml.procedure.body;
+            aProc += GlobalTypes.CR + 'AS' + GlobalTypes.CR +aYaml.procedure.body;
             return aProc;        
         }
 
@@ -97,8 +122,12 @@ export class fbApplyMetadata {
                 }    
 
                 if (procedureInDB !== procedureBody) {
-                    await this.fb.execute(procedureBody,[]);
-                    console.log(('Aplicando procedure '+fileYaml.procedure.name).padEnd(70,'.')+'OK');
+                    if (this.pathFileScript === '') {
+                        await this.fb.execute(procedureBody,[]);
+                        console.log(('Aplicando procedure '+fileYaml.procedure.name).padEnd(70,'.')+'OK');
+                    }
+                    else 
+                        this.outFileScript('procedures',procedureBody);    
                 }    
 
                 procedureBody= '';
@@ -107,7 +136,7 @@ export class fbApplyMetadata {
             console.log(Date.now());               
         }
         catch (err) {
-            console.log('Error aplicando procedimiento '+procedureName+'. ', err.message+GlobalTypes.charCode+procedureBody);
+            console.log('Error aplicando procedimiento '+procedureName+'. ', err.message+GlobalTypes.CR+procedureBody);
         }  
     }        
 
@@ -136,7 +165,7 @@ export class fbApplyMetadata {
             };
             aProc+= ' POSITION '+ aYaml.triggerFunction.triggers[0].trigger.position;
     
-            aProc += GlobalTypes.charCode +aYaml.triggerFunction.function.body;
+            aProc += GlobalTypes.CR +aYaml.triggerFunction.function.body;
             return aProc;        
         };
 
@@ -165,8 +194,13 @@ export class fbApplyMetadata {
                 }    
                 
                 if (triggerBody !== triggerInDb) {
-                    await this.fb.execute(triggerBody,[]);
-                    console.log(('Aplicando trigger '+triggerName).padEnd(70,'.')+'OK');
+                    if (this.pathFileScript === '') {
+                        await this.fb.execute(triggerBody,[]);
+                        console.log(('Aplicando trigger '+triggerName).padEnd(70,'.')+'OK');
+                    }
+                    else {
+                        this.outFileScript('triggers',triggerBody);
+                    }    
                 }    
 
                 triggerBody= '';
@@ -187,14 +221,14 @@ export class fbApplyMetadata {
         let viewYamltoString = (aYaml:any) => {
             let aView:string = '';
             
-            aView= 'CREATE OR ALTER VIEW ' + aYaml.view.name + '(' + GlobalTypes.charCode ;                  
+            aView= 'CREATE OR ALTER VIEW ' + aYaml.view.name + '(' + GlobalTypes.CR ;                  
                                 
             for (let j=0; j < aYaml.view.columns.length-1; j++){
-                aView+= aYaml.view.columns[j]+','+GlobalTypes.charCode;
+                aView+= aYaml.view.columns[j]+','+GlobalTypes.CR;
             };
-            aView+= aYaml.view.columns[aYaml.view.columns.length-1]+')'+GlobalTypes.charCode;
+            aView+= aYaml.view.columns[aYaml.view.columns.length-1]+')'+GlobalTypes.CR;
 
-            aView += 'AS'+GlobalTypes.charCode +aYaml.view.body;
+            aView += 'AS'+GlobalTypes.CR +aYaml.view.body;
             
             return aView;
         };
@@ -222,8 +256,13 @@ export class fbApplyMetadata {
                 }    
 
                 if (viewBody !== viewInDb) {
-                    await this.fb.execute(viewBody,[]);
-                    console.log(('Aplicando view '+viewName).padEnd(70,'.')+'OK');
+                    if (this.pathFileScript === '') {
+                        await this.fb.execute(viewBody,[]);
+                        console.log(('Aplicando view '+viewName).padEnd(70,'.')+'OK');
+                    }
+                    else {
+                        this.outFileScript('views',viewBody);
+                    }    
                 }    
                 viewBody='';                
                 viewInDb='';
@@ -251,8 +290,13 @@ export class fbApplyMetadata {
                 genBody= 'CREATE SEQUENCE ' + fileYaml.generator.name;  
                                     
                 if (!(await this.fb.validate('SELECT 1 FROM RDB$GENERATORS WHERE RDB$GENERATOR_NAME=?',[genName]))) {
-                    await this.fb.execute(genBody,[]);
-                    console.log(('Aplicando Generator '+genName).padEnd(70,'.')+'OK');
+                    if (this.pathFileScript === '') {
+                        await this.fb.execute(genBody,[]);
+                        console.log(('Aplicando Generator '+genName).padEnd(70,'.')+'OK');
+                    }
+                    else {
+                        this.outFileScript('generators',genBody);
+                    }    
                 }    
                 
             }    
@@ -289,25 +333,31 @@ export class fbApplyMetadata {
                 
                 j= dbYaml.findIndex(aItem => (aItem.table.name === tableName));
                 tableScript= [];
-                
+
                 if (j === -1) { //NO EXISTE TABLA
                     tableScript.push(this.newTableYamltoString(fileYaml.table));
                     /*
                     DESCRIPCIONES EN PROC APARTE
                     if (aFileColumnsYaml[j].column.description !== aDbColumnsYaml[i].column.description) {
-                    retText += 'COMMENT ON COLUMN '+aTableName + '.' + aFileColumnsYaml[j].column.name +' IS '+aFileColumnsYaml[j].column.description+';'+GlobalTypes.charCode;
+                    retText += 'COMMENT ON COLUMN '+aTableName + '.' + aFileColumnsYaml[j].column.name +' IS '+aFileColumnsYaml[j].column.description+';'+GlobalTypes.CR;
                     }
                     */
                 }
                 else {    
                     tableScript= tableScript.concat(this.getTableColumnDiferences(tableName,fileYaml.table.columns,dbYaml[j].table.columns));
+
                 }
         
-                await this.fb.startTransaction(false);
-                for (let i in tableScript) {                
-                    await this.fb.execute(tableScript[i],[]);
+                if (this.pathFileScript === '') {
+                    await this.fb.startTransaction(false);
+                    for (let i=0; i < tableScript.length; i++){                    
+                        await this.fb.execute(tableScript[i],[]);
+                        console.log('aplicando cambios en tablas. '+tableScript[i]);
+                    }
+                    await this.fb.commit();    
                 }
-                await this.fb.commit();    
+                else 
+                    this.outFileScript('tables',tableScript);    
             }            
 
         } catch(err) {
@@ -317,16 +367,78 @@ export class fbApplyMetadata {
     }
 
     newTableYamltoString(aYaml:any){         
-
+    
         let aTable:string = '';
+        let aText:string = '';
 
-        aTable= 'CREATE TABLE '+ aYaml.name+' ('+GlobalTypes.charCode;
+        aTable= 'CREATE TABLE '+ aYaml.name+' ('+GlobalTypes.CR;
         for (let j=0; j < aYaml.columns.length-1; j++){
-            aTable += 'ADD ' +fieldToSql(aYaml.columns[j].column) + ',' + GlobalTypes.charCode;
+            aTable += GlobalTypes.TAB +fieldToSql(aYaml.columns[j].column) + ',' + GlobalTypes.CR;
         }
 
-        aTable += 'ADD ' +fieldToSql(aYaml.columns[aYaml.columns.length-1].column) + ')' + GlobalTypes.charCode;
+        aTable += GlobalTypes.TAB +fieldToSql(aYaml.columns[aYaml.columns.length-1].column) + ');' + GlobalTypes.CR;
     
+        if ('constraint' in aYaml) {
+            if ('foreignkeys' in aYaml.constraint) {
+                //name,onColumn,toTable,toColumn,updateRole,deleteRole
+                //ALTER TABLE ART_ARCH ADD CONSTRAINT FK_ART_ARCH_CUECOM FOREIGN KEY (FCUECOM) REFERENCES CON_CUEN (FCUENTA) ON UPDATE CASCADE;
+                for (let j=0; j < aYaml.constraint.foreignkeys.length; j++) {
+                    aTable += 'ALTER TABLE '+aYaml.name+' ADD CONSTRAINT '+aYaml.constraint.foreignkeys[j].foreignkey.name+ ' FOREIGN KEY ('+aYaml.constraint.foreignkeys[j].foreignkey.onColumn+') REFERENCES '+aYaml.constraint.foreignkeys[j].foreignkey.toTable+' ('+aYaml.constraint.foreignkeys[j].foreignkey.toColumn+')';
+                    if ('updateRole' in aYaml.constraint.foreignkeys[j].foreignkey) {
+                        aTable += ' ON UPDATE '+aYaml.constraint.foreignkeys[j].foreignkey.updateRole+';'+GlobalTypes.CR
+                    }
+                    if ('deleteRole' in aYaml.constraint.foreignkeys[j].foreignkey) {
+                        aTable += ' ON DELETE '+aYaml.constraint.foreignkeys[j].foreignkey.deleteRole+';'+GlobalTypes.CR    
+                    }
+                }    
+            }
+            
+            if ('checks' in aYaml.constraint) {
+                //name, expresion
+                //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_UXD CHECK (FUXD>0);
+                for (let j=0; j < aYaml.constraint.checks.length; j++) {
+                    aTable += 'ALTER TABLE '+aYaml.name+' ADD CONSTRAINT '+aYaml.constraint.checks[j].check.name;
+                    if (aYaml.constraint.checks[j].check.expresion.trim().toUpperCase().startsWith('CHECK')) {
+                        aTable += ' '+aYaml.constraint.checks[j].check.expresion.trim()+';'+GlobalTypes.CR;  
+                    }
+                    else {
+                        aTable += ' CHECK '+aYaml.constraint.checks[j].check.expresion.trim()+';'+GlobalTypes.CR;
+                    }    
+                }    
+            }
+            
+            if ('primaryKey' in aYaml.constraint) {
+                //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_PK PRIMARY KEY (FCODINT);
+                aTable += 'ALTER TABLE '+aYaml.name+' ADD CONSTRAINT '+aYaml.constraint.primaryKey.name+' PRIMARY KEY (';                
+                for (let j=0; j < aYaml.constraint.primaryKey.columns.length-1; j++) {
+                    aTable += aYaml.constraint.primaryKey.columns[j] + ',';
+                }
+                aTable += aYaml.constraint.primaryKey.columns[aYaml.constraint.primaryKey.columns.length-1] + ');'+GlobalTypes.CR;
+            }            
+        }
+        if ('indexes' in aYaml) {
+            //active,computedBy,columns,name,unique,descending
+            //CREATE UNIQUE INDEX ART_ARCH_CODIGO ON ART_ARCH (FCODIGO);
+            //CREATE INDEX ART_ARCH_CODMAD ON ART_ARCH (FCODMAD);
+            //CREATE INDEX ART_ARCH_IDX2 ON ART_ARCH COMPUTED BY (TRIM(FCODIGO))
+            for (let j=0; j < aYaml.indexes.length; j++) {
+                aText='';
+                if (aYaml.indexes[j].index.unique == true) 
+                    aText = ' UNIQUE ';
+                if (aYaml.indexes[j].index.descending == true) 
+                    aText = ' DESCENDING ';                                    
+                if ('computedBy' in aYaml.indexes[j].index) 
+                    aText = 'CREATE '+ aText +' INDEX '+aYaml.indexes[j].index.name+ ' COMPUTED BY ('+aYaml.indexes[j].index.computedBy+')';
+                else {
+                    aText = 'CREATE '+ aText +' INDEX '+aYaml.indexes[j].index.name+ '(';
+                    for (let i=0; i < aYaml.indexes[j].index.columns.length-1; i++) {
+                        aText+= aYaml.indexes[j].index.columns[i]+',';
+                    }                    
+                    aText+= aYaml.indexes[j].index.columns[aYaml.indexes[j].index.columns.length-1]+')'
+                }
+                aTable += aText+';'+GlobalTypes.CR;
+            }    
+        }
         return aTable;
     }  
 
@@ -341,12 +453,14 @@ export class fbApplyMetadata {
             i= aDbColumnsYaml.findIndex(aItem => (aItem.column.name === aFileColumnsYaml[j].column.name));
             
             if (i === -1) { //no existe campo
-                retArray.push('ALTER TABLE ' + aTableName + ' ADD ' + fieldToSql(aFileColumnsYaml[j].column));
+                retArray.push('ALTER TABLE ' + aTableName + ' ADD ' + fieldToSql(aFileColumnsYaml[j].column)+';');
             }
-            else { //existe campo                 
-                if (aFileColumnsYaml[j].column.type !== aDbColumnsYaml[i].column.type) {
-                    retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' TYPE ' + aFileColumnsYaml[j].column.type + ';');
-                }
+            else { //existe campo 
+                if (!("computed" in aFileColumnsYaml[j].column)) {                                 
+                    if (aFileColumnsYaml[j].column.type.toUpperCase() !== aDbColumnsYaml[i].column.type.toUpperCase()) {
+                        retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' TYPE ' + aFileColumnsYaml[j].column.type + ';');
+                    }
+                }    
                 if (aFileColumnsYaml[j].column.default !== aDbColumnsYaml[i].column.default) {
                     if (aFileColumnsYaml[j].column.default !== '') 
                         retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' SET DEFAULT '+ aFileColumnsYaml[j].column.default+';');
@@ -354,7 +468,7 @@ export class fbApplyMetadata {
                         retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' DROP DEFAULT;');     
                 }    
                 if (aFileColumnsYaml[j].column.nullable !== aDbColumnsYaml[i].column.nullable) {                    
-                    retAux = 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name;
+                    retAux = 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name+';';
                     retCmd = '';
 
                     if (aFileColumnsYaml[j].column.nullable === false && aDbColumnsYaml[i].column.nullable === true) {
@@ -364,7 +478,9 @@ export class fbApplyMetadata {
                     else if (aFileColumnsYaml[j].column.nullable === true && aDbColumnsYaml[i].column.nullable === false) {
                         retAux += ' DROP NOT NULL;';
                     }
-                    retArray.push(retCmd);
+                    if (retCmd !== '') 
+                        retArray.push(retCmd);
+
                     retArray.push(retAux);
                 }                
                 if (aFileColumnsYaml[j].column.computed !== aDbColumnsYaml[i].column.computed) {
@@ -387,7 +503,7 @@ export class fbApplyMetadata {
 
     constructor() {
         this.fb = new fbClass.fbConnection;
-        this.fbExMe= new fbExtractMetadata.fbExtractMetadata(this.fb);    
+        this.fbExMe= new fbExtractMetadata.fbExtractMetadata(this.fb);            
     }
 
     public async applyYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string, objectType:string, objectName:string)  {                
@@ -402,22 +518,21 @@ export class fbApplyMetadata {
     
             await this.fb.connect();
             try {
-                
-                if (objectType === 'procedures' || objectType === '') {
-                    await this.applyProcedures(readDirectory(this.filesPath,'procedures',objectName));
-                }
+                if (objectType === 'generators' || objectType === '') {                                              
+                    await this.applyGenerators(readDirectory(this.filesPath,'generators',objectName));
+                }      
                 if (objectType === 'tables' || objectType === '') {                                                 
                     await this.applyTables(readDirectory(this.filesPath,'tables',objectName));
                 }
+                if (objectType === 'views' || objectType === '') {                     
+                    await this.applyViews(readDirectory(this.filesPath,'views',objectName));
+                } 
                 if (objectType === 'triggers' || objectType === '') {                                             
                     await this.applyTriggers(readDirectory(this.filesPath,'triggers',objectName));
                 }
-                if (objectType === 'generators' || objectType === '') {                                              
-                    await this.applyGenerators(readDirectory(this.filesPath,'generators',objectName));
-                }
-                if (objectType === 'views' || objectType === '') {                     
-                    await this.applyViews(readDirectory(this.filesPath,'views',objectName));
-                }                                       
+                if (objectType === 'procedures' || objectType === '') {
+                    await this.applyProcedures(readDirectory(this.filesPath,'procedures',objectName));
+                }                                                     
                
             }
             finally {
