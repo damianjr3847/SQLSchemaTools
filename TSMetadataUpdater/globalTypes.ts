@@ -44,6 +44,7 @@ export interface iTriggerTable {
 export interface iTriggerYamlType {
     triggerFunction: {
 		name:string,
+		ensure?: string, //present: crea si no esta pero no actualisa, absent: si es lo borra, latest: que este la ultima version 
 		triggers: Array<iTriggerTable>,		
 		function: { 
         	language?: string,
@@ -65,6 +66,7 @@ export function emptyTriggerYamlType () {
 	return { 
 		triggerFunction: {
 			name:'',
+			ensure: '',
 			triggers: [],		
 			function: {
 				language:'plpgsql',
@@ -107,6 +109,7 @@ export interface iProcedureYamlType {
         name:string,
         inputs?: Array<iProcedureParameter>,    
 		outputs?: Array<iProcedureParameter>,
+		ensure?: string, //present: crea si no esta pero no actualisa, absent: si es lo borra, latest: que este la ultima version 
 		pg: { 
         	language?: string,
         	resultType?: string,
@@ -127,6 +130,7 @@ export function emptyProcedureYamlType () {
 	return { 
 		procedure:{
 			name:'',
+			ensure:'', 
 			pg: {
 				language:'plpgsql',
 				resultType:'TABLE',

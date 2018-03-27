@@ -335,17 +335,13 @@ export class fbApplyMetadata {
                 tableScript= [];
 
                 if (j === -1) { //NO EXISTE TABLA
-                    tableScript.push(this.newTableYamltoString(fileYaml.table));
-                    /*
-                    DESCRIPCIONES EN PROC APARTE
-                    if (aFileColumnsYaml[j].column.description !== aDbColumnsYaml[i].column.description) {
-                    retText += 'COMMENT ON COLUMN '+aTableName + '.' + aFileColumnsYaml[j].column.name +' IS '+aFileColumnsYaml[j].column.description+';'+GlobalTypes.CR;
-                    }
-                    */
+                    tableScript.push(this.newTableYamltoString(fileYaml.table));                    
                 }
                 else {    
                     tableScript= tableScript.concat(this.getTableColumnDiferences(tableName,fileYaml.table.columns,dbYaml[j].table.columns));
-
+                    tableScript= tableScript.concat(this.getTableConstraintDiferences(tableName,fileYaml.table.constraint,dbYaml[j].table.constraint));
+                    tableScript= tableScript.concat(this.getTableDescriptionDiferences(tableName,fileYaml.table,dbYaml[j].table));
+                    tableScript= tableScript.concat(this.getTableIndexesDiferences(tableName,fileYaml.table,dbYaml[j].table));
                 }
         
                 if (this.pathFileScript === '') {
@@ -366,8 +362,7 @@ export class fbApplyMetadata {
         
     }
 
-    newTableYamltoString(aYaml:any){         
-    
+    newTableYamltoString(aYaml:any){                 
         let aTable:string = '';
         let aText:string = '';
 
@@ -379,66 +374,25 @@ export class fbApplyMetadata {
         aTable += GlobalTypes.TAB +fieldToSql(aYaml.columns[aYaml.columns.length-1].column) + ');' + GlobalTypes.CR;
     
         if ('constraint' in aYaml) {
-            if ('foreignkeys' in aYaml.constraint) {
-                //name,onColumn,toTable,toColumn,updateRole,deleteRole
-                //ALTER TABLE ART_ARCH ADD CONSTRAINT FK_ART_ARCH_CUECOM FOREIGN KEY (FCUECOM) REFERENCES CON_CUEN (FCUENTA) ON UPDATE CASCADE;
-                for (let j=0; j < aYaml.constraint.foreignkeys.length; j++) {
-                    aTable += 'ALTER TABLE '+aYaml.name+' ADD CONSTRAINT '+aYaml.constraint.foreignkeys[j].foreignkey.name+ ' FOREIGN KEY ('+aYaml.constraint.foreignkeys[j].foreignkey.onColumn+') REFERENCES '+aYaml.constraint.foreignkeys[j].foreignkey.toTable+' ('+aYaml.constraint.foreignkeys[j].foreignkey.toColumn+')';
-                    if ('updateRole' in aYaml.constraint.foreignkeys[j].foreignkey) {
-                        aTable += ' ON UPDATE '+aYaml.constraint.foreignkeys[j].foreignkey.updateRole+';'+GlobalTypes.CR
-                    }
-                    if ('deleteRole' in aYaml.constraint.foreignkeys[j].foreignkey) {
-                        aTable += ' ON DELETE '+aYaml.constraint.foreignkeys[j].foreignkey.deleteRole+';'+GlobalTypes.CR    
-                    }
-                }    
-            }
+            if ('foreignkeys' in aYaml.constraint)                 
+                aTable += arrayToString(foreignkeysToSql(aYaml.name, aYaml.constraint.foreignkeys));               
             
-            if ('checks' in aYaml.constraint) {
-                //name, expresion
-                //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_UXD CHECK (FUXD>0);
-                for (let j=0; j < aYaml.constraint.checks.length; j++) {
-                    aTable += 'ALTER TABLE '+aYaml.name+' ADD CONSTRAINT '+aYaml.constraint.checks[j].check.name;
-                    if (aYaml.constraint.checks[j].check.expresion.trim().toUpperCase().startsWith('CHECK')) {
-                        aTable += ' '+aYaml.constraint.checks[j].check.expresion.trim()+';'+GlobalTypes.CR;  
-                    }
-                    else {
-                        aTable += ' CHECK '+aYaml.constraint.checks[j].check.expresion.trim()+';'+GlobalTypes.CR;
-                    }    
-                }    
-            }
+            if ('checks' in aYaml.constraint)                 
+                aTable += arrayToString(checkToSql(aYaml.name, aYaml.constraint.checks));
             
-            if ('primaryKey' in aYaml.constraint) {
-                //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_PK PRIMARY KEY (FCODINT);
-                aTable += 'ALTER TABLE '+aYaml.name+' ADD CONSTRAINT '+aYaml.constraint.primaryKey.name+' PRIMARY KEY (';                
-                for (let j=0; j < aYaml.constraint.primaryKey.columns.length-1; j++) {
-                    aTable += aYaml.constraint.primaryKey.columns[j] + ',';
-                }
-                aTable += aYaml.constraint.primaryKey.columns[aYaml.constraint.primaryKey.columns.length-1] + ');'+GlobalTypes.CR;
-            }            
+            if ('primaryKey' in aYaml.constraint) 
+                aTable += primaryKeyToSql(aYaml.name, aYaml.constraint.primaryKey);   
         }
-        if ('indexes' in aYaml) {
-            //active,computedBy,columns,name,unique,descending
-            //CREATE UNIQUE INDEX ART_ARCH_CODIGO ON ART_ARCH (FCODIGO);
-            //CREATE INDEX ART_ARCH_CODMAD ON ART_ARCH (FCODMAD);
-            //CREATE INDEX ART_ARCH_IDX2 ON ART_ARCH COMPUTED BY (TRIM(FCODIGO))
-            for (let j=0; j < aYaml.indexes.length; j++) {
-                aText='';
-                if (aYaml.indexes[j].index.unique == true) 
-                    aText = ' UNIQUE ';
-                if (aYaml.indexes[j].index.descending == true) 
-                    aText = ' DESCENDING ';                                    
-                if ('computedBy' in aYaml.indexes[j].index) 
-                    aText = 'CREATE '+ aText +' INDEX '+aYaml.indexes[j].index.name+ ' COMPUTED BY ('+aYaml.indexes[j].index.computedBy+')';
-                else {
-                    aText = 'CREATE '+ aText +' INDEX '+aYaml.indexes[j].index.name+ '(';
-                    for (let i=0; i < aYaml.indexes[j].index.columns.length-1; i++) {
-                        aText+= aYaml.indexes[j].index.columns[i]+',';
-                    }                    
-                    aText+= aYaml.indexes[j].index.columns[aYaml.indexes[j].index.columns.length-1]+')'
-                }
-                aTable += aText+';'+GlobalTypes.CR;
-            }    
-        }
+        if ('indexes' in aYaml) 
+            aTable += arrayToString(indexesToSql(aYaml.name, aYaml.indexes));      
+        
+        if ('description' in aYaml) 
+            aTable += "COMMENT ON TABLE "+aYaml.name+" IS '"+aYaml.description+"';"+GlobalTypes.CR;
+        
+        for (let j=0; j < aYaml.columns.length; j++){
+            if ('description' in aYaml.columns[j].column && aYaml.columns[j].column.description !== '')     
+                aTable += "COMMENT ON COLUMN "+aYaml.name+"."+aYaml.columns[j].column.name+" IS '"+aYaml.columns[j].column.description+"';"+GlobalTypes.CR;
+        }                
         return aTable;
     }  
 
@@ -494,6 +448,124 @@ export class fbApplyMetadata {
         }
         return retArray;    
     }
+
+    getTableConstraintDiferences(aTableName:string, aFileConstraintYaml: any, aDbConstraintYaml: any):Array<string> {
+        let retArray: Array<string> = [];
+        let iDB:number=0;
+        let pkDB:string = '';
+        let pkFY:string = '';
+        let arrayAux:Array<any> = [];
+
+
+        if ('foreignkeys' in aFileConstraintYaml) {
+            arrayAux= aDbConstraintYaml.foreignkeys;
+            for (let j=0; j < aFileConstraintYaml.foreignkeys.length; j++) {    
+                iDB= arrayAux.findIndex(aItem => (aItem.foreignkey.name === aFileConstraintYaml.foreignkeys[j].foreignkey.name));
+                if (iDB === -1) 
+                    retArray.push(arrayToString(foreignkeysToSql(aTableName, Array(aFileConstraintYaml.foreignkeys[j]))));
+                else { /* || or && and*/
+                    if (String(aFileConstraintYaml.foreignkeys[j].foreignkey.onColumn).trim().toUpperCase()   !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.onColumn).trim().toUpperCase()   ||
+                        String(aFileConstraintYaml.foreignkeys[j].foreignkey.toTable).trim().toUpperCase()    !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.toTable).trim().toUpperCase()    ||
+                        String(aFileConstraintYaml.foreignkeys[j].foreignkey.toColumn).trim().toUpperCase()   !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase()   ||
+                        String(aFileConstraintYaml.foreignkeys[j].foreignkey.updateRole).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.updateRole).trim().toUpperCase() || 
+                        String(aFileConstraintYaml.foreignkeys[j].foreignkey.deleteRole).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.deleteRole).trim().toUpperCase()) {
+                        
+                            retArray.push('ALTER TABLE '+aTableName+' DROP CONSTRAINT '+aFileConstraintYaml.foreignkeys[j].foreignkey.name+';'+GlobalTypes.CR);
+                            retArray.push(arrayToString(foreignkeysToSql(aTableName, Array(aFileConstraintYaml.foreignkeys[j]))));
+                    }
+                }
+            }    
+        }    
+
+        if ('checks' in aFileConstraintYaml) { 
+            arrayAux=aDbConstraintYaml.checks;
+            for (let j=0; j < aFileConstraintYaml.checks.length; j++) {    
+                iDB= arrayAux.findIndex(aItem => (aItem.check.name === aFileConstraintYaml.checks[j].check.name));
+                if (iDB === -1) 
+                    retArray.push(arrayToString(checkToSql(aTableName, Array(aFileConstraintYaml.checks[j]))));
+                else { /* || or && and*/
+                    if (String(aFileConstraintYaml.checks[j].expresion).trim().toUpperCase() !== String(aDbConstraintYaml.checks[iDB].expresion).trim().toUpperCase()) {                        
+                            retArray.push('ALTER TABLE '+aTableName+' DROP CONSTRAINT '+aFileConstraintYaml[j].foreignkey.name+';'+GlobalTypes.CR);
+                            retArray.push(arrayToString(checkToSql(aTableName, Array(aFileConstraintYaml.foreignkeys[j]))));
+                    }
+                }
+            }                           
+        }
+
+        if ('primaryKey' in aFileConstraintYaml) {
+            pkFY=primaryKeyToSql(aTableName, aFileConstraintYaml.primaryKey); 
+            pkDB=primaryKeyToSql(aTableName, aDbConstraintYaml.primaryKey); 
+            if (pkFY.trim().toUpperCase() !== pkDB.trim().toUpperCase()) {
+                if (pkDB !== '') 
+                    retArray.push('ALTER TABLE '+aTableName+' DROP CONSTRAINT '+aDbConstraintYaml.primaryKey.name);
+                        
+                retArray.push(pkFY);
+            }    
+        }            
+
+        return retArray;
+    } 
+    
+    getTableIndexesDiferences(aTableName:string, aFileIdxYaml: any, aDbIdxYaml: any):Array<string> {
+        let retArray: Array<string> = [];
+        let iDB:number = 0;
+        let arrayAux: Array<any> = [];
+        let idxYL:string = '';
+        let idxDB:string = '';
+
+        if ('indexes' in aFileIdxYaml) { 
+            arrayAux= aDbIdxYaml.indexes;    
+            for (let j=0; j < aFileIdxYaml.indexes.length; j++){
+                iDB= arrayAux.findIndex(aItem => (aItem.index.name === aFileIdxYaml.indexes[j].index.name));
+                idxYL=indexesToSql(aTableName, Array(aFileIdxYaml.indexes[j]))[0]; 
+                if (iDB === -1) 
+                    retArray.push(idxYL);
+                else {
+                    idxDB=indexesToSql(aTableName, Array(aDbIdxYaml.indexes[iDB]))[0];   
+                    if (idxDB.trim().toUpperCase() !== idxYL.trim().toUpperCase()) {
+                        retArray.push('DROP INDEX '+aFileIdxYaml.indexes[j].index.name+';'+GlobalTypes.CR); 
+                        retArray.push(idxYL);    
+                    }    
+                }
+            }
+        }        
+        return retArray;
+    }
+
+    getTableDescriptionDiferences(aTableName:string, aFileYaml: any, aDbYaml: any):Array<string> {
+        let setDescription=(aFY:any, aDB:any, aStartQuery:string):string => {
+            let aText:string = ''; 
+            if ('description' in aFY) {
+                if ('description' in aDB) {
+                    if (aFY.description !== aDB.description) 
+                    aText = 'COMMENT ON '+aStartQuery+" IS '"+aFY.description+"';"+GlobalTypes.CR;
+                }
+                else
+                    aText = 'COMMENT ON '+aStartQuery+" IS '"+aFY.description+"';"+GlobalTypes.CR; 
+            }
+            else if ('description' in aDB)
+                aText = 'COMMENT ON '+aStartQuery+" IS NULL;"+GlobalTypes.CR;
+            
+            return aText;    
+        }
+
+        let retArray: Array<string> = [];
+        let iDB:number=0;
+        let arrayAux:Array<any> = [];
+
+        if (setDescription(aFileYaml,aDbYaml,'TABLE '+aTableName) !== '')
+            retArray.push(setDescription(aFileYaml,aDbYaml,'TABLE '+aTableName));
+
+        arrayAux= aDbYaml.columns;
+
+        for (let j=0; j < aFileYaml.columns.length; j++){
+            iDB= arrayAux.findIndex(aItem => (aItem.column.name === aFileYaml.columns[j].column.name));
+            if (iDB !== -1 && setDescription(aFileYaml.columns[j].column,aDbYaml.columns[iDB].column,'COLUMN '+aTableName+'.'+aFileYaml.columns[j].column.name) !== '') 
+                retArray.push(setDescription(aFileYaml.columns[j].column,aDbYaml.columns[iDB].column,'COLUMN '+aTableName+'.'+aFileYaml.columns[j].column.name));
+        }
+
+        return retArray;
+    }    
 
     //****************************************************************** */
     //        D E C L A R A C I O N E S    P U B L I C A S
@@ -572,4 +644,86 @@ function fieldToSql(aField:any) {
         }
     }
     return retFld;        
+}
+
+function foreignkeysToSql(aTableName:string, aForeinKey:any):Array<string> {
+    //name,onColumn,toTable,toColumn,updateRole,deleteRole
+    //ALTER TABLE ART_ARCH ADD CONSTRAINT FK_ART_ARCH_CUECOM FOREIGN KEY (FCUECOM) REFERENCES CON_CUEN (FCUENTA) ON UPDATE CASCADE;
+    let aRet: Array<string> = [];
+    let aText: string = '';
+    
+    for (let j=0; j < aForeinKey.length; j++) {
+        aText ='ALTER TABLE '+aTableName+' ADD CONSTRAINT '+aForeinKey[j].foreignkey.name+ ' FOREIGN KEY ('+aForeinKey[j].foreignkey.onColumn+') REFERENCES '+aForeinKey[j].foreignkey.toTable+' ('+aForeinKey[j].foreignkey.toColumn+')';
+        if ('updateRole' in aForeinKey[j].foreignkey) {
+            aText += ' ON UPDATE '+aForeinKey[j].foreignkey.updateRole+';'+GlobalTypes.CR
+        }
+        if ('deleteRole' in aForeinKey[j].foreignkey) {
+            aText += ' ON DELETE '+aForeinKey[j].foreignkey.deleteRole+';'+GlobalTypes.CR    
+        }
+        aRet.push(aText);
+    }
+    return aRet;
+}
+
+function checkToSql(aTableName:string, aCheck:any):Array<string> {
+    //name, expresion
+    //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_UXD CHECK (FUXD>0);
+    let aRet: Array<string> = [];
+    let aText: string = '';            
+    for (let j=0; j < aCheck.length; j++) {
+        aText = 'ALTER TABLE '+aTableName+' ADD CONSTRAINT '+aCheck[j].check.name;
+        if (aCheck[j].check.expresion.trim().toUpperCase().startsWith('CHECK')) {
+            aText += ' '+aCheck[j].check.expresion.trim()+';'+GlobalTypes.CR;  
+        }
+        else {
+            aText += ' CHECK '+aCheck[j].check.expresion.trim()+';'+GlobalTypes.CR;
+        }
+        aRet.push(aText);   
+    } 
+    return aRet;                  
+}
+
+function primaryKeyToSql(aTableName:string, aPk:any):string {
+    //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_PK PRIMARY KEY (FCODINT);    
+    let aText: string = '';
+    aText += 'ALTER TABLE '+aTableName+' ADD CONSTRAINT '+aPk.name+' PRIMARY KEY (';                
+    for (let j=0; j < aPk.columns.length-1; j++) {
+        aText += aPk.columns[j] + ',';
+    }
+    aText += aPk.columns[aPk.columns.length-1] + ');'+GlobalTypes.CR;    
+    return aText;   
+}    
+
+function indexesToSql(aTableName:string, aIdx:any):Array<string> {
+    //active,computedBy,columns,name,unique,descending
+    //CREATE UNIQUE INDEX ART_ARCH_CODIGO ON ART_ARCH (FCODIGO);
+    //CREATE INDEX ART_ARCH_CODMAD ON ART_ARCH (FCODMAD);
+    //CREATE INDEX ART_ARCH_IDX2 ON ART_ARCH COMPUTED BY (TRIM(FCODIGO))
+    let aRet: Array<string> = [];
+    let aText: string = '';  
+    for (let j=0; j < aIdx.length; j++) {
+        aText='';
+        if (aIdx[j].index.unique == true) 
+            aText = ' UNIQUE ';
+        if (aIdx[j].index.descending == true) 
+            aText = ' DESCENDING ';                                    
+        if ('computedBy' in aIdx[j].index) 
+            aText = 'CREATE '+ aText +' INDEX '+aIdx[j].index.name+ ' ON '+aTableName+' COMPUTED BY ('+aIdx[j].index.computedBy+')';
+        else {
+            aText = 'CREATE '+ aText +' INDEX '+aIdx[j].index.name+ ' ON '+aTableName+'(';
+            for (let i=0; i < aIdx[j].index.columns.length-1; i++) {
+                aText+= aIdx[j].index.columns[i]+',';
+            }                    
+            aText+= aIdx[j].index.columns[aIdx[j].index.columns.length-1]+')'
+        }
+        aRet.push(aText+';'+GlobalTypes.CR);   
+    } 
+    return aRet;
+}            
+function arrayToString(aArray:Array<any>) {
+    let aText:string = '';    
+    for (let j=0; j < aArray.length; j++) {
+        aText += aArray[j]; 
+    } 
+    return aText;   
 }
