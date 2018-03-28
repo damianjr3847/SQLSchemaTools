@@ -28,7 +28,10 @@ import * as fbApplyMetadata from './fbApplyMetadata';
 import * as GlobalTypes from './globalTypes';
 
 let actionYalm:string   = 'read';
-let pathYalm:string     = './export/';
+let source1:string     = './export/';
+let source2:string     = './source2/';
+
+let pathSave:string     = './export/';
 let dbDriver:string     = 'fb';
 let dbPath:string       = '/pool/testing/demo.gdb';
 let dbHost:string       = 'srv-01.sig2k.com';
@@ -42,9 +45,13 @@ let pathfilescript:string   = './export/script.sql';
 /*params.version('1.0.0');
 
 params.option('-r, --readyalm', 'Lee el directorio o archivo en el parametro -yalm para aplicar cambios');
+
+params.option('--source1 <source1>', 'Path del directorio a leer');
+params.option('--source2 <source2>', 'Path del directorio a leer');
+
 params.option('-w, --writeyalm', 'Genera los archivos yalm en el directorio especificado -yalm');
 
-params.option('-y, --yalm <pathyalm>', 'Path del directorio o archivo Yalm a leer o escribir');
+params.option('--pathsave <pathsave>', 'Path del directorio donde se guardaran los archivos');
 
 params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB ps=PostgreSql fb=Firebird');
 params.option('-h, --dbhost <dbhost>', 'Host DB');
@@ -65,7 +72,7 @@ params.parse(process.argv);
 
 if (params.writeyalm && params.readyalm) {
     console.log('Debe elegir -r o -w no ambos');
-    process.exit();    
+    process.exit(1);    
 }    
 else if (params.writeyalm){ 
     actionYalm = 'write';
@@ -75,7 +82,7 @@ else if (params.readyalm){
 }
 else {
     console.log('debe haber -r o -w para continuar');
-    process.exit();
+    process.exit(1);
 }
 
 if (params.dbdriver) {
@@ -84,32 +91,53 @@ if (params.dbdriver) {
     }
     else {
         console.log('dbdriver puede ser ps=PostgreSql o fb=firebird');
-        process.exit();    
+        process.exit(1);    
     }    
 }
 else {
     console.log('debe especificar un driver de base de datos');    
-    process.exit();        
+    process.exit(1);        
 }
 
-if (params.yalm) {
-    if (! fs.existsSync(params.yalm)) {
-        console.log('el path %j no existe', params.yalm);
-        process.exit();
+if (params.pathsave) {
+    if (! fs.existsSync(params.pathsave)) {
+        console.log('el path %j no existe', params.pathsave);
+        process.exit(1);
     }
-    pathYalm= params.yalm;
+    pathSave= params.pathsave;
 }
 else {
     console.log('debe haber un Path del archivo y directorio de los archivos yalm');    
-    process.exit();
+    process.exit(1);
 }
+
+if (params.source1) {
+    if (! fs.existsSync(params.source1)) {
+        console.log('el path source1 %j no existe', params.source1);
+        process.exit(1);
+    }
+    source1= params.source1;
+}
+else {
+    console.log('debe haber un path en source1');    
+    process.exit(1);
+}
+
+if (params.source2) {
+    if (! fs.existsSync(params.source2)) {
+        console.log('el path source2 %j no existe', params.source2);
+        process.exit(1);
+    }
+    source2= params.source2;
+}
+
 
 if (params.dbuser) {
     dbUser = params.dbuser; 
 }
 else {
     console.log('falta dbuser');
-    process.exit();
+    process.exit(1);
 }
 
 if (params.dbpass) {
@@ -117,7 +145,7 @@ if (params.dbpass) {
 }
 else {
     console.log('falta dbpass');
-    process.exit();
+    process.exit(1);
 }
 
 if (params.dbhost ) {
@@ -125,7 +153,7 @@ if (params.dbhost ) {
 }
 else {
     console.log('falta dbhost');
-    process.exit();
+    process.exit(1);
 }
 
 if (params.dbport ) {
@@ -133,7 +161,7 @@ if (params.dbport ) {
 }
 else {
     console.log('falta dbport');
-    process.exit();
+    process.exit(1);
 }
 
 if (params.dbpath ) {
@@ -141,7 +169,7 @@ if (params.dbpath ) {
 }
 else {
     console.log('falta dbpath');
-    process.exit();
+    process.exit(1);
 }
 
 if (params.objecttype) {
@@ -150,14 +178,14 @@ if (params.objecttype) {
     }
     else {
         console.log('objecType solo pueden ser (procedures,triggers,tables,generators)');
-        process.exit();
+        process.exit(1);
     }
 }
 
 if (params.objectname) {
     if (objectType = '') {
         console.log('debe haber un objecttype');
-        process.exit();
+        process.exit(1);
     }
 }
 
@@ -165,15 +193,18 @@ if (params.pathfilescript) {
     pathfilescript= params.pathfilescript;
 }
 
-/*console.log('actionYalm: %j',actionYalm);
-console.log('pathYalm: %j',pathYalm);
+console.log('actionYalm: %j',actionYalm);
+console.log('pathYalm: %j',pathSave);
+console.log('source1: %j',source1);
+console.log('source2: %j',source2);
 console.log('dbDriver: %j', dbDriver);
 console.log('connectionString: %j',dbHost+':'+dbPath);
 console.log('dbPort: %j', dbPort);
 console.log('dbUser: %j', dbUser);
 console.log('dbPass: %j',dbPass);
 console.log('objectType: %j', objectType);
-console.log('objectName: %j', objectName);*/
+console.log('objectName: %j', objectName);
+*/
 
 (async () => {
     let fbem: fbExtractMetadata.fbExtractMetadata;  
@@ -183,12 +214,13 @@ console.log('objectName: %j', objectName);*/
 
         if (actionYalm === 'write') {
             fbem = new fbExtractMetadata.fbExtractMetadata;
-            fbem.filesPath = pathYalm;
+            fbem.filesPath = pathSave;
             await fbem.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
         }
         else if (actionYalm === 'read') {
             fbam = new fbApplyMetadata.fbApplyMetadata;
-            fbam.filesPath = pathYalm;
+            fbam.pathSource1 = source1;
+            fbam.pathSource2 = source2;
             fbam.pathFileScript= pathfilescript;
             if (pathfilescript !== '')
                 if (fs.existsSync(pathfilescript)) {

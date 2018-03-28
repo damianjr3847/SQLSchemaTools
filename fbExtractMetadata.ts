@@ -218,7 +218,7 @@ export class fbExtractMetadata {
             }    
         }
         catch (err) {
-            console.log('Error generando procedimiento '+procedureName+'. ', err.message);
+            throw new Error('Error generando procedimiento '+procedureName+'. '+err.message);
         }  
     }
 
@@ -424,7 +424,7 @@ export class fbExtractMetadata {
             } 
 
         } catch(err) {
-            console.log('Error generando tabla '+tableName+'.', err.message);   
+            throw new Error('Error generando tabla '+tableName+'.'+err.message);   
         }        
         
     }
@@ -507,7 +507,7 @@ export class fbExtractMetadata {
             }    
         }
         catch (err) {
-            console.log('Error generando trigger '+triggerName+'. ', err.message);
+            throw new Error('Error generando trigger '+triggerName+'. '+ err.message);
         }      
     }
 
@@ -568,7 +568,7 @@ export class fbExtractMetadata {
                 return outViewYalm;
             }
         } catch(err) {
-            console.log('Error generando view '+viewName+'.', err.message);   
+            throw new Error('Error generando view '+viewName+'.'+err.message);   
         } 
 
     }
@@ -602,7 +602,7 @@ export class fbExtractMetadata {
             await this.fb.commit();
         }
         catch (err) {
-            console.log('Error generando procedimiento '+genName+'. ', err.message);
+            throw new Error('Error generando procedimiento '+genName+'. '+err.message);
         }  
     }
 
@@ -672,7 +672,8 @@ export class fbExtractMetadata {
             }
         }
         catch (err) {
-            console.log('Error: ', err.message);
+            console.error(err.message);
+            process.exit(1);
         }
     
     }    

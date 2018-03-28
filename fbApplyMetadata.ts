@@ -20,25 +20,116 @@ interface iFieldType {
     AValidation?:   string  | any
 };
 
-function readDirectory(aPath:string, objectType: string, objectName:string) {
-    if (objectName === '') {
-        return fs.readdirSync(aPath+'/'+objectType+'/');
+
+function readRecursiveDirectory(dir:string):Array<any> {
+    var retArrayFile:Array<any> = [];
+    var files:any;
+    var fStat:any;
+    if (!(dir.endsWith('/') || dir.endsWith('\\'))) 
+        dir+='/';
+
+    files= fs.readdirSync(dir);
+    for(var i in files) {
+        fStat= fs.statSync(dir+files[i]);    
+        if (fStat && fStat.isDirectory())
+            retArrayFile= retArrayFile.concat(readRecursiveDirectory(dir+files[i]));
+        else
+            retArrayFile.push(dir+files[i]);
     }
-    else {
-        if (! fs.existsSync(aPath+'/'+objectType+'/'+objectName+'.yaml')) {
-            throw 'el archivo '+objectName+', no existe';                            
-        }    
-        return [objectName+'.yaml'];
-    }        
-}
+    return retArrayFile;  
+};
 
 export class fbApplyMetadata {   
     private fb : fbClass.fbConnection;
     private fbExMe: fbExtractMetadata.fbExtractMetadata;   
-    public pathFileScript: string = '';
+    private tablesArrayYaml: Array<any>      = [];
+    private proceduresArrayYaml: Array<any>  = [];
+    private triggersArrayYaml: Array<any>    = [];
+    private generatorsArrayYaml: Array<any>   = [];
+    private viewsArrayYaml: Array<any>       = [];
 
-    
-    outFileScript(aType:string, aScript:Array<any> | string) {        
+    public pathFileScript: string   = '';
+    public pathSource1: string      = '';
+    public pathSource2: string      = '';    
+
+    constructor() {
+        this.fb = new fbClass.fbConnection;
+        this.fbExMe= new fbExtractMetadata.fbExtractMetadata(this.fb);            
+    }
+
+    private readSource(objectType: string, objectName:string) {
+        let loadArrayYaml = (dirSource:Array<any>) => {
+            let ym:any;
+            let j:number = 0;
+
+            for (var i in dirSource) {
+                ym= yaml.safeLoad(fs.readFileSync(dirSource[i], GlobalTypes.yamlFileSaveOptions.encoding));            
+                if ('table' in ym && (objectType === '' || objectType === 'tables')) { 
+                    if (objectName === '' || ym.table.name === objectName) {
+                        j= this.tablesArrayYaml.findIndex((aItem) => (String(aItem.table.name).trim().toUpperCase() === String(ym.table.name).trim().toUpperCase()));
+                        if (j === -1)
+                            this.tablesArrayYaml.push(ym);
+                        else 
+                            throw new Error('tables: no puede haber objetos duplicados en source1 o source2');
+                    }    
+                }    
+                else if ('procedure' in ym && (objectType === '' || objectType === 'procedures')) {
+                    if (objectName === '' || ym.procedure.name === objectName) {
+                        j= this.proceduresArrayYaml.findIndex((aItem) => (String(aItem.procedure.name).trim().toUpperCase() === String(ym.procedure.name).trim().toUpperCase()));
+                        if (j === -1)
+                            this.proceduresArrayYaml.push(ym);
+                        else 
+                            throw new Error('procedure: no puede haber objetos duplicados en source1 o source2');
+                    }        
+                }    
+                else if ('generator' in ym && (objectType === '' || objectType === 'generators')) {
+                    if (objectName === '' || ym.generator.name === objectName) {   
+                        j= this.generatorsArrayYaml.findIndex((aItem) => (String(aItem.generator.name).trim().toUpperCase() === String(ym.generator.name).trim().toUpperCase()));
+                        if (j === -1)
+                            this.generatorsArrayYaml.push(ym);       
+                        else 
+                            throw new Error('generator: no puede haber objetos duplicados en source1 o source2');
+                    }    
+                }
+                else if ('view' in ym && (objectType === '' || objectType === 'views')) {
+                    if (objectName === '' || ym.view.name === objectName) {
+                        j= this.viewsArrayYaml.findIndex((aItem) => (String(aItem.view.name).trim().toUpperCase() === String(ym.view.name).trim().toUpperCase()));
+                        if (j === -1)
+                            this.viewsArrayYaml.push(ym);
+                        else
+                            throw new Error('view: no puede haber objetos duplicados en source1 o source2');
+                    }    
+                }
+                else if ('triggerFunction' in ym && (objectType === '' || objectType === 'triggers')) {
+                    if (objectName === '' || ym.triggerFunction.name === objectName) {
+                        j= this.triggersArrayYaml.findIndex((aItem) => (String(aItem.triggerFunction.name).trim().toUpperCase() === String(ym.triggerFunction.name).trim().toUpperCase()));
+                        if (j === -1)
+                            this.triggersArrayYaml.push(ym);
+                        else
+                            throw new Error('trigger: no puede haber objetos duplicados en source1 o source2');    
+                    }    
+                }    
+            }
+        };     
+        let filesDirSource1:Array<any> = [];
+        let filesDirSource2:Array<any> = [];        
+
+        this.tablesArrayYaml        = [];
+        this.proceduresArrayYaml    = [];
+        this.triggersArrayYaml      = [];
+        this.generatorsArrayYaml    = [];
+        this.viewsArrayYaml         = [];       
+
+        filesDirSource1= readRecursiveDirectory(this.pathSource1);
+        loadArrayYaml(filesDirSource1);
+
+        if (this.pathSource2 !== '') {
+            filesDirSource2= readRecursiveDirectory(this.pathSource2);
+            loadArrayYaml(filesDirSource2);
+        }               
+    }
+
+    private outFileScript(aType:string, aScript:Array<any> | string) {        
         switch (aType) {
             case 'tables':
                 if (aScript.length>0) {
@@ -65,7 +156,7 @@ export class fbApplyMetadata {
     //****************************************************************** */
     //        P R O C E D U R E S
     //******************************************************************* */
-    private async applyProcedures(files: Array<string>) {
+    private async applyProcedures() {
         let procedureYamltoString = (aYaml: any) => {
             let paramString = (param:any, aExtra:string) => {
                 let aText:string='';
@@ -108,9 +199,9 @@ export class fbApplyMetadata {
 
             dbYaml = await this.fbExMe.extractMetadataProcedures('',true,false);
             
-            for (let i in files) {
+            for (let i in this.proceduresArrayYaml) {
                 
-                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/procedures/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+                fileYaml = this.proceduresArrayYaml[i];
                 
                 procedureName= fileYaml.procedure.name;
      
@@ -136,7 +227,7 @@ export class fbApplyMetadata {
             console.log(Date.now());               
         }
         catch (err) {
-            console.log('Error aplicando procedimiento '+procedureName+'. ', err.message+GlobalTypes.CR+procedureBody);
+            console.error('Error aplicando procedimiento '+procedureName+'. ', err.message+GlobalTypes.CR+procedureBody);
         }  
     }        
 
@@ -144,7 +235,7 @@ export class fbApplyMetadata {
     //        T R I G G E R S
     //******************************************************************* */
 
-    private async applyTriggers(files: Array<string>) {
+    private async applyTriggers() {
         let triggerYamltoString = (aYaml: any) => {
             let aProc:string= '';
     
@@ -181,9 +272,10 @@ export class fbApplyMetadata {
 
             dbYaml = await this.fbExMe.extractMetadataTriggers('',true,false);
             
-            for (let i in files) {
+            for (let i in this.triggersArrayYaml) {
                 
-                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/triggers/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+                fileYaml = this.triggersArrayYaml[i];
+
                 triggerName= fileYaml.triggerFunction.name;
                 
                 j= dbYaml.findIndex(aItem => (aItem.triggerFunction.name === triggerName));
@@ -210,14 +302,14 @@ export class fbApplyMetadata {
             await this.fb.commit();  
         }    
         catch (err) {
-            console.log('Error aplicando trigger '+triggerName+'. ', err.message);
+            console.error('Error aplicando trigger '+triggerName+'. ', err.message);
         }      
     }
 
     //****************************************************************** */
     //        V I E W S
     //******************************************************************* */
-    private async applyViews(files: Array<string>) {
+    private async applyViews() {
         let viewYamltoString = (aYaml:any) => {
             let aView:string = '';
             
@@ -244,8 +336,9 @@ export class fbApplyMetadata {
             await this.fb.startTransaction(false);
             dbYaml = await this.fbExMe.extractMetadataViews('',true,false);
 
-            for (let i in files) {               
-                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/views/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+            for (let i in this.viewsArrayYaml) {               
+                fileYaml = this.viewsArrayYaml[i];
+                
                 viewName= fileYaml.view.name;
                 
                 j= dbYaml.findIndex(aItem => (aItem.view.name === viewName));
@@ -269,7 +362,7 @@ export class fbApplyMetadata {
             } 
             await this.fb.commit();
         } catch(err) {
-            console.log('Error aplicando view '+viewName+'.', err.message);   
+            console.error('Error aplicando view '+viewName+'.', err.message);   
         } 
 
     }
@@ -278,14 +371,15 @@ export class fbApplyMetadata {
     //        G E N E R A T O R S
     //******************************************************************* */
 
-    private async applyGenerators(files: Array<string>) {
+    private async applyGenerators() {
         let genName:string = '';
         let genBody: string = ''; 
+        let fileYaml:any;
 
         try {
             await this.fb.startTransaction(false);
-            for (let i in files) {               
-                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/generators/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+            for (let i in this.generatorsArrayYaml) {               
+                fileYaml = this.generatorsArrayYaml[i];
                 genName= fileYaml.generator.name;
                 genBody= 'CREATE SEQUENCE ' + fileYaml.generator.name;  
                                     
@@ -303,19 +397,19 @@ export class fbApplyMetadata {
             await this.fb.commit();
         }
         catch (err) {
-            console.log('Error aplicando procedimiento '+genName+'. ', err.message);
+            console.error('Error aplicando procedimiento '+genName+'. ', err.message);
         }  
     }
    
     //****************************************************************** */
     //        T A B L E S
     //******************************************************************* */
-    private async applyTables(files: Array<string>) {
+    private async applyTables() {
         let tableName:string = '';
         let dbYaml: Array<any> = [];
         let tableScript: Array<string> = [];
         let j:number = 0;
-
+        let fileYaml: any;    
 
         try {
             await this.fb.startTransaction(true);
@@ -327,8 +421,9 @@ export class fbApplyMetadata {
             }
             await this.fb.commit();
 
-            for (let i in files) {               
-                const fileYaml = yaml.safeLoad(fs.readFileSync(this.filesPath+'/tables/'+files[i], GlobalTypes.yamlFileSaveOptions.encoding));
+            for (let i in this.tablesArrayYaml) {               
+                fileYaml = this.tablesArrayYaml[i];
+
                 tableName= fileYaml.table.name;
                 
                 j= dbYaml.findIndex(aItem => (aItem.table.name === tableName));
@@ -357,7 +452,7 @@ export class fbApplyMetadata {
             }            
 
         } catch(err) {
-            console.log('Error aplicando tabla '+tableName+'.', err.message);   
+            console.error('Error aplicando tabla '+tableName+'.', err.message);   
         }        
         
     }
@@ -570,13 +665,6 @@ export class fbApplyMetadata {
     //****************************************************************** */
     //        D E C L A R A C I O N E S    P U B L I C A S
     //******************************************************************* */
-    
-    filesPath:string    = '';
-
-    constructor() {
-        this.fb = new fbClass.fbConnection;
-        this.fbExMe= new fbExtractMetadata.fbExtractMetadata(this.fb);            
-    }
 
     public async applyYalm(ahostName:string, aportNumber:number, adatabase:string, adbUser:string, adbPassword:string, objectType:string, objectName:string)  {                
 
@@ -590,21 +678,18 @@ export class fbApplyMetadata {
     
             await this.fb.connect();
             try {
-                if (objectType === 'generators' || objectType === '') {                                              
-                    await this.applyGenerators(readDirectory(this.filesPath,'generators',objectName));
-                }      
-                if (objectType === 'tables' || objectType === '') {                                                 
-                    await this.applyTables(readDirectory(this.filesPath,'tables',objectName));
-                }
-                if (objectType === 'views' || objectType === '') {                     
-                    await this.applyViews(readDirectory(this.filesPath,'views',objectName));
-                } 
-                if (objectType === 'triggers' || objectType === '') {                                             
-                    await this.applyTriggers(readDirectory(this.filesPath,'triggers',objectName));
-                }
-                if (objectType === 'procedures' || objectType === '') {
-                    await this.applyProcedures(readDirectory(this.filesPath,'procedures',objectName));
-                }                                                     
+                this.readSource(objectType,objectName);
+                if (objectType === '' || objectType === 'generators')
+                    await this.applyGenerators();
+                if (objectType === '' || objectType === 'tables')
+                    await this.applyTables();
+                if (objectType === '' || objectType === 'views')    
+                    await this.applyViews();
+                if (objectType === '' || objectType === 'triggers')
+                    await this.applyTriggers();
+                if (objectType === '' || objectType === 'procedures')
+                    await this.applyProcedures();
+                
                
             }
             finally {
@@ -612,7 +697,8 @@ export class fbApplyMetadata {
             }
         }
         catch (err) {
-            console.log('Error: ', err.message);
+            console.error(err.message);
+            process.exit(1);
         }
     
     }
