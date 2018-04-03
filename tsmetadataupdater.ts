@@ -27,22 +27,25 @@ import * as fbApplyMetadata from './fbApplyMetadata';
 
 import * as GlobalTypes from './globalTypes';
 
-let actionYalm:string   = 'read';
-let source1:string     = './export/';
-let source2:string     = './source2/';
+let actionYalm:string       = 'read';
+let source1:string          = './export/';
+let source2:string          = './source2/';
 
-let pathSave:string     = './export/';
-let dbDriver:string     = 'fb';
-let dbPath:string       = '/pool/testing/demo.gdb';
-let dbHost:string       = 'srv-01.sig2k.com';
-let dbPort:number       = 3050;
-let dbUser:string       = 'SYSDBA';
-let dbPass:string       = 'masterkey';
-let objectType:string   = '';
-let objectName:string   = '';
-let pathfilescript:string   = './export/script.sql';
+let pathSave:string         = './export/';
+let dbDriver:string         = 'fb';
+let dbPath:string           = '/pool/testing/demo.gdb';
+let dbHost:string           = 'srv-01.sig2k.com';
+let dbPort:number           = 3050;
+let dbUser:string           = 'SYSDBA';
+let dbPass:string           = 'masterkey';
+let objectType:string       = '';
+let objectName:string       = '';
+let pathfilescript:string   = '';//'./export/script.sql';
+let excludeObject:any;
+let excludeObjectStr:string = '{"tables":["usr$*","rpl$*"],"fields":["rpl$*","usr$*"],"procedures":["usr$*"],"triggers":["rpl$*"]}';
+let saveToLog: boolean      = true;
 
-/*params.version('1.0.0');
+params.version('1.0.0');
 
 params.option('-r, --readyalm', 'Lee el directorio o archivo en el parametro -yalm para aplicar cambios');
 
@@ -51,7 +54,7 @@ params.option('--source2 <source2>', 'Path del directorio a leer');
 
 params.option('-w, --writeyalm', 'Genera los archivos yalm en el directorio especificado -yalm');
 
-params.option('--pathsave <pathsave>', 'Path del directorio donde se guardaran los archivos');
+params.option('-x, --pathsave <pathsave>', 'Path del directorio donde se guardaran los archivos');
 
 params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB ps=PostgreSql fb=Firebird');
 params.option('-h, --dbhost <dbhost>', 'Host DB');
@@ -62,14 +65,21 @@ params.option('-p, --dbpass <dbpass>', 'Password DB');
 
 params.option('-t, --objecttype <objecttype>', 'opcional, especifica que tipo de cambios se aplican (procedures,triggers,tables,generators');
 params.option('-n, --objectname <objectname>', 'opcional, nombre particular del ObjectType (ot) que se desea aplicar');
-params.option('--outscript <pathfilescript>', 'opcional, devuelve un archivo con las sentencias sql');
+params.option('-s, --outscript <pathfilescript>', 'opcional, devuelve un archivo con las sentencias sql');
+
+params.option('-e, --exclude <excludejson>', 'opcional, json con lo que que quiere excluir {tables:[],fields:[],procedures:[],triggers:[],generator:[],views:[]}');
+
+params.option('-l, --savetolog', 'guarda en la db el log de los querys ejecutados');
 
 //console.log(process.argv);
+
+//process.exit(1);
 
 params.parse(process.argv);
 
 // validacion de parametros
 
+/*
 if (params.writeyalm && params.readyalm) {
     console.log('Debe elegir -r o -w no ambos');
     process.exit(1);    
@@ -189,11 +199,20 @@ if (params.objectname) {
     }
 }
 
-if (params.pathfilescript) {
-    pathfilescript= params.pathfilescript;
+if (params.outscript) {
+    pathfilescript= params.outscript;
 }
 
-console.log('actionYalm: %j',actionYalm);
+if (params.exclude) {
+    excludeObjectStr=params.exclude;
+    excludeObject= JSON.parse(excludeObjectStr);
+}    
+
+if (params.savetolog) {
+    saveToLog= true;
+}
+
+/*console.log('actionYalm: %j',actionYalm);
 console.log('pathYalm: %j',pathSave);
 console.log('source1: %j',source1);
 console.log('source2: %j',source2);
@@ -204,7 +223,11 @@ console.log('dbUser: %j', dbUser);
 console.log('dbPass: %j',dbPass);
 console.log('objectType: %j', objectType);
 console.log('objectName: %j', objectName);
+console.log('e '+params.exclude+' '+excludeObject.pepe)
+console.log('p '+params.outscript)
 */
+
+excludeObject= JSON.parse(excludeObjectStr);
 
 (async () => {
     let fbem: fbExtractMetadata.fbExtractMetadata;  
@@ -215,6 +238,7 @@ console.log('objectName: %j', objectName);
         if (actionYalm === 'write') {
             fbem = new fbExtractMetadata.fbExtractMetadata;
             fbem.filesPath = pathSave;
+            fbem.excludeObject = excludeObject;
             await fbem.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
         }
         else if (actionYalm === 'read') {
@@ -222,6 +246,8 @@ console.log('objectName: %j', objectName);
             fbam.pathSource1 = source1;
             fbam.pathSource2 = source2;
             fbam.pathFileScript= pathfilescript;
+            fbam.excludeObject = excludeObject;
+            fbam.saveToLog = saveToLog;
             if (pathfilescript !== '')
                 if (fs.existsSync(pathfilescript)) {
                     fs.unlinkSync(pathfilescript);

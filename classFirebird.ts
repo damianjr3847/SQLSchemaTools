@@ -172,17 +172,7 @@ export class fbConnection {
             });
         });  
     }
-
-    /*async validate(aQuery:string, aParams:Array<any>) {
-        let res:any;
-        try {
-            res= await this.query(aQuery, aParams);            
-            return (res.length > 0);
-        }
-        catch(err) {
-            throw err.message;
-        }    
-    };*/
+    
 
     validate(aQuery:string, aParams:Array<any>) {
         let res:any;

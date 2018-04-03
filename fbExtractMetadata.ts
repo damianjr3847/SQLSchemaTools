@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as fbClass from './classFirebird';
 import * as GlobalTypes from './globalTypes';
+import * as globalFunction from './globalFunction';
+
 
 const queryProcedure:string = 
     `SELECT TRIM(RDB$PROCEDURE_NAME) AS NAME,
@@ -129,8 +131,8 @@ export class fbExtractMetadata {
     //        D E C L A R A C I O N E S    P R I V A D A S
     //******************************************************************* */
 
-    private  fb : fbClass.fbConnection;            
-    
+    private  fb : fbClass.fbConnection;
+
     async extractMetadataProcedures(objectName:string, aRetYaml:boolean=false, openTr:boolean=true):Promise<any> {
         let rProcedures: Array<any>;
         let rParamater: Array<any>;
@@ -157,58 +159,61 @@ export class fbExtractMetadata {
             for (let i=0; i < rProcedures.length; i++){
                 
                 procedureName= rProcedures[i].NAME; 
-                outProcedure.procedure.name= procedureName; 
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
 
-                while ((j< rParamater.length) && (rParamater[j].PROCEDURE_NAME == rProcedures[i].NAME)) {
-                    ft.AName        = rParamater[j].PARAMATER_NAME;
-                    ft.AType        = rParamater[j].FTYPE;                    
-                    ft.ASubType     = rParamater[j].FSUB_TYPE;
-                    ft.ALength      = rParamater[j].FLENGTH; 
-                    ft.APrecision   = rParamater[j].FPRECISION;
-                    ft.AScale       = rParamater[j].FSCALE;
-                    ft.ACharSet     = null;
-                    ft.ACollate     = rParamater[j].FCOLLATION_NAME;
-                    if (rParamater[j].FSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
-                        ft.ADefault = await this.fb.getBlobAsString(rParamater[j].FSOURCE);
-                    else
-                        ft.ADefault = rParamater[j].FSOURCE;
-                    ft.ANotNull     = rParamater[j].FLAG
-                    ft.AComputed    = null;
+                    outProcedure.procedure.name= procedureName; 
 
-                    if (rParamater[j].PARAMATER_TYPE == 0) {
-                        outProcedureParameterInput.push({param:{name:"",type:""}});
-                        outProcedureParameterInput[outProcedureParameterInput.length-1].param.name = rParamater[j].PARAMATER_NAME;                        
-                        outProcedureParameterInput[outProcedureParameterInput.length-1].param.type = FieldType(ft);  
+                    while ((j< rParamater.length) && (rParamater[j].PROCEDURE_NAME == rProcedures[i].NAME)) {
+                        ft.AName        = rParamater[j].PARAMATER_NAME;
+                        ft.AType        = rParamater[j].FTYPE;                    
+                        ft.ASubType     = rParamater[j].FSUB_TYPE;
+                        ft.ALength      = rParamater[j].FLENGTH; 
+                        ft.APrecision   = rParamater[j].FPRECISION;
+                        ft.AScale       = rParamater[j].FSCALE;
+                        ft.ACharSet     = null;
+                        ft.ACollate     = rParamater[j].FCOLLATION_NAME;
+                        if (rParamater[j].FSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
+                            ft.ADefault = await this.fb.getBlobAsString(rParamater[j].FSOURCE);
+                        else
+                            ft.ADefault = rParamater[j].FSOURCE;
+                        ft.ANotNull     = rParamater[j].FLAG
+                        ft.AComputed    = null;
+
+                        if (rParamater[j].PARAMATER_TYPE == 0) {
+                            outProcedureParameterInput.push({param:{name:"",type:""}});
+                            outProcedureParameterInput[outProcedureParameterInput.length-1].param.name = rParamater[j].PARAMATER_NAME;                        
+                            outProcedureParameterInput[outProcedureParameterInput.length-1].param.type = FieldType(ft);  
+                        }
+                        else if (rParamater[j].PARAMATER_TYPE == 1) {
+                            outProcedureParameterOutput.push({param:{name:"",type:""}});
+                            outProcedureParameterOutput[outProcedureParameterOutput.length-1].param.name = rParamater[j].PARAMATER_NAME;
+                            outProcedureParameterOutput[outProcedureParameterOutput.length-1].param.type = FieldType(ft);
+                        }           
+                        j++;
+                    }                     
+                                
+                    body = await this.fb.getBlobAsString(rProcedures[i].SOURCE);                                            
+                    
+                    outProcedure.procedure.body= body.replace(/\r/g,'');;
+
+                    if (outProcedureParameterInput.length > 0) 
+                        outProcedure.procedure.inputs=outProcedureParameterInput;
+
+                    if (outProcedureParameterOutput.length > 0)     
+                        outProcedure.procedure.outputs=outProcedureParameterOutput; 
+                
+                    if (aRetYaml) {    
+                        outReturnYaml.push(outProcedure);
                     }
-                    else if (rParamater[j].PARAMATER_TYPE == 1) {
-                        outProcedureParameterOutput.push({param:{name:"",type:""}});
-                        outProcedureParameterOutput[outProcedureParameterOutput.length-1].param.name = rParamater[j].PARAMATER_NAME;
-                        outProcedureParameterOutput[outProcedureParameterOutput.length-1].param.type = FieldType(ft);
-                    }           
-                    j++;
-                }                     
-                            
-                body = await this.fb.getBlobAsString(rProcedures[i].SOURCE);                                            
-                
-                outProcedure.procedure.body= body.replace(/\r/g,'');;
-
-                if (outProcedureParameterInput.length > 0) 
-                    outProcedure.procedure.inputs=outProcedureParameterInput;
-
-                if (outProcedureParameterOutput.length > 0)     
-                    outProcedure.procedure.outputs=outProcedureParameterOutput; 
-               
-                if (aRetYaml) {    
-                    outReturnYaml.push(outProcedure);
-                }
-                else {
-                    fs.writeFileSync(this.filesPath+'procedures/'+outProcedure.procedure.name+'.yaml',yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
-                    console.log(('generado procedimiento '+outProcedure.procedure.name+'.yaml').padEnd(70,'.')+'OK');
-                }
-                
-                outProcedure = GlobalTypes.emptyProcedureYamlType();
-                outProcedureParameterInput    = [];
-                outProcedureParameterOutput   = [];                
+                    else {
+                        fs.writeFileSync(this.filesPath+GlobalTypes.ArrayobjectType[0]+'/'+outProcedure.procedure.name+'.yaml',yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                        console.log(('generado procedimiento '+outProcedure.procedure.name+'.yaml').padEnd(70,'.')+'OK');
+                    }
+                    
+                    outProcedure = GlobalTypes.emptyProcedureYamlType();
+                    outProcedureParameterInput    = [];
+                    outProcedureParameterOutput   = [];
+                }                
             }
             if (openTr) {
                 await this.fb.commit();
@@ -262,9 +267,10 @@ export class fbExtractMetadata {
             
             
             for (let i=0; i < rTables.length; i++){
-                    /*FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
-                    FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION*/
-                    tableName= rTables[i].NAME.trim();
+                /*FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
+                FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION*/
+                tableName= rTables[i].NAME.trim();
+                if (globalFunction.includeObject(this.excludeObject,GlobalTypes.ArrayobjectType[2],tableName)) {
                     outTables.table.name= tableName;
                                         
                     if (rTables[i].RELTYPE === 5) 
@@ -278,38 +284,39 @@ export class fbExtractMetadata {
                     //fields
                     while ((j_fld< rFields.length) && (rFields[j_fld].TABLENAME.trim() == rTables[i].NAME.trim())) {
                         
-                        outFields.push(GlobalTypes.emptyTablesFieldYamlType());
+                        if (globalFunction.includeObject(this.excludeObject,'fields',rFields[j_fld].FIELDNAME.trim())) {
+                            outFields.push(GlobalTypes.emptyTablesFieldYamlType());
 
-                        outFields[outFields.length-1].column.name      = rFields[j_fld].FIELDNAME.trim();
-                        
-                        if (rFields[j_fld].COMSOURCE !== null)
-                            outFields[outFields.length-1].column.computed    = await this.fb.getBlobAsString(rFields[j_fld].COMSOURCE);
-                        else {
-                            if (rFields[j_fld].CHARACTERSET !== null && rFields[j_fld].CHARACTERSET.trim() !== 'NONE')
-                                outFields[outFields.length-1].column.charset   = rFields[j_fld].CHARACTERSET.trim();
-                                                
-                            outFields[outFields.length-1].column.nullable  = rFields[j_fld].FLAG !== 1;
-
-                            ft.AType        = rFields[j_fld].FTYPE;
-                            ft.ASubType     = rFields[j_fld].SUBTYPE;
-                            ft.ALength      = rFields[j_fld].FLENGTH;
-                            ft.APrecision   = rFields[j_fld].FPRECISION;
-                            ft.AScale       = rFields[j_fld].SCALE;                                             
-
-                            if (rFields[j_fld].FCOLLATION !== null && rFields[j_fld].FCOLLATION.trim() !== 'NONE')
-                                outFields[outFields.length-1].column.collate     = rFields[j_fld].FCOLLATION.trim();
-                        
-                            if (rFields[j_fld].DESCRIPTION !== null)
-                                outFields[outFields.length-1].column.description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);                    
-
-                            if (rFields[j_fld].DEFSOURCE !== null) {// al ser blob si es nulo no devuelve una funcion si no null
-                                outFields[outFields.length-1].column.default  = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
-                                //outFields[outFields.length-1].column.default = txtAux.trim();//.replace('DEFAULT','');                           
-                            }
+                            outFields[outFields.length-1].column.name      = rFields[j_fld].FIELDNAME.trim();
                             
-                            outFields[outFields.length-1].column.type=  FieldType(ft);
-                        }    
+                            if (rFields[j_fld].COMSOURCE !== null)
+                                outFields[outFields.length-1].column.computed    = await this.fb.getBlobAsString(rFields[j_fld].COMSOURCE);
+                            else {
+                                if (rFields[j_fld].CHARACTERSET !== null && rFields[j_fld].CHARACTERSET.trim() !== 'NONE')
+                                    outFields[outFields.length-1].column.charset   = rFields[j_fld].CHARACTERSET.trim();
+                                                    
+                                outFields[outFields.length-1].column.nullable  = rFields[j_fld].FLAG !== 1;
 
+                                ft.AType        = rFields[j_fld].FTYPE;
+                                ft.ASubType     = rFields[j_fld].SUBTYPE;
+                                ft.ALength      = rFields[j_fld].FLENGTH;
+                                ft.APrecision   = rFields[j_fld].FPRECISION;
+                                ft.AScale       = rFields[j_fld].SCALE;                                             
+
+                                if (rFields[j_fld].FCOLLATION !== null && rFields[j_fld].FCOLLATION.trim() !== 'NONE')
+                                    outFields[outFields.length-1].column.collate     = rFields[j_fld].FCOLLATION.trim();
+                            
+                                if (rFields[j_fld].DESCRIPTION !== null)
+                                    outFields[outFields.length-1].column.description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);                    
+
+                                if (rFields[j_fld].DEFSOURCE !== null) {// al ser blob si es nulo no devuelve una funcion si no null
+                                    outFields[outFields.length-1].column.default  = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
+                                    //outFields[outFields.length-1].column.default = txtAux.trim();//.replace('DEFAULT','');                           
+                                }
+                                
+                                outFields[outFields.length-1].column.type=  FieldType(ft);
+                            }    
+                        }    
                         j_fld++;
                     }
                     //indices                    
@@ -406,7 +413,7 @@ export class fbExtractMetadata {
                         outReturnYaml.push(outTables);
                     }
                     else {
-                        fs.writeFileSync(this.filesPath+'tables/'+outTables.table.name+'.yaml',yaml.safeDump(outTables, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                        fs.writeFileSync(this.filesPath+GlobalTypes.ArrayobjectType[2]+'/'+outTables.table.name+'.yaml',yaml.safeDump(outTables, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                         console.log(('generado tabla '+outTables.table.name+'.yaml').padEnd(70,'.')+'OK');
                     }                    
                     outTables = GlobalTypes.emptyTablesYamlType();
@@ -414,7 +421,7 @@ export class fbExtractMetadata {
                     outIndexes= [];
                     outcheck=[];
                     outforeignk=[];
-
+                }    
             }
             if (openTr) {
                 await this.fb.commit();
@@ -449,55 +456,57 @@ export class fbExtractMetadata {
             for (let i=0; i < rTrigger.length; i++){
                 
                 triggerName= rTrigger[i].NAME.trim(); 
-                outTrigger.triggerFunction.name= triggerName; 
-                
-                outTriggerTables.push({trigger:{name:'',events:[]}});
+                if (globalFunction.includeObject(this.excludeObject,GlobalTypes.ArrayobjectType[1],triggerName)) {
+                    outTrigger.triggerFunction.name= triggerName; 
+                    
+                    outTriggerTables.push({trigger:{name:'',events:[]}});
 
-                outTriggerTables[outTriggerTables.length-1].trigger.name=triggerName;
-                outTriggerTables[outTriggerTables.length-1].trigger.table= rTrigger[i].TABLENAME.trim();                
-                
-                
+                    outTriggerTables[outTriggerTables.length-1].trigger.name=triggerName;
+                    outTriggerTables[outTriggerTables.length-1].trigger.table= rTrigger[i].TABLENAME.trim();                
+                    
+                    
 
-                outTriggerTables[outTriggerTables.length-1].trigger.active=  rTrigger[i].INACTIVE === 0;
-                               
-                if ([1,3,5,17,25,27,113].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTriggerTables[outTriggerTables.length-1].trigger.fires= 'BEFORE';
-                }
-                else if ([2,4,6,18,26,28,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTriggerTables[outTriggerTables.length-1].trigger.fires= 'AFTER';
-                }
-                if ([1,2,17,18,25,26,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTriggerTables[outTriggerTables.length-1].trigger.events.push('INSERT');
-                }
-                if ([3,4,17,18,27,28,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTriggerTables[outTriggerTables.length-1].trigger.events.push('UPDATE');
-                }
-                if ([5,6,25,26,27,28,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
-                    outTriggerTables[outTriggerTables.length-1].trigger.events.push('DELETE');
-                }       
-
-                if (rTrigger[i].DESCRIPTION !== null) {
-                    outTriggerTables[outTriggerTables.length-1].trigger.description= await this.fb.getBlobAsString(rTrigger[i].DESCRIPTION);        
-                }
-
-                outTriggerTables[outTriggerTables.length-1].trigger.position= rTrigger[i].SEQUENCE;
-
-                body = await this.fb.getBlobAsString(rTrigger[i].SOURCE);
-                
-                outTrigger.triggerFunction.function.body= body.replace(/\r/g,'');;
+                    outTriggerTables[outTriggerTables.length-1].trigger.active=  rTrigger[i].INACTIVE === 0;
                                 
-                outTrigger.triggerFunction.triggers= outTriggerTables;
+                    if ([1,3,5,17,25,27,113].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                        outTriggerTables[outTriggerTables.length-1].trigger.fires= 'BEFORE';
+                    }
+                    else if ([2,4,6,18,26,28,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                        outTriggerTables[outTriggerTables.length-1].trigger.fires= 'AFTER';
+                    }
+                    if ([1,2,17,18,25,26,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                        outTriggerTables[outTriggerTables.length-1].trigger.events.push('INSERT');
+                    }
+                    if ([3,4,17,18,27,28,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                        outTriggerTables[outTriggerTables.length-1].trigger.events.push('UPDATE');
+                    }
+                    if ([5,6,25,26,27,28,113,114].indexOf(rTrigger[i].TTYPE) !== -1 ) {
+                        outTriggerTables[outTriggerTables.length-1].trigger.events.push('DELETE');
+                    }       
 
-                if (aRetYaml) {    
-                    outReturnYaml.push(outTrigger);
-                }    
-                else {
-                    fs.writeFileSync(this.filesPath+'triggers/'+triggerName+'.yaml',yaml.safeDump(outTrigger, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);                 
-                    console.log(('generado trigger '+triggerName+'.yaml').padEnd(70,'.')+'OK');
-                }  
+                    if (rTrigger[i].DESCRIPTION !== null) {
+                        outTriggerTables[outTriggerTables.length-1].trigger.description= await this.fb.getBlobAsString(rTrigger[i].DESCRIPTION);        
+                    }
 
-                outTrigger = GlobalTypes.emptyTriggerYamlType();               
-                outTriggerTables = [];               
+                    outTriggerTables[outTriggerTables.length-1].trigger.position= rTrigger[i].SEQUENCE;
+
+                    body = await this.fb.getBlobAsString(rTrigger[i].SOURCE);
+                    
+                    outTrigger.triggerFunction.function.body= body.replace(/\r/g,'');;
+                                    
+                    outTrigger.triggerFunction.triggers= outTriggerTables;
+
+                    if (aRetYaml) {    
+                        outReturnYaml.push(outTrigger);
+                    }    
+                    else {
+                        fs.writeFileSync(this.filesPath+GlobalTypes.ArrayobjectType[1]+'/'+triggerName+'.yaml',yaml.safeDump(outTrigger, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);                 
+                        console.log(('generado trigger '+triggerName+'.yaml').padEnd(70,'.')+'OK');
+                    }  
+
+                    outTrigger = GlobalTypes.emptyTriggerYamlType();               
+                    outTriggerTables = [];
+                }
             }
             if (openTr) {
                 await this.fb.commit();
@@ -535,7 +544,8 @@ export class fbExtractMetadata {
             for (let i=0; i < rViews.length; i++){
                     /*FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
                     FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION*/
-                    viewName= rViews[i].NAME.trim();
+                viewName= rViews[i].NAME.trim();
+                if (globalFunction.includeObject(this.excludeObject,GlobalTypes.ArrayobjectType[4],viewName)) {
                     outViews.view.name= viewName;                                                                
                     
                     if (rViews[i].DESCRIPTION !== null)
@@ -555,11 +565,11 @@ export class fbExtractMetadata {
                         outViewYalm.push(outViews);
                     }
                     else {
-                        fs.writeFileSync(this.filesPath+'views/'+viewName+'.yaml',yaml.safeDump(outViews, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                        fs.writeFileSync(this.filesPath+GlobalTypes.ArrayobjectType[4]+'/'+viewName+'.yaml',yaml.safeDump(outViews, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
                         console.log(('generado view '+viewName+'.yaml').padEnd(70,'.')+'OK');
                     }    
                     outViews = GlobalTypes.emptyViewYamlType();                    
-
+                }        
             }   
             if (openTr) { 
                 await this.fb.commit();
@@ -588,16 +598,18 @@ export class fbExtractMetadata {
             for (let i=0; i < rGenerator.length; i++){
                 
                 genName= rGenerator[i].GNAME.trim(); 
-                outGenerator.generator.name= genName;                                   
-                            
-                if (rGenerator[i].DESCRIPTION !== null) {
-                    outGenerator.generator.description = await this.fb.getBlobAsString(rGenerator[i].DESCRIPTION);
-                }
-                
-                fs.writeFileSync(this.filesPath+'generators/'+genName+'.yaml',yaml.safeDump(outGenerator, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
-                
-                console.log(('generado generator '+genName+'.yaml').padEnd(70,'.')+'OK');
-                outGenerator = {generator:{name:''}};                          
+                if (globalFunction.includeObject(this.excludeObject,GlobalTypes.ArrayobjectType[3],genName)) {
+                    outGenerator.generator.name= genName;                                   
+                                
+                    if (rGenerator[i].DESCRIPTION !== null) {
+                        outGenerator.generator.description = await this.fb.getBlobAsString(rGenerator[i].DESCRIPTION);
+                    }
+                    
+                    fs.writeFileSync(this.filesPath+GlobalTypes.ArrayobjectType[3]+'/'+genName+'.yaml',yaml.safeDump(outGenerator, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions); 
+                    
+                    console.log(('generado generator '+genName+'.yaml').padEnd(70,'.')+'OK');
+                    outGenerator = {generator:{name:''}};
+                }                             
             }
             await this.fb.commit();
         }
@@ -611,6 +623,7 @@ export class fbExtractMetadata {
     //******************************************************************* */
     
     filesPath:string    = '';
+    excludeObject:any;
 
     constructor(aConnection:fbClass.fbConnection | undefined = undefined) {
         if (aConnection === undefined) {
@@ -635,33 +648,33 @@ export class fbExtractMetadata {
              
             try {
                 
-                if (objectType === 'procedures' || objectType === '') {
-                    if (! fs.existsSync(this.filesPath+'procedures/')) {
-                        fs.mkdirSync(this.filesPath+'procedures')        
+                if (objectType === GlobalTypes.ArrayobjectType[0] || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+GlobalTypes.ArrayobjectType[0]+'/')) {
+                        fs.mkdirSync(this.filesPath+GlobalTypes.ArrayobjectType[0])        
                     }    
                     await this.extractMetadataProcedures(objectName);
                 }
-                if (objectType === 'tables' || objectType === '') {
-                    if (! fs.existsSync(this.filesPath+'tables/')) {
-                        fs.mkdirSync(this.filesPath+'tables')        
+                if (objectType === GlobalTypes.ArrayobjectType[2] || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+GlobalTypes.ArrayobjectType[2]+'/')) {
+                        fs.mkdirSync(this.filesPath+GlobalTypes.ArrayobjectType[2])        
                     } 
                     await this.extractMetadataTables(objectName);
                 }
-                if (objectType === 'triggers' || objectType === '') {
-                    if (! fs.existsSync(this.filesPath+'triggers/')) {
-                        fs.mkdirSync(this.filesPath+'triggers')        
+                if (objectType === GlobalTypes.ArrayobjectType[1] || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+GlobalTypes.ArrayobjectType[1]+'/')) {
+                        fs.mkdirSync(this.filesPath+GlobalTypes.ArrayobjectType[1])        
                     } 
                     await this.extractMetadataTriggers(objectName);
                 }
-                if (objectType === 'generator' || objectType === '') {
-                    if (! fs.existsSync(this.filesPath+'generators/')) {
-                        fs.mkdirSync(this.filesPath+'generators')        
+                if (objectType === GlobalTypes.ArrayobjectType[3] || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+GlobalTypes.ArrayobjectType[3]+'/')) {
+                        fs.mkdirSync(this.filesPath+GlobalTypes.ArrayobjectType[3])        
                     } 
                     await this.extractMetadataGenerators(objectName);
                 }
-                if (objectType === 'views' || objectType === '') {
-                    if (! fs.existsSync(this.filesPath+'views/')) {
-                        fs.mkdirSync(this.filesPath+'views')        
+                if (objectType === GlobalTypes.ArrayobjectType[4] || objectType === '') {
+                    if (! fs.existsSync(this.filesPath+GlobalTypes.ArrayobjectType[4]+'/')) {
+                        fs.mkdirSync(this.filesPath+GlobalTypes.ArrayobjectType[4])        
                     } 
                     await this.extractMetadataViews(objectName);
                 }                                       
