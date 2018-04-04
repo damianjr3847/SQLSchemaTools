@@ -33,24 +33,104 @@ interface iFieldType {
     AValidation?:   string  | any
 };
 
+export class tSource {
+    tablesArrayYaml:        Array<any> = [];
+    proceduresArrayYaml:    Array<any> = [];
+    triggersArrayYaml:      Array<any> = [];
+    generatorsArrayYaml:    Array<any> = [];
+    viewsArrayYaml:         Array<any> = [];
+    pathSource1: string                = '';
+    pathSource2: string                = ''; 
+    loadYaml:boolean                   = false;
+
+    private loadArrayYaml (dirSource:Array<any>, aObjectType: string, aObjectName:string) {
+        let ym:any;
+        let j:number = 0;
+
+        for (var i in dirSource) {
+            ym= yaml.safeLoad(fs.readFileSync(dirSource[i], GlobalTypes.yamlFileSaveOptions.encoding));            
+            if ('table' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[2])) { 
+                if (aObjectName === '' || ym.table.name === aObjectName) {
+                    j= this.tablesArrayYaml.findIndex((aItem) => (String(aItem.table.name).trim().toUpperCase() === String(ym.table.name).trim().toUpperCase()));
+                    if (j === -1)
+                        this.tablesArrayYaml.push(ym);
+                    else 
+                        throw new Error('tables: no puede haber objetos duplicados en source1 o source2');
+                }    
+            }    
+            else if ('procedure' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[0])) {
+                if (aObjectName === '' || ym.procedure.name === aObjectName) {
+                    j= this.proceduresArrayYaml.findIndex((aItem) => (String(aItem.procedure.name).trim().toUpperCase() === String(ym.procedure.name).trim().toUpperCase()));
+                    if (j === -1)
+                        this.proceduresArrayYaml.push(ym);
+                    else 
+                        throw new Error('procedure: no puede haber objetos duplicados en source1 o source2');
+                }        
+            }    
+            else if ('generator' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[3])) {
+                if (aObjectName === '' || ym.generator.name === aObjectName) {   
+                    j= this.generatorsArrayYaml.findIndex((aItem) => (String(aItem.generator.name).trim().toUpperCase() === String(ym.generator.name).trim().toUpperCase()));
+                    if (j === -1)
+                        this.generatorsArrayYaml.push(ym);       
+                    else 
+                        throw new Error('generator: no puede haber objetos duplicados en source1 o source2');
+                }    
+            }
+            else if ('view' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[4])) {
+                if (aObjectName === '' || ym.view.name === aObjectName) {
+                    j= this.viewsArrayYaml.findIndex((aItem) => (String(aItem.view.name).trim().toUpperCase() === String(ym.view.name).trim().toUpperCase()));
+                    if (j === -1)
+                        this.viewsArrayYaml.push(ym);
+                    else
+                        throw new Error('view: no puede haber objetos duplicados en source1 o source2');
+                }    
+            }
+            else if ('triggerFunction' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[1])) {
+                if (aObjectName === '' || ym.triggerFunction.name === aObjectName) {
+                    j= this.triggersArrayYaml.findIndex((aItem) => (String(aItem.triggerFunction.name).trim().toUpperCase() === String(ym.triggerFunction.name).trim().toUpperCase()));
+                    if (j === -1)
+                        this.triggersArrayYaml.push(ym);
+                    else
+                        throw new Error('trigger: no puede haber objetos duplicados en source1 o source2');    
+                }    
+            }    
+        }
+    };
+
+    readSource(aObjectType: string, aObjectName:string) {     
+        let filesDirSource1:Array<any> = [];
+        let filesDirSource2:Array<any> = [];        
+
+        this.tablesArrayYaml        = [];
+        this.proceduresArrayYaml    = [];
+        this.triggersArrayYaml      = [];
+        this.generatorsArrayYaml    = [];
+        this.viewsArrayYaml         = [];       
+
+        filesDirSource1= globalFunction.readRecursiveDirectory(this.pathSource1);
+        this.loadArrayYaml(filesDirSource1, aObjectType, aObjectName);
+
+        if (this.pathSource2 !== '') {
+            filesDirSource2= globalFunction.readRecursiveDirectory(this.pathSource2);
+            this.loadArrayYaml(filesDirSource2, aObjectType, aObjectName);
+        }
+        this.loadYaml= true;               
+    }
+}
+
 export class fbApplyMetadata {   
     private fb : fbClass.fbConnection;
     private fbExMe: fbExtractMetadata.fbExtractMetadata;   
-    private tablesArrayYaml: Array<any>      = [];
-    private proceduresArrayYaml: Array<any>  = [];
-    private triggersArrayYaml: Array<any>    = [];
-    private generatorsArrayYaml: Array<any>   = [];
-    private viewsArrayYaml: Array<any>       = [];
 
     public pathFileScript: string   = '';
-    public pathSource1: string      = '';
-    public pathSource2: string      = '';    
     public excludeObject: any;
-    public saveToLog:boolean        = false;
+    public saveToLog: boolean       = false;
+    public sources: tSource | any; 
 
     constructor() {
-        this.fb = new fbClass.fbConnection;
-        this.fbExMe= new fbExtractMetadata.fbExtractMetadata(this.fb);                    
+        this.fb= new fbClass.fbConnection;
+        this.fbExMe= new fbExtractMetadata.fbExtractMetadata(this.fb);
+        this.sources= new tSource;                    
     }
 
     private async checkMetadataLog() {
@@ -62,79 +142,7 @@ export class fbApplyMetadata {
             await this.fb.execute(saveMetadataGenerator,[]);            
         }
         await this.fb.commit();        
-    }
-
-    private readSource(objectType: string, objectName:string) {
-        let loadArrayYaml = (dirSource:Array<any>) => {
-            let ym:any;
-            let j:number = 0;
-
-            for (var i in dirSource) {
-                ym= yaml.safeLoad(fs.readFileSync(dirSource[i], GlobalTypes.yamlFileSaveOptions.encoding));            
-                if ('table' in ym && (objectType === '' || objectType === GlobalTypes.ArrayobjectType[2])) { 
-                    if (objectName === '' || ym.table.name === objectName) {
-                        j= this.tablesArrayYaml.findIndex((aItem) => (String(aItem.table.name).trim().toUpperCase() === String(ym.table.name).trim().toUpperCase()));
-                        if (j === -1)
-                            this.tablesArrayYaml.push(ym);
-                        else 
-                            throw new Error('tables: no puede haber objetos duplicados en source1 o source2');
-                    }    
-                }    
-                else if ('procedure' in ym && (objectType === '' || objectType === GlobalTypes.ArrayobjectType[0])) {
-                    if (objectName === '' || ym.procedure.name === objectName) {
-                        j= this.proceduresArrayYaml.findIndex((aItem) => (String(aItem.procedure.name).trim().toUpperCase() === String(ym.procedure.name).trim().toUpperCase()));
-                        if (j === -1)
-                            this.proceduresArrayYaml.push(ym);
-                        else 
-                            throw new Error('procedure: no puede haber objetos duplicados en source1 o source2');
-                    }        
-                }    
-                else if ('generator' in ym && (objectType === '' || objectType === GlobalTypes.ArrayobjectType[3])) {
-                    if (objectName === '' || ym.generator.name === objectName) {   
-                        j= this.generatorsArrayYaml.findIndex((aItem) => (String(aItem.generator.name).trim().toUpperCase() === String(ym.generator.name).trim().toUpperCase()));
-                        if (j === -1)
-                            this.generatorsArrayYaml.push(ym);       
-                        else 
-                            throw new Error('generator: no puede haber objetos duplicados en source1 o source2');
-                    }    
-                }
-                else if ('view' in ym && (objectType === '' || objectType === GlobalTypes.ArrayobjectType[4])) {
-                    if (objectName === '' || ym.view.name === objectName) {
-                        j= this.viewsArrayYaml.findIndex((aItem) => (String(aItem.view.name).trim().toUpperCase() === String(ym.view.name).trim().toUpperCase()));
-                        if (j === -1)
-                            this.viewsArrayYaml.push(ym);
-                        else
-                            throw new Error('view: no puede haber objetos duplicados en source1 o source2');
-                    }    
-                }
-                else if ('triggerFunction' in ym && (objectType === '' || objectType === GlobalTypes.ArrayobjectType[1])) {
-                    if (objectName === '' || ym.triggerFunction.name === objectName) {
-                        j= this.triggersArrayYaml.findIndex((aItem) => (String(aItem.triggerFunction.name).trim().toUpperCase() === String(ym.triggerFunction.name).trim().toUpperCase()));
-                        if (j === -1)
-                            this.triggersArrayYaml.push(ym);
-                        else
-                            throw new Error('trigger: no puede haber objetos duplicados en source1 o source2');    
-                    }    
-                }    
-            }
-        };     
-        let filesDirSource1:Array<any> = [];
-        let filesDirSource2:Array<any> = [];        
-
-        this.tablesArrayYaml        = [];
-        this.proceduresArrayYaml    = [];
-        this.triggersArrayYaml      = [];
-        this.generatorsArrayYaml    = [];
-        this.viewsArrayYaml         = [];       
-
-        filesDirSource1= globalFunction.readRecursiveDirectory(this.pathSource1);
-        loadArrayYaml(filesDirSource1);
-
-        if (this.pathSource2 !== '') {
-            filesDirSource2= globalFunction.readRecursiveDirectory(this.pathSource2);
-            loadArrayYaml(filesDirSource2);
-        }               
-    }
+    }    
 
     private outFileScript(aType:string, aScript:Array<any> | string) {        
         switch (aType) {
@@ -221,9 +229,9 @@ export class fbApplyMetadata {
 
             dbYaml = await this.fbExMe.extractMetadataProcedures('',true,false);
             
-            for (let i in this.proceduresArrayYaml) {
+            for (let i in this.sources.proceduresArrayYaml) {
                 
-                fileYaml = this.proceduresArrayYaml[i];
+                fileYaml = this.sources.proceduresArrayYaml[i];
                 
                 procedureName= fileYaml.procedure.name;
                 
@@ -291,9 +299,9 @@ export class fbApplyMetadata {
 
             dbYaml = await this.fbExMe.extractMetadataTriggers('',true,false);
             
-            for (let i in this.triggersArrayYaml) {
+            for (let i in this.sources.triggersArrayYaml) {
                 
-                fileYaml = this.triggersArrayYaml[i];
+                fileYaml = this.sources.triggersArrayYaml[i];
 
                 triggerName= fileYaml.triggerFunction.name;
                 
@@ -350,8 +358,8 @@ export class fbApplyMetadata {
             await this.fb.startTransaction(false);
             dbYaml = await this.fbExMe.extractMetadataViews('',true,false);
 
-            for (let i in this.viewsArrayYaml) {               
-                fileYaml = this.viewsArrayYaml[i];
+            for (let i in this.sources.viewsArrayYaml) {               
+                fileYaml = this.sources.viewsArrayYaml[i];
                 
                 viewName= fileYaml.view.name;
                 
@@ -388,8 +396,8 @@ export class fbApplyMetadata {
 
         try {
             await this.fb.startTransaction(false);
-            for (let i in this.generatorsArrayYaml) {               
-                fileYaml = this.generatorsArrayYaml[i];
+            for (let i in this.sources.generatorsArrayYaml) {               
+                fileYaml = this.sources.generatorsArrayYaml[i];
                 genName= fileYaml.generator.name;
                 if (globalFunction.includeObject(this.excludeObject,GlobalTypes.ArrayobjectType[3],genName)) {
                     genBody= 'CREATE SEQUENCE ' + fileYaml.generator.name;  
@@ -426,8 +434,8 @@ export class fbApplyMetadata {
             }
             await this.fb.commit();
 
-            for (let i in this.tablesArrayYaml) {               
-                fileYaml = this.tablesArrayYaml[i];
+            for (let i in this.sources.tablesArrayYaml) {               
+                fileYaml = this.sources.tablesArrayYaml[i];
 
                 tableName= fileYaml.table.name;
                 if (globalFunction.includeObject(this.excludeObject,GlobalTypes.ArrayobjectType[2],tableName)) {
@@ -683,7 +691,7 @@ export class fbApplyMetadata {
                 await this.checkMetadataLog();
 
             try {
-                this.readSource(objectType,objectName);
+                this.sources.readSource(objectType,objectName);
                 if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[3])
                     await this.applyGenerators();
                 if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[2])

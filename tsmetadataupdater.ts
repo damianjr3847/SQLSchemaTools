@@ -27,11 +27,11 @@ import * as fbApplyMetadata from './fbApplyMetadata';
 
 import * as GlobalTypes from './globalTypes';
 
-let actionYalm:string       = 'read';
+let actionYalm:string       = 'write';
 let source1:string          = './export/';
 let source2:string          = './source2/';
 
-let pathSave:string         = './export/';
+let pathSave:string         = './export2/';
 let dbDriver:string         = 'fb';
 let dbPath:string           = '/pool/testing/demo.gdb';
 let dbHost:string           = 'srv-01.sig2k.com';
@@ -44,6 +44,7 @@ let pathfilescript:string   = '';//'./export/script.sql';
 let excludeObject:any;
 let excludeObjectStr:string = '{"tables":["usr$*","rpl$*"],"fields":["rpl$*","usr$*"],"procedures":["usr$*"],"triggers":["rpl$*"]}';
 let saveToLog: boolean      = true;
+let excludefrom: string     = './export/';
 
 params.version('1.0.0');
 
@@ -68,6 +69,7 @@ params.option('-n, --objectname <objectname>', 'opcional, nombre particular del 
 params.option('-s, --outscript <pathfilescript>', 'opcional, devuelve un archivo con las sentencias sql');
 
 params.option('-e, --exclude <excludejson>', 'opcional, json con lo que que quiere excluir {tables:[],fields:[],procedures:[],triggers:[],generator:[],views:[]}');
+params.option('--excludefrom <pathexclude>', 'opcional, generar matadata exluyendo objetos de dicho path');
 
 params.option('-l, --savetolog', 'guarda en la db el log de los querys ejecutados');
 
@@ -79,7 +81,7 @@ params.parse(process.argv);
 
 // validacion de parametros
 
-/*
+
 if (params.writeyalm && params.readyalm) {
     console.log('Debe elegir -r o -w no ambos');
     process.exit(1);    
@@ -212,6 +214,10 @@ if (params.savetolog) {
     saveToLog= true;
 }
 
+if (params.excludefrom) {
+    excludefrom= params.excludefrom;
+}
+
 /*console.log('actionYalm: %j',actionYalm);
 console.log('pathYalm: %j',pathSave);
 console.log('source1: %j',source1);
@@ -239,12 +245,17 @@ excludeObject= JSON.parse(excludeObjectStr);
             fbem = new fbExtractMetadata.fbExtractMetadata;
             fbem.filesPath = pathSave;
             fbem.excludeObject = excludeObject;
+
+            if (excludefrom !== '') {
+                fbem.sources.pathSource1 = excludefrom;
+                fbem.excludeFrom= true;
+            }    
             await fbem.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
         }
         else if (actionYalm === 'read') {
             fbam = new fbApplyMetadata.fbApplyMetadata;
-            fbam.pathSource1 = source1;
-            fbam.pathSource2 = source2;
+            fbam.sources.pathSource1 = source1;
+            fbam.sources.pathSource2 = source2;
             fbam.pathFileScript= pathfilescript;
             fbam.excludeObject = excludeObject;
             fbam.saveToLog = saveToLog;

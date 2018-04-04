@@ -23,11 +23,12 @@ export function includeObject(aObjExclude:any, aType:string, aName:string) {
     
 }
 
-export function arrayToString(aArray:Array<any>) {
+export function arrayToString(aArray:Array<any>,aSeparated:string='') {
     let aText:string = '';    
-    for (let j=0; j < aArray.length; j++) {
-        aText += aArray[j]; 
+    for (let j=0; j < aArray.length-1; j++) {
+        aText += aArray[j]+aSeparated; 
     } 
+    aText += aArray[aArray.length-1];
     return aText;   
 }
 
