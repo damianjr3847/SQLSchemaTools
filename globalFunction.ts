@@ -2,13 +2,12 @@ import * as fs from 'fs';
 
 export function includeObject(aObjExclude:any, aType:string, aName:string) {
     var element:string = '';
-    var ret:boolean = false;    
-
-    if (aObjExclude == undefined && aType in aObjExclude) {        
+    var ret:boolean = false;        
+    if (aObjExclude !== undefined && aType in aObjExclude) {                
         for(var i in aObjExclude[aType]) {
-            element= aObjExclude[aType][i];
+            element= aObjExclude[aType][i];            
             if (element.endsWith('*'))
-                ret= aName.toUpperCase().startsWith(element.replace('*','').toUpperCase());
+                ret= aName.toUpperCase().startsWith(element.replace('*',function (x:string) { return ''}).toUpperCase());
             else 
                 ret= aName.trim().toUpperCase() === element.trim().toUpperCase();
             
@@ -19,8 +18,7 @@ export function includeObject(aObjExclude:any, aType:string, aName:string) {
     }
     else {
         return !ret;
-    }
-    
+    }    
 }
 
 export function arrayToString(aArray:Array<any>,aSeparated:string='') {

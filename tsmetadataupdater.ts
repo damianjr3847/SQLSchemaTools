@@ -27,11 +27,31 @@ import * as fbApplyMetadata from './fbApplyMetadata';
 
 import * as GlobalTypes from './globalTypes';
 
-let actionYalm:string       = 'write';
+let actionYalm:string       = '';
+let source1:string          = '';
+let source2:string          = '';
+
+let pathSave:string         = '';
+let dbDriver:string         = '';
+let dbPath:string           = '';
+let dbHost:string           = '';
+let dbPort:number           = 3050;
+let dbUser:string           = 'SYSDBA';
+let dbPass:string           = 'masterkey';
+let objectType:string       = '';
+let objectName:string       = '';
+let pathfilescript:string   = '';
+let excludeObject:any;
+let excludeObjectStr:string = '';
+let saveToLog: boolean      = false;
+let excludefrom: string     = '';
+
+/**********para pruebas */
+/*let actionYalm:string       = 'write';
 let source1:string          = './export/';
 let source2:string          = './source2/';
 
-let pathSave:string         = './export2/';
+let pathSave:string         = './export/';
 let dbDriver:string         = 'fb';
 let dbPath:string           = '/pool/testing/demo.gdb';
 let dbHost:string           = 'srv-01.sig2k.com';
@@ -45,6 +65,9 @@ let excludeObject:any;
 let excludeObjectStr:string = '{"tables":["usr$*","rpl$*"],"fields":["rpl$*","usr$*"],"procedures":["usr$*"],"triggers":["rpl$*"]}';
 let saveToLog: boolean      = true;
 let excludefrom: string     = './export/';
+
+excludeObject= JSON.parse(excludeObjectStr);
+*/
 
 params.version('1.0.0');
 
@@ -72,10 +95,6 @@ params.option('-e, --exclude <excludejson>', 'opcional, json con lo que que quie
 params.option('--excludefrom <pathexclude>', 'opcional, generar matadata exluyendo objetos de dicho path');
 
 params.option('-l, --savetolog', 'guarda en la db el log de los querys ejecutados');
-
-//console.log(process.argv);
-
-//process.exit(1);
 
 params.parse(process.argv);
 
@@ -118,7 +137,7 @@ if (params.pathsave) {
     }
     pathSave= params.pathsave;
 }
-else {
+else if (actionYalm === 'write') {
     console.log('debe haber un Path del archivo y directorio de los archivos yalm');    
     process.exit(1);
 }
@@ -130,7 +149,7 @@ if (params.source1) {
     }
     source1= params.source1;
 }
-else {
+else if (actionYalm === 'read') {
     console.log('debe haber un path en source1');    
     process.exit(1);
 }
@@ -233,7 +252,6 @@ console.log('e '+params.exclude+' '+excludeObject.pepe)
 console.log('p '+params.outscript)
 */
 
-excludeObject= JSON.parse(excludeObjectStr);
 
 (async () => {
     let fbem: fbExtractMetadata.fbExtractMetadata;  
