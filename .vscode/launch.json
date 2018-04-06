@@ -12,6 +12,26 @@
             "preLaunchTask": "tsc: build - tsconfig.json",
             "outFiles": [
                 "${workspaceFolder}//**/js/*.js"
+            ],
+            "args": [
+                "--readyalm",
+                "--source1",
+                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/export/",
+                "--source2",
+                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/export2/",
+                "--dbdriver",
+                "fb",
+                "--dbuser",
+                "SYSDBA",
+                "--dbpass",
+                "masterkey",
+                "--dbhost",
+                "localhost",
+                "--dbport",
+                "5130",
+                "--dbpath",
+                "/pool/testing/demo.gdb",
+                "--savetolog"   
             ]
         }
     ]

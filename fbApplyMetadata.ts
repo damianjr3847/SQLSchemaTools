@@ -8,7 +8,7 @@ import * as sources from './loadsource';
 
 const saveMetadataTable= `CREATE TABLE ZLG_META_UPD (
                                 FINDICE  INTEGER NOT NULL PRIMARY KEY,
-                                FDIAHOR  TIME NOT NULL,
+                                FDIAHOR  TIMESTAMP NOT NULL,
                                 FOBTYPE  VARCHAR(20) NOT NULL,
                                 FOBNAME  VARCHAR(100) NOT NULL,
                                 FQUERY   BLOB SUB_TYPE 1 SEGMENT SIZE 80
@@ -86,18 +86,30 @@ export class fbApplyMetadata {
     }
 
     private async applyChange(aObjectType:string, aObjectName:string, aAlterScript:Array<string>) {
+        let query:string = '';
 
-        if (this.pathFileScript === '') {
-            for (var i in aAlterScript) {    
-                await this.fb.execute(aAlterScript[i],[]);
-                if (this.saveToLog) {
-                    await this.fb.execute(saveQueryLog,[aObjectType, aObjectName, aAlterScript[i]]);
-                }
-            }    
-            console.log(('Aplicando '+aObjectType+aObjectName).padEnd(70,'.')+'OK');
+        try {
+            if (this.pathFileScript === '') {
+                for (var i in aAlterScript) {
+                    //console.log(i.toString()+'--'+aAlterScript[i]);    
+                    query= aAlterScript[i];
+                    await this.fb.startTransaction(false);
+                    await this.fb.execute(aAlterScript[i],[]);
+                    if (this.saveToLog) {                    
+                        await this.fb.execute(saveQueryLog,[aObjectType, aObjectName, aAlterScript[i]]);
+                    }
+                    await this.fb.commit();
+                }    
+                console.log(('Aplicando '+aObjectType+aObjectName).padEnd(70,'.')+'OK');
+            }
+            else 
+                this.outFileScript(aObjectType,aAlterScript);
         }
-        else 
-            this.outFileScript(aObjectType,globalFunction.arrayToString(aAlterScript));    
+        catch (err) {
+            if (this.fb.inTransaction()) 
+                await this.fb.rollback();    
+            throw new Error(query+'.'+err.message);
+        }
 
     }
     //****************************************************************** */
@@ -139,13 +151,13 @@ export class fbApplyMetadata {
         let procedureInDB: any;    
         let j:number = 0;
 
-        
-
         try {           
-            await this.fb.startTransaction(false);
+            await this.fb.startTransaction(true);
 
             dbYaml = await this.fbExMe.extractMetadataProcedures('',true,false);
             
+            await this.fb.commit(); 
+
             for (let i in this.sources.proceduresArrayYaml) {
                 
                 fileYaml = this.sources.proceduresArrayYaml[i];
@@ -166,8 +178,7 @@ export class fbApplyMetadata {
 
                     procedureBody= '';
                 }    
-            }
-            await this.fb.commit(); 
+            }           
             //console.log(Date.now());               
         }
         catch (err) {
@@ -212,10 +223,12 @@ export class fbApplyMetadata {
         let j:number = 0;
 
         try { 
-            await this.fb.startTransaction(false);
+            await this.fb.startTransaction(true);
 
             dbYaml = await this.fbExMe.extractMetadataTriggers('',true,false);
             
+            await this.fb.commit(); 
+
             for (let i in this.sources.triggersArrayYaml) {
                 
                 fileYaml = this.sources.triggersArrayYaml[i];
@@ -231,14 +244,13 @@ export class fbApplyMetadata {
                     }    
                     
                     if (triggerBody !== triggerInDb) {
-                        this.applyChange(GlobalTypes.ArrayobjectType[1],triggerName,Array(triggerBody));                    
+                        await this.applyChange(GlobalTypes.ArrayobjectType[1],triggerName,Array(triggerBody));                    
                     }    
 
                     triggerBody= '';
                     triggerInDb= '';               
                 }
-            }
-            await this.fb.commit();  
+            }             
         }    
         catch (err) {
             console.error('Error aplicando trigger '+triggerName+'. ', err.message);
@@ -272,8 +284,9 @@ export class fbApplyMetadata {
         let viewBody: string = '';        
 
         try {           
-            await this.fb.startTransaction(false);
+            await this.fb.startTransaction(true);
             dbYaml = await this.fbExMe.extractMetadataViews('',true,false);
+            await this.fb.commit();
 
             for (let i in this.sources.viewsArrayYaml) {               
                 fileYaml = this.sources.viewsArrayYaml[i];
@@ -289,13 +302,13 @@ export class fbApplyMetadata {
                     }    
 
                     if (viewBody !== viewInDb) {
-                        this.applyChange(GlobalTypes.ArrayobjectType[4], viewName, Array(viewBody));                      
+                        await this.applyChange(GlobalTypes.ArrayobjectType[4], viewName, Array(viewBody));                      
                     }    
                     viewBody='';                
                     viewInDb='';
                 }    
             } 
-            await this.fb.commit();
+            
         } catch(err) {
             console.error('Error aplicando view '+viewName+'.', err.message);   
         } 
@@ -311,16 +324,17 @@ export class fbApplyMetadata {
         let genBody: string = ''; 
         let fileYaml:any;
 
-        try {
-            await this.fb.startTransaction(false);
+        try {            
             for (let i in this.sources.generatorsArrayYaml) {               
                 fileYaml = this.sources.generatorsArrayYaml[i];
                 genName= fileYaml.generator.name;
                 if (globalFunction.includeObject(this.excludeObject,GlobalTypes.ArrayobjectType[3],genName)) {
                     genBody= 'CREATE SEQUENCE ' + fileYaml.generator.name;  
-                                        
+                    if (!this.fb.inTransaction())
+                        await this.fb.startTransaction(false);
+
                     if (!(await this.fb.validate('SELECT 1 FROM RDB$GENERATORS WHERE RDB$GENERATOR_NAME=?',[genName]))) {
-                        this.applyChange(GlobalTypes.ArrayobjectType[3],genName,Array(genBody));                    
+                        await this.applyChange(GlobalTypes.ArrayobjectType[3],genName,Array(genBody));                    
                     }
                 }    
             }    
@@ -349,6 +363,7 @@ export class fbApplyMetadata {
             if (dbYaml === undefined) {
                 throw 'no se pudo extraer el metadata de la base';
             }
+
             await this.fb.commit();
 
             for (let i in this.sources.tablesArrayYaml) {               
@@ -361,7 +376,7 @@ export class fbApplyMetadata {
                     tableScript= [];
 
                     if (j === -1) { //NO EXISTE TABLA
-                        tableScript.push(this.newTableYamltoString(fileYaml.table));                    
+                        tableScript= this.newTableYamltoString(fileYaml.table);                    
                     }
                     else {    
                         tableScript= tableScript.concat(this.getTableColumnDiferences(tableName,fileYaml.table.columns,dbYaml[j].table.columns));
@@ -371,9 +386,9 @@ export class fbApplyMetadata {
                     }
             
                     if (tableScript.length > 0)
-                        this.applyChange(GlobalTypes.ArrayobjectType[2],tableName,tableScript);                    
+                        await this.applyChange(GlobalTypes.ArrayobjectType[2],tableName,tableScript);                    
                 }    
-            }            
+            }           
 
         } catch(err) {
             console.error('Error aplicando tabla '+tableName+'.', err.message);   
@@ -381,9 +396,10 @@ export class fbApplyMetadata {
         
     }
 
-    newTableYamltoString(aYaml:any){                 
+    newTableYamltoString(aYaml:any):Array<string>{                 
         let aTable:string = '';
         let aText:string = '';
+        let aRet:Array<string> = [];
 
         aTable= 'CREATE TABLE '+ aYaml.name+' ('+GlobalTypes.CR;
         for (let j=0; j < aYaml.columns.length-1; j++){
@@ -391,28 +407,41 @@ export class fbApplyMetadata {
         }
 
         aTable += GlobalTypes.TAB +fieldToSql(aYaml.columns[aYaml.columns.length-1].column) + ');' + GlobalTypes.CR;
-    
+        
+        aRet.push(aTable);        
         if ('constraint' in aYaml) {
-            if ('foreignkeys' in aYaml.constraint)                 
-                aTable += globalFunction.arrayToString(foreignkeysToSql(aYaml.name, aYaml.constraint.foreignkeys));               
+            if ('foreignkeys' in aYaml.constraint) {
+                aTable = globalFunction.arrayToString(foreignkeysToSql(aYaml.name, aYaml.constraint.foreignkeys));               
+                aRet.push(aTable);                
+            }
+            if ('checks' in aYaml.constraint) {
+                aTable = globalFunction.arrayToString(checkToSql(aYaml.name, aYaml.constraint.checks));
+                aRet.push(aTable);
+            }    
             
-            if ('checks' in aYaml.constraint)                 
-                aTable += globalFunction.arrayToString(checkToSql(aYaml.name, aYaml.constraint.checks));
-            
-            if ('primaryKey' in aYaml.constraint) 
-                aTable += primaryKeyToSql(aYaml.name, aYaml.constraint.primaryKey);   
+            if ('primaryKey' in aYaml.constraint) {
+                aTable = primaryKeyToSql(aYaml.name, aYaml.constraint.primaryKey);   
+                aRet.push(aTable);
+            }    
         }
-        if ('indexes' in aYaml) 
-            aTable += globalFunction.arrayToString(indexesToSql(aYaml.name, aYaml.indexes));      
+
+        if ('indexes' in aYaml) {
+            aTable = globalFunction.arrayToString(indexesToSql(aYaml.name, aYaml.indexes));      
+            aRet.push(aTable);
+        }            
         
-        if ('description' in aYaml) 
-            aTable += "COMMENT ON TABLE "+aYaml.name+" IS '"+aYaml.description+"';"+GlobalTypes.CR;
+        if ('description' in aYaml) {
+            aTable = "COMMENT ON TABLE "+aYaml.name+" IS '"+aYaml.description+"';"+GlobalTypes.CR;
+            aRet.push(aTable);
+        }
         
-        for (let j=0; j < aYaml.columns.length; j++){
-            if ('description' in aYaml.columns[j].column && aYaml.columns[j].column.description !== '')     
-                aTable += "COMMENT ON COLUMN "+aYaml.name+"."+aYaml.columns[j].column.name+" IS '"+aYaml.columns[j].column.description+"';"+GlobalTypes.CR;
+        for (let j=0; j < aYaml.columns.length; j++) {
+            if ('description' in aYaml.columns[j].column && aYaml.columns[j].column.description !== '') {
+                aTable = "COMMENT ON COLUMN "+aYaml.name+"."+aYaml.columns[j].column.name+" IS '"+aYaml.columns[j].column.description+"';"+GlobalTypes.CR;
+                aRet.push(aTable);
+            }    
         }                
-        return aTable;
+        return aRet;
     }  
 
     getTableColumnDiferences(aTableName:string, aFileColumnsYaml: Array<any>, aDbColumnsYaml: Array<any>):Array<string> {
@@ -446,6 +475,9 @@ export class fbApplyMetadata {
                         retCmd = '';
 
                         if (aFileColumnsYaml[j].column.nullable === false && aDbColumnsYaml[i].column.nullable === true) {
+                            if (!('nullableToNotNullValue' in aFileColumnsYaml[j].column))
+                                throw new Error('Si cambia de null a not null complete la opcion "nullableToNotNullValue" para llenar el campo');
+
                             retCmd = 'UPDATE '+ aTableName +' SET ' +  aFileColumnsYaml[j].column.name + "='" + aFileColumnsYaml[j].column.nullableToNotNullValue + "' WHERE " + aFileColumnsYaml[j].column.name + ' IS NOT NULL;'; 
                             retAux +=  ' SET NOT NULL;'; //ver con que lo lleno al campo que seteo asi   
                         } 
@@ -514,14 +546,14 @@ export class fbApplyMetadata {
         }
 
         if ('primaryKey' in aFileConstraintYaml) {
-            pkFY=primaryKeyToSql(aTableName, aFileConstraintYaml.primaryKey); 
+            pkFY=primaryKeyToSql(aTableName, aFileConstraintYaml.primaryKey);            
             pkDB=primaryKeyToSql(aTableName, aDbConstraintYaml.primaryKey); 
             if (pkFY.trim().toUpperCase() !== pkDB.trim().toUpperCase()) {
                 if (pkDB !== '') 
                     retArray.push('ALTER TABLE '+aTableName+' DROP CONSTRAINT '+aDbConstraintYaml.primaryKey.name);
                         
                 retArray.push(pkFY);
-            }    
+            }        
         }            
 
         return retArray;
@@ -702,11 +734,13 @@ function checkToSql(aTableName:string, aCheck:any):Array<string> {
 function primaryKeyToSql(aTableName:string, aPk:any):string {
     //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_PK PRIMARY KEY (FCODINT);    
     let aText: string = '';
-    aText += 'ALTER TABLE '+aTableName+' ADD CONSTRAINT '+aPk.name+' PRIMARY KEY (';                
-    for (let j=0; j < aPk.columns.length-1; j++) {
-        aText += aPk.columns[j] + ',';
-    }
-    aText += aPk.columns[aPk.columns.length-1] + ');'+GlobalTypes.CR;    
+    if (aPk.name !== undefined && aPk.name !== '' && aPk.columns.length>0) {
+        aText += 'ALTER TABLE '+aTableName+' ADD CONSTRAINT '+aPk.name+' PRIMARY KEY (';                
+        for (let j=0; j < aPk.columns.length-1; j++) {
+            aText += aPk.columns[j] + ',';
+        }
+        aText += aPk.columns[aPk.columns.length-1] + ');'+GlobalTypes.CR;
+    }    
     return aText;   
 }    
 

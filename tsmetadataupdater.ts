@@ -71,12 +71,12 @@ excludeObject= JSON.parse(excludeObjectStr);
 
 params.version('1.0.0');
 
-params.option('-r, --readyalm', 'Lee el directorio o archivo en el parametro -yalm para aplicar cambios');
+params.option('-r, --readyalm', 'Lee el directorio de los parametros source1 y/o source2 para aplicar cambios');
 
 params.option('--source1 <source1>', 'Path del directorio a leer');
 params.option('--source2 <source2>', 'Path del directorio a leer');
 
-params.option('-w, --writeyalm', 'Genera los archivos yalm en el directorio especificado -yalm');
+params.option('-w, --writeyalm', 'Genera los archivos yalm en el directorio especificado en pathsave');
 
 params.option('-x, --pathsave <pathsave>', 'Path del directorio donde se guardaran los archivos');
 
@@ -87,11 +87,12 @@ params.option('-c, --dbpath <dbpath>', 'path DB');
 params.option('-u, --dbuser <dbuser>', 'User DB');
 params.option('-p, --dbpass <dbpass>', 'Password DB');
 
-params.option('-t, --objecttype <objecttype>', 'opcional, especifica que tipo de cambios se aplican (procedures,triggers,tables,generators');
-params.option('-n, --objectname <objectname>', 'opcional, nombre particular del ObjectType (ot) que se desea aplicar');
-params.option('-s, --outscript <pathfilescript>', 'opcional, devuelve un archivo con las sentencias sql');
+params.option('-t, --objecttype <objecttype>', 'opcional, especifica que tipo de cambios se aplican (procedures,triggers,tables,generators,views)');
+params.option('-n, --objectname <objectname>', 'opcional, nombre particular del ObjectType que se desea aplicar');
+params.option('-s, --outscript <pathfilescript>', 'opcional, devuelve un archivo con las sentencias sql en vez de ejecutarlas en la base de datos');
 
-params.option('-e, --exclude <excludejson>', 'opcional, json con lo que que quiere excluir {tables:[],fields:[],procedures:[],triggers:[],generator:[],views:[]}');
+params.option('-e, --exclude <excludejson>', 'opcional, json con lo que que quiere excluir {tables:[],fields:[],procedures:[],triggers:[],generator:[],views:[]}')
+
 params.option('--excludefrom <pathexclude>', 'opcional, generar matadata exluyendo objetos de dicho path');
 
 params.option('-l, --savetolog', 'guarda en la db el log de los querys ejecutados');

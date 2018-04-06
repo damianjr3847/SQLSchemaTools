@@ -29,7 +29,7 @@ export class tSource {
                         if (j === -1)
                             this.tablesArrayYaml.push(ym);
                         else 
-                            throw new Error('tables: no puede haber objetos duplicados en source1 o source2');
+                            throw new Error('tables: no puede haber objetos duplicados en source1 y source2');
                     }    
                 }    
                 else if ('procedure' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[0])) {
@@ -38,7 +38,7 @@ export class tSource {
                         if (j === -1)
                             this.proceduresArrayYaml.push(ym);
                         else 
-                            throw new Error('procedure: no puede haber objetos duplicados en source1 o source2');
+                            throw new Error('procedure: no puede haber objetos duplicados en source1 y source2');
                     }        
                 }    
                 else if ('generator' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[3])) {
@@ -47,7 +47,7 @@ export class tSource {
                         if (j === -1)
                             this.generatorsArrayYaml.push(ym);       
                         else 
-                            throw new Error('generator: no puede haber objetos duplicados en source1 o source2');
+                            throw new Error('generator: no puede haber objetos duplicados en source1 y source2');
                     }    
                 }
                 else if ('view' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[4])) {
@@ -56,7 +56,7 @@ export class tSource {
                         if (j === -1)
                             this.viewsArrayYaml.push(ym);
                         else
-                            throw new Error('view: no puede haber objetos duplicados en source1 o source2');
+                            throw new Error('view: no puede haber objetos duplicados en source1 y source2');
                     }    
                 }
                 else if ('triggerFunction' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[1])) {
@@ -65,7 +65,7 @@ export class tSource {
                         if (j === -1)
                             this.triggersArrayYaml.push(ym);
                         else
-                            throw new Error('trigger: no puede haber objetos duplicados en source1 o source2');    
+                            throw new Error('trigger: no puede haber objetos duplicados en source1 y source2');    
                     }    
                 }    
             }

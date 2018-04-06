@@ -23,25 +23,25 @@ export class fbConnection {
 
     checkConnectionParams() {            
         if (this.hostName === '')
-            throw 'Connection error: hostName empty';
+            throw new Error('Connection error: hostName empty');
         if (this.portNumber === 0)
-            throw 'Connection error: invalid portNumber';
+            throw new Error('Connection error: invalid portNumber');
         if (this.database === '')
-            throw 'Connection error: database Empty';
+            throw new Error('Connection error: database Empty');
         if (this.dbUser === '')
-            throw 'Connection error: dbUser Empty';
+            throw new Error('Connection error: dbUser Empty');
         if (this.dbPassword === '')
-            throw 'Connection error: dbPassword Empty';
+            throw new Error('Connection error: dbPassword Empty');
     }           
 
     checkInConnection() {
         if (!this.db)
-            throw 'conection is closed';
+            throw new Error('conection is closed');
     }
 
     checkInTransaction() {
         if (!this.tr)
-            throw 'transaction is closed';
+            throw new Error('transaction is closed');
     }
     
     connected(): boolean {
