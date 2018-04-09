@@ -6,17 +6,18 @@ import * as fbExtractMetadata from './fbExtractMetadata';
 import * as globalFunction from './globalFunction';
 import * as sources from './loadsource';
 
-const saveMetadataTable= `CREATE TABLE ZLG_META_UPD (
+const saveMetadataTable= `CREATE TABLE {TABLA} (
                                 FINDICE  INTEGER NOT NULL PRIMARY KEY,
-                                FDIAHOR  TIMESTAMP NOT NULL,
+                                FFECHA   DATE NOT NULL,
+                                FHORA    TIME NOT NULL,
                                 FOBTYPE  VARCHAR(20) NOT NULL,
                                 FOBNAME  VARCHAR(100) NOT NULL,
                                 FQUERY   BLOB SUB_TYPE 1 SEGMENT SIZE 80
                             );`;
-const saveMetadataGenerator= `CREATE SEQUENCE G_ZLG_META_UPD;`;
+const saveMetadataGenerator= `CREATE SEQUENCE G_{TABLA};`;
 
-const saveQueryLog = `INSERT INTO ZLG_META_UPD (FINDICE, FDIAHOR, FOBTYPE, FOBNAME, FQUERY)
-                      VALUES (GEN_ID(G_ZLG_META_UPD,1), CURRENT_TIMESTAMP, ?, ?, ?)`;
+const saveQueryLog = `INSERT INTO {TABLA} (FINDICE, FFECHA, FHORA, FOBTYPE, FOBNAME, FQUERY)
+                      VALUES (GEN_ID(G_{TABLA},1), CURRENT_DATE, CURRENT_TIME, ?, ?, ?)`;
 
 interface iFieldType {
     AName?:         string  | any;
@@ -41,7 +42,7 @@ export class fbApplyMetadata {
 
     public pathFileScript: string   = '';
     public excludeObject: any;
-    public saveToLog: boolean       = false;
+    public saveToLog: string        = '';
     public sources: sources.tSource | any; 
 
     constructor() {
@@ -52,11 +53,11 @@ export class fbApplyMetadata {
 
     private async checkMetadataLog() {
         await this.fb.startTransaction(false);
-        if (!(await this.fb.validate('SELECT 1 FROM RDB$RELATIONS REL WHERE REL.RDB$RELATION_NAME=?',['ZLG_META_UPD']))) {           
-            await this.fb.execute(saveMetadataTable,[]);
+        if (!(await this.fb.validate('SELECT 1 FROM RDB$RELATIONS REL WHERE REL.RDB$RELATION_NAME=?',[this.saveToLog]))) {           
+            await this.fb.execute(saveMetadataTable.replace('{TABLE}',this.saveToLog),[]);
         }
-        if (!(await this.fb.validate('SELECT 1 FROM RDB$GENERATORS WHERE RDB$GENERATOR_NAME=?',['G_ZLG_META_UPD']))) {        
-            await this.fb.execute(saveMetadataGenerator,[]);            
+        if (!(await this.fb.validate('SELECT 1 FROM RDB$GENERATORS WHERE RDB$GENERATOR_NAME=?',['G_'+this.saveToLog]))) {        
+            await this.fb.execute(saveMetadataGenerator.replace('{TABLE}',this.saveToLog),[]);            
         }
         await this.fb.commit();        
     }    
@@ -95,12 +96,12 @@ export class fbApplyMetadata {
                     query= aAlterScript[i];
                     await this.fb.startTransaction(false);
                     await this.fb.execute(aAlterScript[i],[]);
-                    if (this.saveToLog) {                    
-                        await this.fb.execute(saveQueryLog,[aObjectType, aObjectName, aAlterScript[i]]);
+                    if (this.saveToLog !== '') {                    
+                        await this.fb.execute(saveQueryLog.replace('{TABLA}',this.saveToLog),[aObjectType, aObjectName, aAlterScript[i]]);
                     }
                     await this.fb.commit();
                 }    
-                console.log(('Aplicando '+aObjectType+aObjectName).padEnd(70,'.')+'OK');
+                console.log(('Aplicando '+aObjectType+' '+aObjectName).padEnd(70,'.')+'OK');
             }
             else 
                 this.outFileScript(aObjectType,aAlterScript);
@@ -329,7 +330,7 @@ export class fbApplyMetadata {
                 fileYaml = this.sources.generatorsArrayYaml[i];
                 genName= fileYaml.generator.name;
                 if (globalFunction.includeObject(this.excludeObject,GlobalTypes.ArrayobjectType[3],genName)) {
-                    genBody= 'CREATE SEQUENCE ' + fileYaml.generator.name;  
+                    genBody= 'CREATE SEQUENCE ' + fileYaml.generator.name+';';  
                     if (!this.fb.inTransaction())
                         await this.fb.startTransaction(false);
 
@@ -337,11 +338,12 @@ export class fbApplyMetadata {
                         await this.applyChange(GlobalTypes.ArrayobjectType[3],genName,Array(genBody));                    
                     }
                 }    
-            }    
-            await this.fb.commit();
+            }
+            if (this.fb.inTransaction())    
+                await this.fb.commit();
         }
         catch (err) {
-            console.error('Error aplicando procedimiento '+genName+'. ', err.message);
+            console.error('Error aplicando generador '+genName+'. ', err.message);
         }  
     }
    
@@ -471,23 +473,23 @@ export class fbApplyMetadata {
                             retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' DROP DEFAULT;');     
                     }    
                     if (aFileColumnsYaml[j].column.nullable !== aDbColumnsYaml[i].column.nullable) {                    
-                        retAux = 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name+';';
+                        retAux = 'ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name;
                         retCmd = '';
 
                         if (aFileColumnsYaml[j].column.nullable === false && aDbColumnsYaml[i].column.nullable === true) {
                             if (!('nullableToNotNullValue' in aFileColumnsYaml[j].column))
                                 throw new Error('Si cambia de null a not null complete la opcion "nullableToNotNullValue" para llenar el campo');
 
-                            retCmd = 'UPDATE '+ aTableName +' SET ' +  aFileColumnsYaml[j].column.name + "='" + aFileColumnsYaml[j].column.nullableToNotNullValue + "' WHERE " + aFileColumnsYaml[j].column.name + ' IS NOT NULL;'; 
-                            retAux +=  ' SET NOT NULL;'; //ver con que lo lleno al campo que seteo asi   
+                            retCmd = 'UPDATE '+ aTableName +' SET ' +  aFileColumnsYaml[j].column.name + "='" + aFileColumnsYaml[j].column.nullableToNotNullValue + "' WHERE " + aFileColumnsYaml[j].column.name + ' IS NULL;'; 
+                            retAux +=  ' SET NOT NULL'; //ver con que lo lleno al campo que seteo asi   
                         } 
                         else if (aFileColumnsYaml[j].column.nullable === true && aDbColumnsYaml[i].column.nullable === false) {
-                            retAux += ' DROP NOT NULL;';
+                            retAux += ' DROP NOT NULL';
                         }
                         if (retCmd !== '') 
                             retArray.push(retCmd);
 
-                        retArray.push(retAux);
+                        retArray.push(retAux+';');
                     }                
                     if (aFileColumnsYaml[j].column.computed !== aDbColumnsYaml[i].column.computed) {
                         retArray.push('ALTER TABLE ' + aTableName +' ALTER COLUMN ' +  aFileColumnsYaml[j].column.name + ' COMPUTED BY ' + aFileColumnsYaml[j].column.computed + ';');

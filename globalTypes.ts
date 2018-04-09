@@ -5,6 +5,8 @@ export const ArrayobjectType:string[] = ['procedures','triggers','tables','gener
 
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 
+export const saveToLog_Table = 'ZLG_META_UPD';
+
 export const yamlExportOptions = {
 	indent: 2,
 	skipInvalid: false,

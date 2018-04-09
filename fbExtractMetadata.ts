@@ -151,6 +151,18 @@ export class fbExtractMetadata {
     private fb: fbClass.fbConnection;
     public sources: sources.tSource | any;
 
+    private saveToFile(aYalm:any, aObjectType:string, aObjectName:string){
+        if (this.nofolders) {
+            fs.writeFileSync(this.filesPath + '/' + aObjectType+'_'+aObjectName + '.yaml', yaml.safeDump(aYalm, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);
+        }
+        else {
+            if (!fs.existsSync(this.filesPath + aObjectType + '/')) {
+                fs.mkdirSync(this.filesPath + aObjectType)
+            }            
+            fs.writeFileSync(this.filesPath + aObjectType + '/' + aObjectName + '.yaml', yaml.safeDump(aYalm, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);
+        }          
+    }
+
     private analyzeQuery(aQuery: string, aObjectName: string, aObjectType: string) {        
         let aRet:string = aQuery;
         let namesArray: Array<string> = [];
@@ -281,7 +293,7 @@ export class fbExtractMetadata {
                         outReturnYaml.push(outProcedure);
                     }
                     else {
-                        fs.writeFileSync(this.filesPath + GlobalTypes.ArrayobjectType[0] + '/' + outProcedure.procedure.name + '.yaml', yaml.safeDump(outProcedure, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);
+                        this.saveToFile(outProcedure,GlobalTypes.ArrayobjectType[0],outProcedure.procedure.name);                        
                         console.log(('generado procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
                     }
 
@@ -496,7 +508,7 @@ export class fbExtractMetadata {
                         outReturnYaml.push(outTables);
                     }
                     else {
-                        fs.writeFileSync(this.filesPath + GlobalTypes.ArrayobjectType[2] + '/' + outTables.table.name + '.yaml', yaml.safeDump(outTables, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);
+                        this.saveToFile(outTables,GlobalTypes.ArrayobjectType[2],outTables.table.name);                        
                         console.log(('generado tabla ' + outTables.table.name + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outTables = GlobalTypes.emptyTablesYamlType();
@@ -583,7 +595,7 @@ export class fbExtractMetadata {
                         outReturnYaml.push(outTrigger);
                     }
                     else {
-                        fs.writeFileSync(this.filesPath + GlobalTypes.ArrayobjectType[1] + '/' + triggerName + '.yaml', yaml.safeDump(outTrigger, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);
+                        this.saveToFile(outTrigger,GlobalTypes.ArrayobjectType[1],triggerName);                        
                         console.log(('generado trigger ' + triggerName + '.yaml').padEnd(70, '.') + 'OK');
                     }
 
@@ -651,7 +663,7 @@ export class fbExtractMetadata {
                         outViewYalm.push(outViews);
                     }
                     else {
-                        fs.writeFileSync(this.filesPath + GlobalTypes.ArrayobjectType[4] + '/' + viewName + '.yaml', yaml.safeDump(outViews, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);
+                        this.saveToFile(outViews,GlobalTypes.ArrayobjectType[4],viewName);                        
                         console.log(('generado view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outViews = GlobalTypes.emptyViewYamlType();
@@ -691,7 +703,7 @@ export class fbExtractMetadata {
                         outGenerator.generator.description = await this.fb.getBlobAsString(rGenerator[i].DESCRIPTION);
                     }
 
-                    fs.writeFileSync(this.filesPath + GlobalTypes.ArrayobjectType[3] + '/' + genName + '.yaml', yaml.safeDump(outGenerator, GlobalTypes.yamlExportOptions), GlobalTypes.yamlFileSaveOptions);
+                    this.saveToFile(outGenerator,GlobalTypes.ArrayobjectType[3],genName);                                            
 
                     console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
                     outGenerator = { generator: { name: '' } };
@@ -711,6 +723,7 @@ export class fbExtractMetadata {
     filesPath: string = '';
     excludeObject: any;
     excludeFrom:boolean = false;
+    nofolders:boolean = false;
 
     constructor(aConnection: fbClass.fbConnection | undefined = undefined) {
         if (aConnection === undefined) {
@@ -736,37 +749,21 @@ export class fbExtractMetadata {
 
             try {
 
-                if (objectType === GlobalTypes.ArrayobjectType[0] || objectType === '') {
-                    if (!fs.existsSync(this.filesPath + GlobalTypes.ArrayobjectType[0] + '/')) {
-                        fs.mkdirSync(this.filesPath + GlobalTypes.ArrayobjectType[0])
-                    }
+                if (objectType === GlobalTypes.ArrayobjectType[0] || objectType === '') {                    
                     await this.extractMetadataProcedures(objectName);
                 }
-                if (objectType === GlobalTypes.ArrayobjectType[2] || objectType === '') {
-                    if (!fs.existsSync(this.filesPath + GlobalTypes.ArrayobjectType[2] + '/')) {
-                        fs.mkdirSync(this.filesPath + GlobalTypes.ArrayobjectType[2])
-                    }
+                if (objectType === GlobalTypes.ArrayobjectType[2] || objectType === '') {                    
                     await this.extractMetadataTables(objectName);
                 }
-                if (objectType === GlobalTypes.ArrayobjectType[1] || objectType === '') {
-                    if (!fs.existsSync(this.filesPath + GlobalTypes.ArrayobjectType[1] + '/')) {
-                        fs.mkdirSync(this.filesPath + GlobalTypes.ArrayobjectType[1])
-                    }
+                if (objectType === GlobalTypes.ArrayobjectType[1] || objectType === '') {                    
                     await this.extractMetadataTriggers(objectName);
                 }
-                if (objectType === GlobalTypes.ArrayobjectType[3] || objectType === '') {
-                    if (!fs.existsSync(this.filesPath + GlobalTypes.ArrayobjectType[3] + '/')) {
-                        fs.mkdirSync(this.filesPath + GlobalTypes.ArrayobjectType[3])
-                    }
+                if (objectType === GlobalTypes.ArrayobjectType[3] || objectType === '') {                    
                     await this.extractMetadataGenerators(objectName);
                 }
-                if (objectType === GlobalTypes.ArrayobjectType[4] || objectType === '') {
-                    if (!fs.existsSync(this.filesPath + GlobalTypes.ArrayobjectType[4] + '/')) {
-                        fs.mkdirSync(this.filesPath + GlobalTypes.ArrayobjectType[4])
-                    }
+                if (objectType === GlobalTypes.ArrayobjectType[4] || objectType === '') {                    
                     await this.extractMetadataViews(objectName);
                 }
-
             }
             finally {
                 await this.fb.disconnect();

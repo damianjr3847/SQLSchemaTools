@@ -14,11 +14,12 @@
                 "${workspaceFolder}//**/js/*.js"
             ],
             "args": [
-                "--readyalm",
-                "--source1",
-                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/export/",
-                "--source2",
-                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/export2/",
+                "--conf",
+                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/params.conf"
+                /*"--operation",
+                "writeyalm",
+                "--pathsave",
+                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/export/",                
                 "--dbdriver",
                 "fb",
                 "--dbuser",
@@ -30,8 +31,10 @@
                 "--dbport",
                 "5130",
                 "--dbpath",
-                "/pool/testing/demo.gdb",
-                "--savetolog"   
+                "/pool/testing/demo.gdb",                
+                "--exclude",
+                "tables:usr$*; *:rpl$*",
+                "--nofolders"*/
             ]
         }
     ]

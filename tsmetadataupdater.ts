@@ -35,16 +35,23 @@ let pathSave:string         = '';
 let dbDriver:string         = '';
 let dbPath:string           = '';
 let dbHost:string           = '';
-let dbPort:number           = 3050;
-let dbUser:string           = 'SYSDBA';
-let dbPass:string           = 'masterkey';
+let dbPort:number           = 0;
+let dbUser:string           = '';
+let dbPass:string           = '';
 let objectType:string       = '';
 let objectName:string       = '';
 let pathfilescript:string   = '';
 let excludeObject:any;
 let excludeObjectStr:string = '';
-let saveToLog: boolean      = false;
+let saveToLog: string       = 'X';
 let excludefrom: string     = '';
+
+let object:string           = '';
+let elements:string         = '';
+let nofolders:boolean       = false;
+let fileconf:string         = '';
+let aParam:string           = '';
+let aValue:string           = '';
 
 /**********para pruebas */
 /*let actionYalm:string       = 'write';
@@ -54,7 +61,7 @@ let source2:string          = './source2/';
 let pathSave:string         = './export/';
 let dbDriver:string         = 'fb';
 let dbPath:string           = '/pool/testing/demo.gdb';
-let dbHost:string           = 'srv-01.sig2k.com';
+let dbHost= aValue;:string           = 'srv-01.sig2k.com';
 let dbPort:number           = 3050;
 let dbUser:string           = 'SYSDBA';
 let dbPass:string           = 'masterkey';
@@ -71,14 +78,14 @@ excludeObject= JSON.parse(excludeObjectStr);
 
 params.version('1.0.0');
 
-params.option('-r, --readyalm', 'Lee el directorio de los parametros source1 y/o source2 para aplicar cambios');
+params.option('--operation', '<read/write> lee los archivos para aplicar o escribe la estructura');
 
 params.option('--source1 <source1>', 'Path del directorio a leer');
 params.option('--source2 <source2>', 'Path del directorio a leer');
 
-params.option('-w, --writeyalm', 'Genera los archivos yalm en el directorio especificado en pathsave');
 
 params.option('-x, --pathsave <pathsave>', 'Path del directorio donde se guardaran los archivos');
+params.option('--nofolders', 'cuando genera los archivos no los separa en carpetas');
 
 params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB ps=PostgreSql fb=Firebird');
 params.option('-h, --dbhost <dbhost>', 'Host DB');
@@ -91,37 +98,97 @@ params.option('-t, --objecttype <objecttype>', 'opcional, especifica que tipo de
 params.option('-n, --objectname <objectname>', 'opcional, nombre particular del ObjectType que se desea aplicar');
 params.option('-s, --outscript <pathfilescript>', 'opcional, devuelve un archivo con las sentencias sql en vez de ejecutarlas en la base de datos');
 
-params.option('-e, --exclude <excludejson>', 'opcional, json con lo que que quiere excluir {tables:[],fields:[],procedures:[],triggers:[],generator:[],views:[]}')
+params.option('-e, --exclude <excludeobject>', 'opcional, filtros de objetos a excluir ejemplo: table:usr$*,rpl$*; *:rpl$*')
 
 params.option('--excludefrom <pathexclude>', 'opcional, generar matadata exluyendo objetos de dicho path');
 
-params.option('-l, --savetolog', 'guarda en la db el log de los querys ejecutados');
+params.option('-l, --savetolog <tabla>', 'seguido de la tabla, guarda en la db el log de los querys ejecutados');
+
+params.option('--conf <archivoconf>', 'archivo de configuracion');
 
 params.parse(process.argv);
 
 // validacion de parametros
 
+if (params.conf) {
+    if (! fs.existsSync(params.conf)) {
+        console.log('el archivo conf no existe');
+        process.exit(1);
+    }    
+    fileconf= fs.readFileSync(params.conf, GlobalTypes.yamlFileSaveOptions.encoding);
+    fileconf.split(/\r?\n/).forEach(function (line) {
+        aParam= line.substr(0,line.indexOf('=')).trim().toLowerCase();
+        aValue= line.substr(line.indexOf('=')+1);
+        switch (aParam) {
+            case 'operation':
+                actionYalm= aValue;
+            break;
+            case 'source1':
+                source1= aValue;
+            break;
+            case 'source2':
+                source2= aValue;
+            break;
+            case 'pathsave':
+                pathSave= aValue;
+            break;
+            case 'nofolders':
+                nofolders= true;
+            break;
+            case 'dbdriver':
+                dbDriver= aValue;
+            break;
+            case 'dbhost':
+                dbHost= aValue;
+            break;
+            case 'dbport':
+                dbPort = parseInt(aValue);
+            break;
+            case 'dbpath':
+                dbPath= aValue;
+            break;
+            case 'dbuser':
+                dbUser= aValue;
+            break;
+            case 'dbpass':
+                dbPass= aValue;
+            break;
+            case 'objecttype':
+                objectType= aValue;
+            break;
+            case 'objectname':
+                objectName= aValue;
+            break;
+            case 'outscript':
+                pathfilescript= aValue;
+            break;
+            case 'exclude':
+                excludeObjectStr= aValue;    
+            break;
+            case 'excludefrom':
+                excludefrom= aValue;
+            break;
+            case 'savetolog':
+                saveToLog= aValue;
+            break;
+        }    
+    });
 
-if (params.writeyalm && params.readyalm) {
-    console.log('Debe elegir -r o -w no ambos');
+}
+
+if (params.operation) 
+    actionYalm = params.operation;
+
+if (!(actionYalm == 'read' || actionYalm == 'write')) {
+    console.log('debe haber una operacion valida para continuar');
     process.exit(1);    
 }    
-else if (params.writeyalm){ 
-    actionYalm = 'write';
-}
-else if (params.readyalm){ 
-    actionYalm = 'read';
-}
-else {
-    console.log('debe haber -r o -w para continuar');
-    process.exit(1);
-}
 
-if (params.dbdriver) {
-    if (GlobalTypes.ArrayDbDriver.indexOf(params.dbdriver) !== -1) {   
-        dbDriver = params.dbdriver;
-    }
-    else {
+if (params.dbdriver) 
+    dbDriver = params.dbdriver;
+
+if (dbDriver !== '') {
+    if (GlobalTypes.ArrayDbDriver.indexOf(dbDriver) === -1) {           
         console.log('dbdriver puede ser ps=PostgreSql o fb=firebird');
         process.exit(1);    
     }    
@@ -131,112 +198,151 @@ else {
     process.exit(1);        
 }
 
-if (params.pathsave) {
-    if (! fs.existsSync(params.pathsave)) {
-        console.log('el path %j no existe', params.pathsave);
+if (params.pathsave) 
+    pathSave= params.pathsave;    
+
+if (pathSave !== '') {   
+    if (! fs.existsSync(pathSave)) {
+        console.log('el path %j no existe', pathSave);
         process.exit(1);
-    }
-    pathSave= params.pathsave;
+    }    
 }
 else if (actionYalm === 'write') {
     console.log('debe haber un Path del archivo y directorio de los archivos yalm');    
     process.exit(1);
 }
 
-if (params.source1) {
-    if (! fs.existsSync(params.source1)) {
-        console.log('el path source1 %j no existe', params.source1);
+if (params.source1) 
+    source1= params.source1;
+
+if (source1 !== '') {     
+    if (! fs.existsSync(source1)) {
+        console.log('el path source1 %j no existe', source1);
         process.exit(1);
     }
-    source1= params.source1;
 }
 else if (actionYalm === 'read') {
     console.log('debe haber un path en source1');    
     process.exit(1);
 }
 
-if (params.source2) {
-    if (! fs.existsSync(params.source2)) {
-        console.log('el path source2 %j no existe', params.source2);
+if (params.source2) 
+    source2= params.source2;
+
+if (source2 !== '') {
+    if (! fs.existsSync(source2)) {
+        console.log('el path source2 %j no existe',source2);
         process.exit(1);
     }
-    source2= params.source2;
 }
 
 
-if (params.dbuser) {
+if (params.dbuser) 
     dbUser = params.dbuser; 
-}
-else {
+
+if (dbUser === '') {
     console.log('falta dbuser');
     process.exit(1);
 }
 
-if (params.dbpass) {
+if (params.dbpass) 
     dbPass = params.dbpass; 
-}
-else {
+
+if (dbPass === '') {
     console.log('falta dbpass');
     process.exit(1);
 }
 
-if (params.dbhost ) {
+if (params.dbhost ) 
     dbHost = params.dbhost; 
-}
-else {
+
+if (dbHost === '') {
     console.log('falta dbhost');
     process.exit(1);
 }
 
-if (params.dbport ) {
+if (params.dbport ) 
     dbPort = params.dbport; 
-}
-else {
+
+if (dbPort === 0) {
     console.log('falta dbport');
     process.exit(1);
 }
 
-if (params.dbpath ) {
+if (params.dbpath ) 
     dbPath = params.dbpath; 
-}
-else {
+
+if (dbPath === '') {
     console.log('falta dbpath');
     process.exit(1);
 }
 
-if (params.objecttype) {
-    if (GlobalTypes.ArrayobjectType.indexOf(params.objecttype) !== -1) {
-        objectType = params.objecttype;
-    }
-    else {
+if (params.objecttype) 
+    objectType = params.objecttype;
+
+if (objectType !== '') {    
+    if (GlobalTypes.ArrayobjectType.indexOf(objectType) === -1) {
         console.log('objecType solo pueden ser (procedures,triggers,tables,generators)');
         process.exit(1);
     }
 }
 
-if (params.objectname) {
-    if (objectType = '') {
+if (params.objectname) 
+    objectName=params.objectname;
+
+if (objectName !== '') {
+    if (objectType === '') {
         console.log('debe haber un objecttype');
         process.exit(1);
-    }
+    }    
 }
 
-if (params.outscript) {
+if (params.outscript) 
     pathfilescript= params.outscript;
-}
 
-if (params.exclude) {
+if (params.exclude) 
     excludeObjectStr=params.exclude;
-    excludeObject= JSON.parse(excludeObjectStr);
+
+if (excludeObjectStr !== '') {
+    
+    excludeObject={tables:[],procedures:[],triggers:[],views:[],fields:[]};
+
+    excludeObjectStr.split(';').forEach(function (line) {
+        object= line.substr(0,line.indexOf(':')).trim();
+        elements= line.substr(line.indexOf(':')+1).trim();
+        elements.split(',').forEach(function (element) {
+            if (object !== '*') {
+                excludeObject[object].push(element);
+            }    
+            else {
+                for(let i in excludeObject) { 
+                    excludeObject[i].push(element);    
+                }
+            }    
+        })
+    });
 }    
 
-if (params.savetolog) {
-    saveToLog= true;
+if (params.savetolog) 
+    saveToLog= params.savetolog.trim().toUpperCase();
+
+if (saveToLog === '') {
+    console.log('savetolog debe estar acompañado del nombre de tabla');
+    process.exit(1);
 }
+else if (saveToLog === 'X')
+    saveToLog = '';
+
+
+if (params.excludefrom) 
+    excludefrom= params.excludefrom;
 
 if (params.excludefrom) {
     excludefrom= params.excludefrom;
 }
+
+if (params.nofolders) 
+    nofolders=true;
 
 /*console.log('actionYalm: %j',actionYalm);
 console.log('pathYalm: %j',pathSave);
@@ -264,6 +370,7 @@ console.log('p '+params.outscript)
             fbem = new fbExtractMetadata.fbExtractMetadata;
             fbem.filesPath = pathSave;
             fbem.excludeObject = excludeObject;
+            fbem.nofolders = nofolders;
 
             if (excludefrom !== '') {
                 fbem.sources.pathSource1 = excludefrom;
