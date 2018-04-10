@@ -19,15 +19,14 @@ https://github.com/hgourvest/node-firebird
 
 */
 
-import * as fs from 'fs';
-import * as params from 'commander';
+import * as fs                  from 'fs';
+import * as params              from 'commander';
+import * as fbExtractMetadata   from './fbExtractMetadata';
+import * as fbApplyMetadata     from './fbApplyMetadata';
+import * as GlobalTypes         from './globalTypes';
+import * as fbExtractLoadData   from './fbExtractLoadData';
 
-import * as fbExtractMetadata from './fbExtractMetadata';
-import * as fbApplyMetadata from './fbApplyMetadata';
-
-import * as GlobalTypes from './globalTypes';
-
-let actionYalm:string       = '';
+let operation:string        = '';
 let source1:string          = '';
 let source2:string          = '';
 
@@ -78,7 +77,7 @@ excludeObject= JSON.parse(excludeObjectStr);
 
 params.version('1.0.0');
 
-params.option('--operation', '<read/write> lee los archivos para aplicar o escribe la estructura');
+params.option('--operation', '<readmetadata/writemetadata/extractdata/importdata>');
 
 params.option('--source1 <source1>', 'Path del directorio a leer');
 params.option('--source2 <source2>', 'Path del directorio a leer');
@@ -121,7 +120,7 @@ if (params.conf) {
         aValue= line.substr(line.indexOf('=')+1);
         switch (aParam) {
             case 'operation':
-                actionYalm= aValue;
+                operation= aValue;
             break;
             case 'source1':
                 source1= aValue;
@@ -177,10 +176,10 @@ if (params.conf) {
 }
 
 if (params.operation) 
-    actionYalm = params.operation;
+    operation = params.operation;
 
-if (!(actionYalm == 'read' || actionYalm == 'write')) {
-    console.log('debe haber una operacion valida para continuar');
+if (!(operation === 'readmetadata' || operation === 'writemetadata' || operation === 'extractdata' || operation === 'importdata')) {
+    console.log('debe haber una operacion valida para continuar <readmetadata/writemetadata/extractdata/importdata>');
     process.exit(1);    
 }    
 
@@ -207,8 +206,8 @@ if (pathSave !== '') {
         process.exit(1);
     }    
 }
-else if (actionYalm === 'write') {
-    console.log('debe haber un Path del archivo y directorio de los archivos yalm');    
+else if (operation === 'writemetadata' || operation === 'extractdata') {
+    console.log('debe haber un Path de salida');    
     process.exit(1);
 }
 
@@ -221,8 +220,8 @@ if (source1 !== '') {
         process.exit(1);
     }
 }
-else if (actionYalm === 'read') {
-    console.log('debe haber un path en source1');    
+else if (operation === 'readmetadata' || operation === 'importdata') {
+    console.log('si usa readmetadata debe haber un path en source1');    
     process.exit(1);
 }
 
@@ -282,8 +281,12 @@ if (params.objecttype)
 
 if (objectType !== '') {    
     if (GlobalTypes.ArrayobjectType.indexOf(objectType) === -1) {
-        console.log('objecType solo pueden ser (procedures,triggers,tables,generators)');
+        console.log('objecType solo pueden ser (procedures,triggers,tables,generators,views)');
         process.exit(1);
+    }
+    if (operation === 'extractdata' && objectType !== 'tables') {
+        console.log('si utiliza extractdata el objectType valido es tables');
+        process.exit(1);    
     }
 }
 
@@ -292,7 +295,7 @@ if (params.objectname)
 
 if (objectName !== '') {
     if (objectType === '') {
-        console.log('debe haber un objecttype');
+        console.log('si usa objectname debe haber un objecttype');
         process.exit(1);
     }    
 }
@@ -326,7 +329,7 @@ if (excludeObjectStr !== '') {
 if (params.savetolog) 
     saveToLog= params.savetolog.trim().toUpperCase();
 
-if (saveToLog === '') {
+if (operation === 'writemetdata' || saveToLog === '') {
     console.log('savetolog debe estar acompañado del nombre de tabla');
     process.exit(1);
 }
@@ -337,8 +340,11 @@ else if (saveToLog === 'X')
 if (params.excludefrom) 
     excludefrom= params.excludefrom;
 
-if (params.excludefrom) {
-    excludefrom= params.excludefrom;
+if (excludefrom !== '') {
+    if (! fs.existsSync(excludefrom)) {
+        console.log('el path excludefrom %j no existe',excludefrom);
+        process.exit(1);
+    }
 }
 
 if (params.nofolders) 
@@ -361,12 +367,13 @@ console.log('p '+params.outscript)
 
 
 (async () => {
-    let fbem: fbExtractMetadata.fbExtractMetadata;  
-    let fbam: fbApplyMetadata.fbApplyMetadata;
+    let fbem:   fbExtractMetadata.fbExtractMetadata;  
+    let fbam:   fbApplyMetadata.fbApplyMetadata;
+    let fbdata: fbExtractLoadData.fbExtractLoadData;
 
     if (dbDriver === 'fb') {                
 
-        if (actionYalm === 'write') {
+        if (operation === 'writemetadata') {
             fbem = new fbExtractMetadata.fbExtractMetadata;
             fbem.filesPath = pathSave;
             fbem.excludeObject = excludeObject;
@@ -378,7 +385,7 @@ console.log('p '+params.outscript)
             }    
             await fbem.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
         }
-        else if (actionYalm === 'read') {
+        else if (operation === 'readmetadata') {
             fbam = new fbApplyMetadata.fbApplyMetadata;
             fbam.sources.pathSource1 = source1;
             fbam.sources.pathSource2 = source2;
@@ -390,6 +397,13 @@ console.log('p '+params.outscript)
                     fs.unlinkSync(pathfilescript);
                 }
             await fbam.applyYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
+        }
+        else if (operation === 'extractdata') {
+            fbdata = new fbExtractLoadData.fbExtractLoadData;
+            fbdata.filesPath = pathSave;
+            fbdata.excludeObject = excludeObject;
+               
+            await fbdata.extractData(dbHost,dbPort,dbPath,dbUser,dbPass, objectName);
         }      
         
     }    

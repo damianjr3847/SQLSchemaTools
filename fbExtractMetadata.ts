@@ -37,7 +37,7 @@ const queryProcedureParameters: string =
         ORDER BY PPA.RDB$PROCEDURE_NAME, PPA.RDB$PARAMETER_TYPE, PPA.RDB$PARAMETER_NUMBER)
     {FILTER_OBJECT} `;
 
-const queryTablesView: string =
+export const queryTablesView: string =
     `SELECT * 
      FROM (SELECT REL.RDB$RELATION_NAME AS OBJECT_NAME, REL.RDB$VIEW_SOURCE AS SOURCE, REL.RDB$DESCRIPTION AS DESCRIPTION, REL.RDB$RELATION_TYPE AS RELTYPE
             FROM RDB$RELATIONS REL
@@ -45,7 +45,7 @@ const queryTablesView: string =
             ORDER BY REL.RDB$RELATION_NAME)
     {FILTER_OBJECT}`;
 
-const queryTablesViewFields: string =
+export const queryTablesViewFields: string =
     `SELECT * 
      FROM ( SELECT  
                 REL.RDB$RELATION_NAME AS OBJECT_NAME, RFR.RDB$FIELD_NAME AS FIELDNAME, FLD.RDB$FIELD_TYPE AS FTYPE, 
@@ -126,7 +126,7 @@ const queryTrigger: string =
           ORDER BY TRG.RDB$TRIGGER_NAME)
     {FILTER_OBJECT}`;
 
-interface iFieldType {
+export interface iFieldType {
     AName?: string | any;
     AType?: number | any,
     ASubType?: number | any,
@@ -773,7 +773,6 @@ export class fbExtractMetadata {
             console.error(err.message);
             process.exit(1);
         }
-
     }
 }
 

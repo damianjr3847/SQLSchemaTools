@@ -12,14 +12,14 @@ export class tSource {
     viewsArrayYaml:         Array<any> = [];
     pathSource1: string                = '';
     pathSource2: string                = ''; 
-    loadYaml:boolean                   = false;
+    loadYaml: boolean                  = false;
 
     private loadArrayYaml (dirSource:Array<any>, aObjectType: string, aObjectName:string) {
         let ym:any;
         let j:number = 0;
         let nameFile:string = '';
         try {
-            for (var i in dirSource) {
+            for (let i in dirSource) {
                 nameFile = dirSource[i]; 
 
                 ym= yaml.safeLoad(fs.readFileSync(dirSource[i], GlobalTypes.yamlFileSaveOptions.encoding));            
