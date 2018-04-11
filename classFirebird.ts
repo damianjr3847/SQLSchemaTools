@@ -1,5 +1,7 @@
 import * as libfirebird from 'node-firebird';
 
+type SequentialCallback = (row: any, index: number) => void;
+
 export class fbConnection { 
      
     private db: libfirebird.Database | undefined;
@@ -186,4 +188,18 @@ export class fbConnection {
         
     };
 
+    sequentially(aQuery: string, aParams: Array<any>, aFunctionRow: SequentialCallback){        
+        this.checkInTransaction();
+
+        return new Promise<void>((resolve, reject) => {
+            this.tr!.sequentially(aQuery,aParams, function(row:any, index:any, next:any) {
+                aFunctionRow(row, index);
+                next();
+            },
+            function (err:any) {
+                if (err) return reject(err);
+                resolve();
+            })
+        })
+    }
 }

@@ -56,8 +56,10 @@ export function readRecursiveDirectory(dir:string):Array<any> {
 };
 
 
-export async function varToSql(aValue:any, AType:number, ASubType:number, fb: fbClass.fbConnection | undefined = undefined): Promise<any> {
-    let ft: string = '';    
+export function varToSql(aValue:any, AType:number, ASubType:number, fb: fbClass.fbConnection | undefined = undefined) {
+    let ft: string = ''; 
+    let aDate:string='';
+
     if (aValue === null) 
         ft='NULL';
     else {    
@@ -80,8 +82,11 @@ export async function varToSql(aValue:any, AType:number, ASubType:number, fb: fb
                 if (ASubType === 1) { 
                     if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
                         ft= "''";
-                    else if (fb !== undefined) 
-                        ft="'"+await fb.getBlobAsString(aValue).toString().replace("'","''")+"'";                           
+                    else if (fb !== undefined) {
+                           
+                        ft="'sin nada'";//await fb.getBlobAsString(aValue).toString().replace("'","''")+"'";;                            
+                        
+                    }    
                     else
                         ft="'"+aValue.toString().replace("'","''")+"'";
                 }
@@ -89,13 +94,16 @@ export async function varToSql(aValue:any, AType:number, ASubType:number, fb: fb
                     ft='NULL';
                 break;                
             case 12: //date
-                ft = "'"+aValue.toString()+"'";
+                aDate=new Date(aValue).toJSON();
+                ft = "'"+aDate.substr(0,aDate.indexOf('T'))+"'";
                 break;
             case 13: //time
-                ft = "'"+aValue.toString()+"'";
-                break;                 
-            case 35: //timestamp
-                ft = "'"+aValue.toString()+"'";
+                aDate=new Date(aValue).toJSON();
+                ft = "'"+aDate.substr(aDate.indexOf('T')+1).replace('Z','')+"'";
+                break;             
+            case 35: //timestamp 
+                aDate=new Date(aValue).toJSON();
+                ft = "'"+aDate.replace('T',' ').replace('Z','')+"'";
                 break;   
             default:
                 throw new Error(AType+' tipo de dato no reconocido');
