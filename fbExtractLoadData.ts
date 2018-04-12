@@ -8,43 +8,36 @@ import * as nfb from 'node-firebird';
 import { clearTimeout } from 'timers';
 
 function  outFileScript(aFields:Array<fbExtractMetadata.iFieldType>, aData:Array<any>, aTable:string, filesPath:string) {        
-    const saveTo:number = 6000;
     
-    const insertQuery:string = 'INSERT INTO '+globalFunction.quotedString(aTable)+ '('+globalFunction.arrayToString(aFields,',','AName')+')'+GlobalTypes.CR + ' VALUES(';
+    const saveTo:number = 10000;
+    
+    let insertQuery:string = '';
     
     let contSaveTo:number = 0;
-    let qQuery:string = '';
-    let scriptQuery:string = '';
-    let blobValue: string = '';
+    let qQuery:Array<any> = [];
     let y:number = 0;
-
-    if (aData.length>0) {
-        for (let i=0; i < aData.length; i++) {
-            //process.stdout.write("registros :"+i.toString());
-            qQuery= insertQuery;            
-            for(let j in aData[i]) {
-                y = aFields.findIndex(aItem => (aItem.AName === globalFunction.quotedString(j)));
-                if (y === -1) 
-                    throw new Error(y+'. Field no encontrado');                                 
-                qQuery += globalFunction.varToSql(aData[i][j],aFields[y].AType, aFields[y].ASubType)+',';
-            }
-            //saco ultima coma
-            qQuery = qQuery.substr(0,qQuery.length-1) + ');'+GlobalTypes.CR;
-            if (contSaveTo < saveTo) {   
-                scriptQuery += qQuery
-                contSaveTo++;
-            }    
-            else {
-                fs.appendFileSync(filesPath+aTable+'.sql', scriptQuery, 'utf8');
-                contSaveTo=0;
-                scriptQuery='';
-            }    
-                
-        }
-        fs.appendFileSync(filesPath+aTable+'.sql', scriptQuery, 'utf8');
-        contSaveTo=0;
-        scriptQuery='';
-    }    
+   
+    //fs.appendFileSync(filesPath+aTable+'.sql', '['+globalFunction.arrayToString(aFields,',','AName')+']'+GlobalTypes.CR , 'utf8');
+    fs.appendFileSync(filesPath+aTable+'.sql', JSON.stringify(aFields)+GlobalTypes.CR , 'utf8');
+    for (let i=0; i < aData.length; i++) {                        
+        qQuery=[];
+        y=aData[i].length;
+        for(let j=0; j < aFields.length;j++)                                                 
+            qQuery.push(globalFunction.varToJSON(aData[i][aFields[j].AName],aFields[j].AType, aFields[j].ASubType));
+        
+        insertQuery += JSON.stringify(qQuery)+GlobalTypes.CR;    
+        if (contSaveTo < saveTo)             
+            contSaveTo++;            
+        else {
+            fs.appendFileSync(filesPath+aTable+'.sql', insertQuery, 'utf8');
+            contSaveTo=0;
+            insertQuery='';
+        }    
+            
+    }
+    fs.appendFileSync(filesPath+aTable+'.sql', insertQuery, 'utf8');
+    contSaveTo=0;
+    insertQuery='';  
     
 }
 
@@ -122,7 +115,6 @@ export class fbExtractLoadData {
                         qFields= [];
                         qBlobFields= [];
                         
-
                         if (fs.existsSync(this.filesPath+tableName+'.sql')) {
                             fs.unlinkSync(this.filesPath+tableName+'.sql');
                         }
@@ -131,7 +123,7 @@ export class fbExtractLoadData {
                             while ((j < rFields.length) && (rFields[j].OBJECT_NAME.trim() === tableName)) { 
                                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[5], rFields[j].FIELDNAME)) {
                                     iField={};
-                                    iField.AName= globalFunction.quotedString(rFields[j].FIELDNAME.trim());
+                                    iField.AName= rFields[j].FIELDNAME.trim();
                                     iField.AType= rFields[j].FTYPE;
                                     iField.ASubType= rFields[j].SUBTYPE; 
                                     qFields.push(iField); 
@@ -166,18 +158,21 @@ export class fbExtractLoadData {
                                 rData.push(row);
                                 xCont++;
                                 //console.log(xCont.toString());
-                                if (xCont >= 5000) {
-                                    outFileScript(qFields,rData,tableName, filepath);
+                                if (xCont >= 20000) {
+                                    //outFileScript(qFields,rData,tableName, filepath);
+                                    fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
                                     xContGral += xCont;
                                     console.log('   Registros: '+xContGral.toString());
                                     rData=[];
                                     xCont=0;
                                 }
                             });
-                            xContGral += xCont; 
-                            console.log('   Registros: '+xContGral.toString());                           
-                            outFileScript(qFields,rData,tableName, filepath);                            
-                            
+                            if (rData.length>0) {
+                                xContGral += xCont; 
+                                console.log('   Registros: '+xContGral.toString());                           
+                                //outFileScript(qFields,rData,tableName, filepath);                            
+                                fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
+                            }
                             
                             await this.fb.commit();
                         }

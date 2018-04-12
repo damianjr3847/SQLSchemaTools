@@ -75,30 +75,33 @@ export function varToSql(aValue:any, AType:number, ASubType:number) {
             case 14: //varchar-char
                 if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
                     ft= "''";
-                else
-                    ft="'"+aValue.toString().replace("'","''")+"'";        
+                else                    
+                    ft="'"+aValue.replace("'","''")+"'";        
+                    
                 break;
             case 261: //blob
                 if (ASubType === 1) { 
                     if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
                         ft= "''";                       
-                    else
+                    else {                        
                         ft="'"+aValue.replace("'","''")+"'";
+                    }    
                 }
-                else 
-                    ft="'"+aValue+"'";
+                else {                       
+                    ft="'"+aValue.replace("'","''")+"'";                     
+                }    
                 break;                
             case 12: //date
-                aDate=new Date(aValue).toJSON();
-                ft = "'"+aDate.substr(0,aDate.indexOf('T'))+"'";
+                aDate=new Date(aValue).toJSON();                   
+                ft = "'"+aDate.substr(0,aDate.indexOf('T'))+"'";                
                 break;
             case 13: //time
-                aDate=new Date(aValue).toJSON();
-                ft = "'"+aDate.substr(aDate.indexOf('T')+1).replace('Z','')+"'";
+                aDate=new Date(aValue).toJSON();                                   
+                ft = "'"+aDate.substr(aDate.indexOf('T')+1).replace('Z','')+"'";                
                 break;             
             case 35: //timestamp 
-                aDate=new Date(aValue).toJSON();
-                ft = "'"+aDate.replace('T',' ').replace('Z','')+"'";
+                aDate=new Date(aValue).toJSON();                                  
+                ft = "'"+aDate.replace('T',' ').replace('Z','')+"'";                                   
                 break;   
             default:
                 throw new Error(AType+' tipo de dato no reconocido');
@@ -107,22 +110,74 @@ export function varToSql(aValue:any, AType:number, ASubType:number) {
     return ft;
 }
 
+export function varToJSON(aValue:any, AType:number, ASubType:number) {
+    let ft: any; 
+    let aDate:string='';
+
+    if (aValue === null) 
+        ft=null;
+    else {    
+        switch (AType) {
+            case 7:
+            case 8:
+            case 16:                
+                if (ASubType == 1) //numeric
+                    ft = aValue;
+                else if (ASubType == 2) //decimal
+                    ft = aValue;
+                else if (ASubType == 7) //small
+                    ft={$numberint:aValue};
+                else if (ASubType == 8) //int
+                    ft={$numberint: aValue};
+                else
+                    ft={$numberlong:aValue};
+                break;
+            case 10: //float
+            case 27: //double precision
+                ft = aValue;
+                break;
+            case 37:
+            case 14: //varchar-char
+                if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+                    ft= '';
+                else
+                    ft=aValue.toString();                            
+                break;
+            case 261: //blob
+                if (ASubType === 1) { 
+                    if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+                        ft= ''                       
+                    else {                       
+                        ft=aValue.toString();                        
+                    }    
+                }
+                else {                      
+                    ft={$binary:aValue.toString()};                   
+                }    
+                break;                
+            case 12: //date                                                 
+            case 13: //time                
+            case 35: //timestamp 
+                ft={$date:new Date(aValue).toJSON()};         
+                break;   
+            default:
+                throw new Error(AType+' tipo de dato no reconocido');
+        }
+    }    
+    return ft;
+}
 export function quotedString(aValue:string):string {
-   let x:boolean = false; 
-   /* for(let i=0; i < aValue.length-1; i++) {
-        if (aValue.substr(i,i+1)  
-    }
-    x=/[^A-Z]/.test(aValue);
-    x=/[^a-z]/.test(aValue);
-    x=/[^A-Z]*$/.test(aValue);
-    x=/[^a-z]*$/.test(aValue);
-    x=/[^A-Z]$/.test(aValue);
-    x=/[^a-z]$/.test(aValue);
-    x=/[^A-Z]+$/.test(aValue);
-    x=/[^a-z]+$/.test(aValue);*/
+   let x:boolean = false;   
 
     if (/[^A-Z_0-9]/.test(aValue))
         return '"'+aValue+'"'
     else 
         return aValue
+}
+
+export function ifThen(aCondition:boolean,aTrue:any, aFalse:any) {
+    if (aCondition)
+        return aTrue;
+    else    
+        return aFalse;            
 }
