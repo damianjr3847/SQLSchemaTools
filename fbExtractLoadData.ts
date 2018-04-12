@@ -4,8 +4,12 @@ import * as GlobalTypes         from './globalTypes';
 import * as globalFunction      from './globalFunction';
 import * as fbExtractMetadata   from './fbExtractMetadata';
 
-function  outFileScript(aFields:Array<fbExtractMetadata.iFieldType>, aData:Array<any>, aTable:string, filesPath:string, fb:any) {        
+import * as nfb from 'node-firebird';
+import { clearTimeout } from 'timers';
+
+function  outFileScript(aFields:Array<fbExtractMetadata.iFieldType>, aData:Array<any>, aTable:string, filesPath:string) {        
     const saveTo:number = 6000;
+    
     const insertQuery:string = 'INSERT INTO '+globalFunction.quotedString(aTable)+ '('+globalFunction.arrayToString(aFields,',','AName')+')'+GlobalTypes.CR + ' VALUES(';
     
     let contSaveTo:number = 0;
@@ -21,10 +25,8 @@ function  outFileScript(aFields:Array<fbExtractMetadata.iFieldType>, aData:Array
             for(let j in aData[i]) {
                 y = aFields.findIndex(aItem => (aItem.AName === globalFunction.quotedString(j)));
                 if (y === -1) 
-                    throw new Error(y+'. Field no encontrado');
-                /*if (aData[i][j] === undefined)
-                   y=1;*/                    
-                qQuery += globalFunction.varToSql(aData[i][j],aFields[y].AType, aFields[y].ASubType, fb)+',';
+                    throw new Error(y+'. Field no encontrado');                                 
+                qQuery += globalFunction.varToSql(aData[i][j],aFields[y].AType, aFields[y].ASubType)+',';
             }
             //saco ultima coma
             qQuery = qQuery.substr(0,qQuery.length-1) + ');'+GlobalTypes.CR;
@@ -76,8 +78,7 @@ export class fbExtractLoadData {
     }
 
     public async extractData(ahostName: string, aportNumber: number, adatabase: string, adbUser: string, adbPassword: string, objectName: string) {
-        let filepath:string = this.filesPath; //para poder llamarlo en el callback
-        let fb:any = this.fb;
+        let filepath:string = this.filesPath; //para poder llamarlo en el callback        
 
         let tableName:string = '';
         let filesDirSource1:Array<any> = [];
@@ -86,6 +87,7 @@ export class fbExtractLoadData {
         let rData:          Array<any> = [];
         let iField:         fbExtractMetadata.iFieldType = {};
         let qFields:        Array<fbExtractMetadata.iFieldType> = [];
+        let qBlobFields:    Array<fbExtractMetadata.iFieldType> = [];
         let query:string = '';
         let xCont:number = 0;
         let xContGral:number = 0;
@@ -112,44 +114,60 @@ export class fbExtractLoadData {
                 
                 await this.fb.commit();
 
-                for(let i=0; i < rTables.length; i++){                    
-                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], rTables[i].OBJECT_NAME)) {
+                for(let i=0; i < rTables.length; i++){
+                    tableName= rTables[i].OBJECT_NAME.trim();                    
+                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
 
-                        j= rFields.findIndex( aItem => (aItem.OBJECT_NAME.trim() === rTables[i].OBJECT_NAME.trim()));
+                        j= rFields.findIndex( aItem => (aItem.OBJECT_NAME.trim() === tableName));
                         qFields= [];
-                        tableName= rTables[i].OBJECT_NAME.trim();
+                        qBlobFields= [];
+                        
 
                         if (fs.existsSync(this.filesPath+tableName+'.sql')) {
                             fs.unlinkSync(this.filesPath+tableName+'.sql');
                         }
 
                         if (j !== -1) {
-                            while ((j < rFields.length) && (rFields[j].OBJECT_NAME.trim() === rTables[i].OBJECT_NAME.trim())) { 
+                            while ((j < rFields.length) && (rFields[j].OBJECT_NAME.trim() === tableName)) { 
                                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[5], rFields[j].FIELDNAME)) {
                                     iField={};
                                     iField.AName= globalFunction.quotedString(rFields[j].FIELDNAME.trim());
                                     iField.AType= rFields[j].FTYPE;
                                     iField.ASubType= rFields[j].SUBTYPE; 
-                                    qFields.push(iField);                                    
+                                    qFields.push(iField); 
+                                    if (iField.AType === 261)  //blobs solamente para hacer mas rapida la busqueda en el callback
+                                        qBlobFields.push(iField);
                                 }    
                                 j++;
                             }
+
                             await this.fb.startTransaction(true);
                             
-                            query=  'SELECT '+globalFunction.arrayToString(qFields,',','AName')+' FROM '+globalFunction.quotedString(rTables[i].OBJECT_NAME.trim());
+                            query=  'SELECT '+globalFunction.arrayToString(qFields,',','AName')+' FROM '+globalFunction.quotedString(tableName);
                             rData=[];
                             xCont=0;
                             xContGral=0;
                             console.log(i.toString()+'/'+rTables.length.toString()+' - extract '+tableName);
 
-                            await this.fb.sequentially(query, [], async function(row:any, index:any) {                                
-                                
+                            await this.fb.dbSequentially(query, [], async function(row:any, index:any) {                                
+                                let value: any;
+
+                                if (qBlobFields.length > 0) {
+                                    for(let i in qBlobFields) {
+                                        if (row[qBlobFields[i].AName] !== null || row[qBlobFields[i].AName] instanceof Function) { //me aseguro que es un blob                                            
+                                            if (qBlobFields[i].ASubType === 0) //binario                                            
+                                                value= new Buffer(row[qBlobFields[i].AName]).toString('base64');
+                                               
+                                            row[qBlobFields[i].AName]=value;                                            
+                                        }
+                                    }    
+                                }                                    
+
                                 rData.push(row);
-                                
                                 xCont++;
                                 //console.log(xCont.toString());
                                 if (xCont >= 5000) {
-                                    outFileScript(qFields,rData,tableName, filepath, fb);
+                                    outFileScript(qFields,rData,tableName, filepath);
                                     xContGral += xCont;
                                     console.log('   Registros: '+xContGral.toString());
                                     rData=[];
@@ -158,7 +176,7 @@ export class fbExtractLoadData {
                             });
                             xContGral += xCont; 
                             console.log('   Registros: '+xContGral.toString());                           
-                            outFileScript(qFields,rData,tableName, filepath, fb);                            
+                            outFileScript(qFields,rData,tableName, filepath);                            
                             
                             
                             await this.fb.commit();

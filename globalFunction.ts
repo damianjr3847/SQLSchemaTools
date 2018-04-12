@@ -56,7 +56,7 @@ export function readRecursiveDirectory(dir:string):Array<any> {
 };
 
 
-export function varToSql(aValue:any, AType:number, ASubType:number, fb: fbClass.fbConnection | undefined = undefined) {
+export function varToSql(aValue:any, AType:number, ASubType:number) {
     let ft: string = ''; 
     let aDate:string='';
 
@@ -81,17 +81,12 @@ export function varToSql(aValue:any, AType:number, ASubType:number, fb: fbClass.
             case 261: //blob
                 if (ASubType === 1) { 
                     if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
-                        ft= "''";
-                    else if (fb !== undefined) {
-                           
-                        ft="'sin nada'";//await fb.getBlobAsString(aValue).toString().replace("'","''")+"'";;                            
-                        
-                    }    
+                        ft= "''";                       
                     else
-                        ft="'"+aValue.toString().replace("'","''")+"'";
+                        ft="'"+aValue.replace("'","''")+"'";
                 }
                 else 
-                    ft='NULL';
+                    ft="'"+aValue+"'";
                 break;                
             case 12: //date
                 aDate=new Date(aValue).toJSON();

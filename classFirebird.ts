@@ -2,6 +2,31 @@ import * as libfirebird from 'node-firebird';
 
 type SequentialCallback = (row: any, index: number) => void;
 
+
+export function getBlob(blobField: any) {
+    let value: any;
+
+    return new Promise<any>((resolve, reject) => {
+        blobField(async function(err: any, name: string, e: any){
+            if (err) return reject(err);
+
+            await new Promise(function( resolve ){
+                e.on('data', function(chunk:any) {
+                    value += chunk;
+                });
+                e.on('end', function() {
+                    resolve();    
+                })
+                e.on('error', function(err:any) {
+                    reject(err);    
+                });
+            })
+
+            resolve(value);
+        });
+    });  
+}
+
 export class fbConnection { 
      
     private db: libfirebird.Database | undefined;
@@ -154,7 +179,7 @@ export class fbConnection {
         });
     }
 
-    getBlobAsString(blobField: any) {
+    /*getBlobAsString(blobField: any) {
         let value: string = '';
 
         return new Promise<string>((resolve, reject) => {
@@ -173,7 +198,7 @@ export class fbConnection {
                 resolve(value);
             });
         });  
-    }
+    }*/
     
 
     validate(aQuery:string, aParams:Array<any>) {
@@ -188,11 +213,26 @@ export class fbConnection {
         
     };
 
-    sequentially(aQuery: string, aParams: Array<any>, aFunctionRow: SequentialCallback){        
+    trSequentially(aQuery: string, aParams: Array<any>, aFunctionRow: SequentialCallback){        
         this.checkInTransaction();
 
         return new Promise<void>((resolve, reject) => {
-            this.tr!.sequentially(aQuery,aParams, function(row:any, index:any, next:any) {
+            this.tr!.sequentially(aQuery,aParams, async function(row:any, index:any, next:any) {              
+                aFunctionRow(row, index);
+                next();
+            },
+            function (err:any) {
+                if (err) return reject(err);
+                resolve();
+            })
+        })
+    }
+
+    dbSequentially(aQuery: string, aParams: Array<any>, aFunctionRow: SequentialCallback){        
+        this.checkInConnection();
+
+        return new Promise<void>((resolve, reject) => {
+            this.db!.sequentially(aQuery,aParams, async function(row:any, index:any, next:any) {              
                 aFunctionRow(row, index);
                 next();
             },

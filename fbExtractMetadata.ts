@@ -259,7 +259,7 @@ export class fbExtractMetadata {
                             ft.ACharSet = null;
                             ft.ACollate = rParamater[j].FCOLLATION_NAME;
                             if (rParamater[j].FSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
-                                ft.ADefault = await this.fb.getBlobAsString(rParamater[j].FSOURCE);
+                                ft.ADefault = await fbClass.getBlob(rParamater[j].FSOURCE);
                             else
                                 ft.ADefault = rParamater[j].FSOURCE;
                             ft.ANotNull = rParamater[j].FLAG
@@ -279,7 +279,7 @@ export class fbExtractMetadata {
                         }
                     }
 
-                    body = await this.fb.getBlobAsString(rProcedures[i].SOURCE);
+                    body = await fbClass.getBlob(rProcedures[i].SOURCE);
 
                     outProcedure.procedure.body = body.replace(/\r/g, '');;
 
@@ -366,7 +366,7 @@ export class fbExtractMetadata {
                         outTables.table.temporaryType = 'PRESERVE ROWS';
 
                     if (rTables[i].DESCRIPTION !== null)
-                        outTables.table.description = await this.fb.getBlobAsString(rTables[i].DESCRIPTION);
+                        outTables.table.description = await fbClass.getBlob(rTables[i].DESCRIPTION);
 
                     //fields
                     j_fld= rFields.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rTables[i].OBJECT_NAME.trim()));
@@ -379,7 +379,7 @@ export class fbExtractMetadata {
                                 outFields[outFields.length - 1].column.name = rFields[j_fld].FIELDNAME.trim();
 
                                 if (rFields[j_fld].COMSOURCE !== null)
-                                    outFields[outFields.length - 1].column.computed = await this.fb.getBlobAsString(rFields[j_fld].COMSOURCE);
+                                    outFields[outFields.length - 1].column.computed = await fbClass.getBlob(rFields[j_fld].COMSOURCE);
                                 else {
                                     if (rFields[j_fld].CHARACTERSET !== null && rFields[j_fld].CHARACTERSET.trim() !== 'NONE')
                                         outFields[outFields.length - 1].column.charset = rFields[j_fld].CHARACTERSET.trim();
@@ -396,10 +396,10 @@ export class fbExtractMetadata {
                                         outFields[outFields.length - 1].column.collate = rFields[j_fld].FCOLLATION.trim();
 
                                     if (rFields[j_fld].DESCRIPTION !== null)
-                                        outFields[outFields.length - 1].column.description = await this.fb.getBlobAsString(rFields[j_fld].DESCRIPTION);
+                                        outFields[outFields.length - 1].column.description = await fbClass.getBlob(rFields[j_fld].DESCRIPTION);
 
                                     if (rFields[j_fld].DEFSOURCE !== null) {// al ser blob si es nulo no devuelve una funcion si no null
-                                        outFields[outFields.length - 1].column.default = await this.fb.getBlobAsString(rFields[j_fld].DEFSOURCE);
+                                        outFields[outFields.length - 1].column.default = await fbClass.getBlob(rFields[j_fld].DEFSOURCE);
                                         //outFields[outFields.length-1].column.default = txtAux.trim();//.replace('DEFAULT','');                           
                                     }
 
@@ -421,7 +421,7 @@ export class fbExtractMetadata {
                             outIndexes[outIndexes.length - 1].index.active = rIndexes[j_idx].INACTIVE !== 1;
 
                             if (rIndexes[j_idx].SOURCE !== null)
-                                outIndexes[outIndexes.length - 1].index.computedBy = await this.fb.getBlobAsString(rIndexes[j_idx].SOURCE);
+                                outIndexes[outIndexes.length - 1].index.computedBy = await fbClass.getBlob(rIndexes[j_idx].SOURCE);
 
                             outIndexes[outIndexes.length - 1].index.unique = rIndexes[j_idx].FUNIQUE === 1;
 
@@ -449,7 +449,7 @@ export class fbExtractMetadata {
                                 outcheck.push({ check: { name: '', expresion: '' } });
 
                                 outcheck[outcheck.length - 1].check.name = rCheckConst[j_const].CONST_NAME.trim();
-                                outcheck[outcheck.length - 1].check.expresion = await this.fb.getBlobAsString(rCheckConst[j_const].CHECK_SOURCE);
+                                outcheck[outcheck.length - 1].check.expresion = await fbClass.getBlob(rCheckConst[j_const].CHECK_SOURCE);
                             }
                             else if (rCheckConst[j_const].CONST_TYPE.toString().trim().toUpperCase() === 'FOREIGN KEY') {
                                 outforeignk.push({ foreignkey: { name: '' } });
@@ -580,12 +580,12 @@ export class fbExtractMetadata {
                     }
 
                     if (rTrigger[i].DESCRIPTION !== null) {
-                        outTriggerTables[outTriggerTables.length - 1].trigger.description = await this.fb.getBlobAsString(rTrigger[i].DESCRIPTION);
+                        outTriggerTables[outTriggerTables.length - 1].trigger.description = await fbClass.getBlob(rTrigger[i].DESCRIPTION);
                     }
 
                     outTriggerTables[outTriggerTables.length - 1].trigger.position = rTrigger[i].SEQUENCE;
 
-                    body = await this.fb.getBlobAsString(rTrigger[i].SOURCE);
+                    body = await fbClass.getBlob(rTrigger[i].SOURCE);
 
                     outTrigger.triggerFunction.function.body = body.replace(/\r/g, '');;
 
@@ -644,10 +644,10 @@ export class fbExtractMetadata {
                     outViews.view.name = viewName;
 
                     if (rViews[i].DESCRIPTION !== null)
-                        outViews.view.description = await this.fb.getBlobAsString(rViews[i].DESCRIPTION);
+                        outViews.view.description = await fbClass.getBlob(rViews[i].DESCRIPTION);
 
                     if (rViews[i].SOURCE !== null)
-                        body = await this.fb.getBlobAsString(rViews[i].SOURCE);
+                        body = await fbClass.getBlob(rViews[i].SOURCE);
 
                     outViews.view.body = body.replace(/\r/g, '');
                     //fields
@@ -700,7 +700,7 @@ export class fbExtractMetadata {
                     outGenerator.generator.name = genName;
 
                     if (rGenerator[i].DESCRIPTION !== null) {
-                        outGenerator.generator.description = await this.fb.getBlobAsString(rGenerator[i].DESCRIPTION);
+                        outGenerator.generator.description = await fbClass.getBlob(rGenerator[i].DESCRIPTION);
                     }
 
                     this.saveToFile(outGenerator,GlobalTypes.ArrayobjectType[3],genName);                                            
