@@ -2,7 +2,7 @@
   "name": "tsmetadataupdater",
   "version": "1.0.0",
   "description": "Updater metadata FB y PS",
-  "main": "tsmetadataupdater.js",
+  "main": "js/tsmetadataupdater.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
