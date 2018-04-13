@@ -17,8 +17,6 @@ function  outFileScript(aFields:Array<fbExtractMetadata.iFieldType>, aData:Array
     let qQuery:Array<any> = [];
     let y:number = 0;
    
-    //fs.appendFileSync(filesPath+aTable+'.sql', '['+globalFunction.arrayToString(aFields,',','AName')+']'+GlobalTypes.CR , 'utf8');
-    fs.appendFileSync(filesPath+aTable+'.sql', JSON.stringify(aFields)+GlobalTypes.CR , 'utf8');
     for (let i=0; i < aData.length; i++) {                        
         qQuery=[];
         y=aData[i].length;
@@ -140,6 +138,7 @@ export class fbExtractLoadData {
                             xCont=0;
                             xContGral=0;
                             console.log(i.toString()+'/'+rTables.length.toString()+' - extract '+tableName);
+                            fs.appendFileSync(this.filesPath+tableName+'.sql', JSON.stringify(iField)+GlobalTypes.CR , 'utf8');
 
                             await this.fb.dbSequentially(query, [], async function(row:any, index:any) {                                
                                 let value: any;
@@ -159,8 +158,8 @@ export class fbExtractLoadData {
                                 xCont++;
                                 //console.log(xCont.toString());
                                 if (xCont >= 20000) {
-                                    //outFileScript(qFields,rData,tableName, filepath);
-                                    fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
+                                    outFileScript(qFields,rData,tableName, filepath);
+                                    //fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
                                     xContGral += xCont;
                                     console.log('   Registros: '+xContGral.toString());
                                     rData=[];
@@ -170,8 +169,8 @@ export class fbExtractLoadData {
                             if (rData.length>0) {
                                 xContGral += xCont; 
                                 console.log('   Registros: '+xContGral.toString());                           
-                                //outFileScript(qFields,rData,tableName, filepath);                            
-                                fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
+                                outFileScript(qFields,rData,tableName, filepath);                            
+                                //fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
                             }
                             
                             await this.fb.commit();
