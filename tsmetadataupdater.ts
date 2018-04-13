@@ -372,7 +372,7 @@ console.log('p '+params.outscript)
     let fbdata: fbExtractLoadData.fbExtractLoadData;
 
     if (dbDriver === 'fb') {                
-
+ 
         if (operation === 'writemetadata') {
             fbem = new fbExtractMetadata.fbExtractMetadata;
             fbem.filesPath = pathSave;
