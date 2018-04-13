@@ -84,6 +84,7 @@ export class fbExtractLoadData {
         let xContGral:number = 0;
         let j:number = 0;
 
+        
         this.fb.database    = adatabase;
         this.fb.dbPassword  = adbPassword;
         this.fb.dbUser      = adbUser;

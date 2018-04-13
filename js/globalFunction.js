@@ -150,15 +150,16 @@ function varToJSON(aValue, AType, ASubType) {
                     ft = { $binary: aValue.toString() };
                 }
                 break;
-            case 12://date
-                aDate = new Date(aValue).toJSON();
-                ft = aDate.substr(0, aDate.indexOf('T'));
+            /*case 12: //date
+                aDate=new Date(aValue).toLocaleDateString();
+                ft= aDate;
                 break;
-            case 13://time 
-                aDate = new Date(aValue).toJSON();
-                ft = aDate.substr(aDate.indexOf('T') + 1).replace('Z', '');
-                ;
-                break;
+            case 13: //time
+                aDate=new Date(aValue).toLocaleString();
+                ft=aDate.substr(aDate.indexOf(' ')+1);
+                break; */
+            case 12: //date 
+            case 13: //time    
             case 35://timestamp 
                 ft = { $date: new Date(aValue).toJSON() };
                 break;
