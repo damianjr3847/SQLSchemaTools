@@ -51,7 +51,9 @@ let nofolders:boolean       = false;
 let fileconf:string         = '';
 let aParam:string           = '';
 let aValue:string           = '';
-
+let beginTime: any;
+let endTime: any;
+let textTime:string         = '';
 /**********para pruebas */
 /*let actionYalm:string       = 'write';
 let source1:string          = './export/';
@@ -370,6 +372,7 @@ console.log('p '+params.outscript)
     let fbem:   fbExtractMetadata.fbExtractMetadata;  
     let fbam:   fbApplyMetadata.fbApplyMetadata;
     let fbdata: fbExtractLoadData.fbExtractLoadData;
+    beginTime= new Date();
 
     if (dbDriver === 'fb') {                
  
@@ -405,8 +408,10 @@ console.log('p '+params.outscript)
                
             await fbdata.extractData(dbHost,dbPort,dbPath,dbUser,dbPass, objectName);
         }      
-        
-    }    
-
+     
+    }
+    endTime= new Date();    
+    textTime=new Date(endTime-beginTime).toJSON();
+    console.log('Tiempo total: '+textTime.substr(textTime.indexOf('T')+1).replace('Z',''));
 })();  
 

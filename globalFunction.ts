@@ -155,8 +155,14 @@ export function varToJSON(aValue:any, AType:number, ASubType:number) {
                     ft={$binary:aValue.toString()};                   
                 }    
                 break;                
-            case 12: //date                                                 
-            case 13: //time                
+            case 12: //date
+                aDate=new Date(aValue).toJSON();
+                ft= aDate.substr(0,aDate.indexOf('T'));         
+                break;   
+            case 13: //time 
+                aDate=new Date(aValue).toJSON();               
+                ft=aDate.substr(aDate.indexOf('T')+1).replace('Z','');         ;         
+                break;   
             case 35: //timestamp 
                 ft={$date:new Date(aValue).toJSON()};         
                 break;   

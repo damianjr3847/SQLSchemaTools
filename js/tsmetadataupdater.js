@@ -30,6 +30,9 @@ let nofolders = false;
 let fileconf = '';
 let aParam = '';
 let aValue = '';
+let beginTime;
+let endTime;
+let textTime = '';
 /**********para pruebas */
 /*let actionYalm:string       = 'write';
 let source1:string          = './export/';
@@ -294,6 +297,7 @@ console.log('p '+params.outscript)
     let fbem;
     let fbam;
     let fbdata;
+    beginTime = new Date();
     if (dbDriver === 'fb') {
         if (operation === 'writemetadata') {
             fbem = new fbExtractMetadata.fbExtractMetadata;
@@ -326,5 +330,8 @@ console.log('p '+params.outscript)
             await fbdata.extractData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName);
         }
     }
+    endTime = new Date();
+    textTime = new Date(endTime - beginTime).toJSON();
+    console.log('Tiempo total: ' + textTime.substr(textTime.indexOf('T') + 1).replace('Z', ''));
 })();
 //# sourceMappingURL=tsmetadataupdater.js.map

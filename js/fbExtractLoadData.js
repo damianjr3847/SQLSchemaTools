@@ -104,7 +104,7 @@ class fbExtractLoadData {
                             xCont = 0;
                             xContGral = 0;
                             console.log(i.toString() + '/' + rTables.length.toString() + ' - extract ' + tableName);
-                            fs.appendFileSync(this.filesPath + tableName + '.sql', JSON.stringify(iField) + GlobalTypes.CR, 'utf8');
+                            fs.appendFileSync(this.filesPath + tableName + '.sql', JSON.stringify(qFields) + GlobalTypes.CR, 'utf8');
                             await this.fb.dbSequentially(query, [], async function (row, index) {
                                 let value;
                                 if (qBlobFields.length > 0) {
