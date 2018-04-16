@@ -82,7 +82,7 @@ export class fbExtractLoadData {
         let query:string = '';
         let xCont:number = 0;
         let xContGral:number = 0;
-        let j:number = 0;
+        let j:number = 0;    
 
         
         this.fb.database    = adatabase;
@@ -139,8 +139,9 @@ export class fbExtractLoadData {
                             xCont=0;
                             xContGral=0;
                             console.log(i.toString()+'/'+rTables.length.toString()+' - extract '+tableName);
+                                                    
                             
-                            fs.appendFileSync(this.filesPath+tableName+'.sql', JSON.stringify(qFields)+GlobalTypes.CR , 'utf8');
+                            fs.appendFileSync(this.filesPath+tableName+'.sql','["'+globalFunction.arrayToString(qFields,'","','AName')+'"]'+GlobalTypes.CR , 'utf8');
 
                             await this.fb.dbSequentially(query, [], async function(row:any, index:any) {                                
                                 let value: any;
