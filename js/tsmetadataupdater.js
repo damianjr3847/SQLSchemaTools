@@ -7,6 +7,7 @@ const fbExtractMetadata = require("./fbExtractMetadata");
 const fbApplyMetadata = require("./fbApplyMetadata");
 const GlobalTypes = require("./globalTypes");
 const fbExtractLoadData = require("./fbExtractLoadData");
+const pgApplyMetadata = require("./pgApplyMetadata");
 let operation = '';
 let source1 = '';
 let source2 = '';
@@ -61,7 +62,7 @@ params.option('--source1 <source1>', 'Path del directorio a leer');
 params.option('--source2 <source2>', 'Path del directorio a leer');
 params.option('-x, --pathsave <pathsave>', 'Path del directorio donde se guardaran los archivos');
 params.option('--nofolders', 'cuando genera los archivos no los separa en carpetas');
-params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB ps=PostgreSql fb=Firebird');
+params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB pg=PostgreSql fb=Firebird');
 params.option('-h, --dbhost <dbhost>', 'Host DB');
 params.option('-o, --dbport <dbport>', 'puerto DB');
 params.option('-c, --dbpath <dbpath>', 'path DB');
@@ -297,6 +298,7 @@ console.log('p '+params.outscript)
     let fbem;
     let fbam;
     let fbdata;
+    let pgam;
     beginTime = new Date();
     if (dbDriver === 'fb') {
         if (operation === 'writemetadata') {
@@ -328,6 +330,25 @@ console.log('p '+params.outscript)
             fbdata.filesPath = pathSave;
             fbdata.excludeObject = excludeObject;
             await fbdata.extractData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName);
+        }
+    }
+    else {
+        if (operation === 'writemetadata') {
+        }
+        else if (operation === 'readmetadata') {
+            pgam = new pgApplyMetadata.pgApplyMetadata;
+            pgam.sources.pathSource1 = source1;
+            pgam.sources.pathSource2 = source2;
+            pgam.pathFileScript = pathfilescript;
+            pgam.excludeObject = excludeObject;
+            pgam.saveToLog = saveToLog;
+            if (pathfilescript !== '')
+                if (fs.existsSync(pathfilescript)) {
+                    fs.unlinkSync(pathfilescript);
+                }
+            await pgam.applyYalm(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);
+        }
+        else if (operation === 'extractdata') {
         }
     }
     endTime = new Date();

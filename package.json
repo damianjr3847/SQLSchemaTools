@@ -17,10 +17,13 @@
   "license": "ISC",
   "dependencies": {
     "@types/js-yaml": "^3.10.1",
+    "@types/pg": "^7.4.6",
     "commander": "^2.14.1",
     "fs": "0.0.1-security",
     "js-yaml": "^3.10.0",
     "node-firebird": "git+https://github.com/kattunga/node-firebird.git",
+    "pg": "^7.4.1",
+    "pg-structure": "^4.1.0",
     "typescript": "^2.7.2"
   },
   "devDependencies": {

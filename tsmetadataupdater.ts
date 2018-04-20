@@ -25,6 +25,7 @@ import * as fbExtractMetadata   from './fbExtractMetadata';
 import * as fbApplyMetadata     from './fbApplyMetadata';
 import * as GlobalTypes         from './globalTypes';
 import * as fbExtractLoadData   from './fbExtractLoadData';
+import * as pgApplyMetadata     from './pgApplyMetadata';
 
 let operation:string        = '';
 let source1:string          = '';
@@ -88,7 +89,7 @@ params.option('--source2 <source2>', 'Path del directorio a leer');
 params.option('-x, --pathsave <pathsave>', 'Path del directorio donde se guardaran los archivos');
 params.option('--nofolders', 'cuando genera los archivos no los separa en carpetas');
 
-params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB ps=PostgreSql fb=Firebird');
+params.option('-d, --dbdriver <dbdriver>', 'Driver de la DB pg=PostgreSql fb=Firebird');
 params.option('-h, --dbhost <dbhost>', 'Host DB');
 params.option('-o, --dbport <dbport>', 'puerto DB');
 params.option('-c, --dbpath <dbpath>', 'path DB');
@@ -372,6 +373,9 @@ console.log('p '+params.outscript)
     let fbem:   fbExtractMetadata.fbExtractMetadata;  
     let fbam:   fbApplyMetadata.fbApplyMetadata;
     let fbdata: fbExtractLoadData.fbExtractLoadData;
+
+    let pgam:   pgApplyMetadata.pgApplyMetadata;
+
     beginTime= new Date();
 
     if (dbDriver === 'fb') {                
@@ -409,6 +413,28 @@ console.log('p '+params.outscript)
             await fbdata.extractData(dbHost,dbPort,dbPath,dbUser,dbPass, objectName);
         }      
      
+    }
+    else {
+        if (operation === 'writemetadata') {
+            
+        }
+        else if (operation === 'readmetadata') {
+            pgam = new pgApplyMetadata.pgApplyMetadata;
+            pgam.sources.pathSource1 = source1;
+            pgam.sources.pathSource2 = source2;
+            pgam.pathFileScript= pathfilescript;
+            pgam.excludeObject = excludeObject;
+            pgam.saveToLog = saveToLog;
+            if (pathfilescript !== '')
+                if (fs.existsSync(pathfilescript)) {
+                    fs.unlinkSync(pathfilescript);
+                }
+            await pgam.applyYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
+        }
+        else if (operation === 'extractdata') {
+            
+        }      
+
     }
     endTime= new Date();    
     textTime=new Date(endTime-beginTime).toJSON();
