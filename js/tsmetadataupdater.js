@@ -8,6 +8,7 @@ const fbApplyMetadata = require("./fbApplyMetadata");
 const GlobalTypes = require("./globalTypes");
 const fbExtractLoadData = require("./fbExtractLoadData");
 const pgApplyMetadata = require("./pgApplyMetadata");
+const pgExtractMetadata = require("./pgExtractMetadata");
 let operation = '';
 let source1 = '';
 let source2 = '';
@@ -299,6 +300,7 @@ console.log('p '+params.outscript)
     let fbam;
     let fbdata;
     let pgam;
+    let pgem;
     beginTime = new Date();
     if (dbDriver === 'fb') {
         if (operation === 'writemetadata') {
@@ -334,6 +336,15 @@ console.log('p '+params.outscript)
     }
     else {
         if (operation === 'writemetadata') {
+            pgem = new pgExtractMetadata.pgExtractMetadata;
+            pgem.filesPath = pathSave;
+            pgem.excludeObject = excludeObject;
+            pgem.nofolders = nofolders;
+            if (excludefrom !== '') {
+                pgem.sources.pathSource1 = excludefrom;
+                pgem.excludeFrom = true;
+            }
+            await pgem.writeYalm(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);
         }
         else if (operation === 'readmetadata') {
             pgam = new pgApplyMetadata.pgApplyMetadata;

@@ -26,6 +26,7 @@ import * as fbApplyMetadata     from './fbApplyMetadata';
 import * as GlobalTypes         from './globalTypes';
 import * as fbExtractLoadData   from './fbExtractLoadData';
 import * as pgApplyMetadata     from './pgApplyMetadata';
+import * as pgExtractMetadata   from './pgExtractMetadata';
 
 let operation:string        = '';
 let source1:string          = '';
@@ -375,7 +376,8 @@ console.log('p '+params.outscript)
     let fbdata: fbExtractLoadData.fbExtractLoadData;
 
     let pgam:   pgApplyMetadata.pgApplyMetadata;
-
+    let pgem:   pgExtractMetadata.pgExtractMetadata;  
+    
     beginTime= new Date();
 
     if (dbDriver === 'fb') {                
@@ -416,7 +418,16 @@ console.log('p '+params.outscript)
     }
     else {
         if (operation === 'writemetadata') {
-            
+            pgem = new pgExtractMetadata.pgExtractMetadata;
+            pgem.filesPath = pathSave;
+            pgem.excludeObject = excludeObject;
+            pgem.nofolders = nofolders;
+
+            if (excludefrom !== '') {
+                pgem.sources.pathSource1 = excludefrom;
+                pgem.excludeFrom= true;
+            }    
+            await pgem.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);        
         }
         else if (operation === 'readmetadata') {
             pgam = new pgApplyMetadata.pgApplyMetadata;
