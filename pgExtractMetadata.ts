@@ -5,7 +5,6 @@ import * as globalFunction from './globalFunction';
 import * as sources from './loadsource';
 import * as pg from 'pg';
 
-
 const queryProcedure: string =
     `SELECT * 
      FROM ( SELECT TRIM(RDB$PROCEDURE_NAME) AS OBJECT_NAME,
