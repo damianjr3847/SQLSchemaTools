@@ -100,6 +100,7 @@ function emptyTablesIndexesType() {
         index: {
             active: true,
             columns: [],
+            orderColumns: [],
             name: '',
             unique: false
         }

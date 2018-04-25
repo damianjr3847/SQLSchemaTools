@@ -133,22 +133,51 @@ exports.queryTablesViewFields = `SELECT *
 --(SELECT Array_agg(e.enumlabel) FROM pg_catalog.pg_enum e WHERE t.oid = e.enumtypid) AS "enum_values",
 */
 const queryTablesIndexes = `SELECT * 
-    FROM (SELECT  REL.RDB$RELATION_NAME AS OBJECT_NAME, REL.RDB$INDEX_NAME AS INDEXNAME, REL.RDB$UNIQUE_FLAG AS FUNIQUE, 
-                  REL.RDB$INDEX_INACTIVE AS INACTIVE,
-                  REL.RDB$INDEX_TYPE AS FTYPE,REL.RDB$EXPRESSION_SOURCE AS SOURCE, REL.RDB$DESCRIPTION AS DESCRIPTION
-        FROM RDB$INDICES REL
-        LEFT OUTER JOIN RDB$RELATION_CONSTRAINTS CON ON CON.RDB$INDEX_NAME = REL.RDB$INDEX_NAME
-        WHERE REL.RDB$SYSTEM_FLAG=0 AND CON.RDB$INDEX_NAME IS NULL AND REL.RDB$RELATION_NAME NOT STARTING 'IBE$' 
-        ORDER BY REL.RDB$RELATION_NAME, REL.RDB$INDEX_NAME)
+    FROM (SELECT
+                current_database()                                                          AS "catalog",
+                ns.nspname                                                                  AS "schema",
+                CONCAT(ns.nspname, '.', i.relname) 				                            AS "fullName",
+                CONCAT(current_database(), '.', ns.nspname, '.', i.relname) 				AS "fullCatalogName",
+                CONCAT(current_database(), '.', ns.nspname, '.', t.relname) 				AS "tableFullCatalogName",
+                current_database() 															AS "tableCatalog",
+                ns.nspname 																	AS "tableSchema",
+                t.relname 																	AS "tableName",
+                i.relname 																	AS "name",
+                ix.indisunique 																AS "isUnique",
+                ix.indisprimary																AS "isPrimaryKey",	
+	            pg_get_expr(ix.indexprs, t.oid, true)                                       AS "expresion" 	
+            FROM pg_index ix
+            INNER JOIN pg_class t ON (t.oid = ix.indrelid AND t.relkind = 'r')	-- Tables only from pg_class, r: ordinary table
+            INNER JOIN pg_class i ON (i.oid = ix.indexrelid AND i.relkind = 'i')	-- Indexes only from pg_class, i: indexes
+            INNER JOIN pg_namespace ns ON (ns.oid = t.relnamespace)
+            WHERE ns.nspname = 'public' 
+            ORDER BY t.relname,i.relname) CC
     {FILTER_OBJECT}`;
 const queryTableIndexesField = `SELECT * 
-    FROM (SELECT REL.RDB$RELATION_NAME AS OBJECT_NAME, REL.RDB$INDEX_NAME AS INDEXNAME, SEG.RDB$FIELD_POSITION AS FPOSITION, SEG.RDB$FIELD_NAME FLDNAME
-          FROM RDB$INDICES REL
-          INNER JOIN RDB$INDEX_SEGMENTS SEG ON SEG.RDB$INDEX_NAME=REL.RDB$INDEX_NAME
-          WHERE REL.RDB$SYSTEM_FLAG=0  AND REL.RDB$RELATION_NAME NOT STARTING 'IBE$'
-              /*AND NOT EXISTS(SELECT 1 FROM RDB$RELATION_CONSTRAINTS CON WHERE CON.RDB$CONSTRAINT_NAME=REL.RDB$INDEX_NAME) /*PARA QUE NO TRAIGA LOS CAMPOS DE LAS CLAVES PRIMARIAS*/
-          ORDER BY SEG.RDB$INDEX_NAME, SEG.RDB$FIELD_POSITION)
-     {FILTER_OBJECT}`;
+    FROM (SELECT
+                CONCAT(current_database(), '.', ns.nspname, '.', t.relname, '.', a.attname) AS "columnFullCatalogName",
+                CONCAT(current_database(), '.', ns.nspname, '.', i.relname) 				AS "indexFullCatalogName",
+                CONCAT(current_database(), '.', ns.nspname, '.', t.relname) 				AS "tableFullCatalogName",
+                current_database() 															AS "tableCatalog",
+                ns.nspname 																	AS "tableSchema",
+                t.relname 																	AS "tableName",
+                a.attname 																	AS "columnName",
+                i.relname 																	AS "indexName",
+                ix.indisunique 																AS "isUnique",
+                ix.indisprimary																AS "isPrimaryKey",
+                ix.indoption[(SELECT MIN(CASE WHEN ix.indkey[i] = a.attnum THEN i ELSE NULL END)::int
+                    FROM generate_series(ARRAY_LOWER(ix.indkey, 1), ARRAY_UPPER(ix.indkey, 1)) i)] as "option",
+                (SELECT MIN(CASE WHEN ix.indkey[i] = a.attnum THEN i ELSE NULL END)::int
+                    FROM generate_series(ARRAY_LOWER(ix.indkey, 1), ARRAY_UPPER(ix.indkey, 1)) i) AS "position"
+            
+            FROM pg_index ix
+            INNER JOIN pg_class t ON (t.oid = ix.indrelid AND t.relkind = 'r')	-- Tables only from pg_class, r: ordinary table
+            INNER JOIN pg_class i ON (i.oid = ix.indexrelid AND i.relkind = 'i')	-- Indexes only from pg_class, i: indexes
+            INNER JOIN pg_attribute a ON (a.attrelid = t.oid AND a.attnum = ANY(ix.indkey))
+            INNER JOIN pg_namespace ns ON (ns.oid = t.relnamespace)
+            WHERE ns.nspname = 'public'
+            ORDER BY t.relname,i.relname, 11) CC
+    {FILTER_OBJECT}`;
 const queryTableCheckConstraint = `SELECT *
     FROM (SELECT REL.RDB$RELATION_NAME AS OBJECT_NAME, CON.RDB$CONSTRAINT_NAME AS CONST_NAME, CON.RDB$CONSTRAINT_TYPE AS CONST_TYPE, 
                  CON.RDB$INDEX_NAME AS INDEXNAME, 
@@ -245,7 +274,7 @@ class pgExtractMetadata {
                 }
                 if (namesArray.length > 0) {
                     aux = globalFunction.arrayToString(namesArray, ',');
-                    aRet = aRet.replace('{FILTER_OBJECT}', function (x) { return 'WHERE TRIM(OBJECT_NAME) NOT IN (' + aux + ')'; });
+                    aRet = aRet.replace('{FILTER_OBJECT}', function (x) { return 'WHERE TRIM(CC.OBJECT_NAME) NOT IN (' + aux + ')'; });
                     //                    console.log(aux);
                     //aRet= aRet.replace('{FILTER_OBJECT}', 'WHERE UPPER(TRIM(OBJECT_NAME)) NOT IN (' + aux+')');                                    
                 }
@@ -380,6 +409,7 @@ class pgExtractMetadata {
         let j_fkf = 0;
         let tableName = '';
         let txtAux = '';
+        let aOrden = '';
         let ft = {}; // {AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
         try {
             if (openTr) {
@@ -389,11 +419,15 @@ class pgExtractMetadata {
             rTables = rQuery.rows;
             rQuery = await this.pgDb.query(this.analyzeQuery(exports.queryTablesViewFields, objectName, GlobalTypes.ArrayobjectType[2]), []);
             rFields = rQuery.rows;
-            //rIndexes    = await this.pgDb.query(this.analyzeQuery(queryTablesIndexes, objectName, GlobalTypes.ArrayobjectType[2]), []);
-            //rIndexesFld = await this.pgDb.query(this.analyzeQuery(queryTableIndexesField, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rQuery = await this.pgDb.query(this.analyzeQuery(queryTablesIndexes, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rIndexes = rQuery.rows;
+            rQuery = await this.pgDb.query(this.analyzeQuery(queryTableIndexesField, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rIndexesFld = rQuery.rows;
             //rCheckConst = await this.pgDbfb.query(this.analyzeQuery(queryTableCheckConstraint, objectName, GlobalTypes.ArrayobjectType[2]), []);
             for (let i = 0; i < rTables.length; i++) {
                 tableName = rTables[i].table.trim();
+                if (tableName === 'aaaa')
+                    tableName = tableName;
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
                     outTables.table.name = tableName;
                     if (rTables[i].description !== null)
@@ -412,45 +446,64 @@ class pgExtractMetadata {
                                 ft.AScale = rFields[j_fld].scale;
                                 if (rFields[j_fld].description !== null)
                                     outFields[outFields.length - 1].column.description = rFields[j_fld].description;
-                                outFields[outFields.length - 1].column.default = rFields[j_fld].defaultWithTypeCast;
+                                if (rFields[j_fld].defaultWithTypeCast !== null)
+                                    outFields[outFields.length - 1].column.default = rFields[j_fld].defaultWithTypeCast;
                                 outFields[outFields.length - 1].column.type = FieldType(ft);
                             }
                             j_fld++;
                         }
                     }
                     //indices
-                    /*j_idx= rIndexes.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rTables[i].OBJECT_NAME.trim()));
+                    j_idx = rIndexes.findIndex(aItem => (aItem.tableName.trim() === tableName));
                     if (j_idx !== -1) {
-                        while ((j_idx < rIndexes.length) && (rIndexes[j_idx].OBJECT_NAME.trim() == rTables[i].OBJECT_NAME.trim())) {
-                            //TABLENAME, INDEXNAME,  FUNIQUE, INACTIVE, TYPE, SOURCE,  DESCRIPTION
-                            outIndexes.push(GlobalTypes.emptyTablesIndexesType());
-
-                            outIndexes[outIndexes.length - 1].index.name = rIndexes[j_idx].INDEXNAME.trim();
-
-                            outIndexes[outIndexes.length - 1].index.active = rIndexes[j_idx].INACTIVE !== 1;
-
-                            if (rIndexes[j_idx].SOURCE !== null)
-                                outIndexes[outIndexes.length - 1].index.computedBy = await fbClass.getBlob(rIndexes[j_idx].SOURCE);
-
-                            outIndexes[outIndexes.length - 1].index.unique = rIndexes[j_idx].FUNIQUE === 1;
-
-                            outIndexes[outIndexes.length - 1].index.descending = rIndexes[j_idx].FTYPE === 1;
-
-                            j_idx_fld = rIndexesFld.findIndex(aItem => (aItem.OBJECT_NAME.trim() == rIndexes[j_idx].OBJECT_NAME.trim()) && (aItem.INDEXNAME.trim() == rIndexes[j_idx].INDEXNAME.trim()));
+                        //"catalog","schema","fullName","fullCatalogName","tableFullCatalogName","tableCatalog",
+                        //"tableSchema","tableName","name","isUnique","isPrimaryKey"
+                        while ((j_idx < rIndexes.length) && (rIndexes[j_idx].tableName.trim() == tableName)) {
+                            if (rIndexes[j_idx].isPrimaryKey) {
+                                outTables.table.constraint.primaryKey.name = rIndexes[j_idx].name.trim();
+                            }
+                            else {
+                                outIndexes.push(GlobalTypes.emptyTablesIndexesType());
+                                outIndexes[outIndexes.length - 1].index.name = rIndexes[j_idx].name.trim();
+                                if (rIndexes[j_idx].expresion !== null)
+                                    outIndexes[outIndexes.length - 1].index.computedBy = rIndexes[j_idx].expresion;
+                                outIndexes[outIndexes.length - 1].index.unique = rIndexes[j_idx].isUnique;
+                            }
+                            j_idx_fld = rIndexesFld.findIndex(aItem => (aItem.tableName.trim() == rIndexes[j_idx].tableName.trim()) && (aItem.indexName.trim() == rIndexes[j_idx].name.trim()));
                             if (j_idx_fld > -1) {
-                                while ((j_idx_fld < rIndexesFld.length) && (rIndexesFld[j_idx_fld].OBJECT_NAME.trim() == rIndexes[j_idx].OBJECT_NAME.trim()) && (rIndexesFld[j_idx_fld].INDEXNAME.trim() == rIndexes[j_idx].INDEXNAME.trim())) {
-                                    //TABLENAME, INDEXNAME, FPOSITION, FLDNAME
-                                    outIndexes[outIndexes.length - 1].index.columns.push(rIndexesFld[j_idx_fld].FLDNAME.trim());
+                                // "columnFullCatalogName","indexFullCatalogName","tableFullCatalogName","tableCatalog",
+                                // "tableSchema","tableName","columnName","indexName","isUnique","isPrimaryKey","position"
+                                while ((j_idx_fld < rIndexesFld.length) && (rIndexesFld[j_idx_fld].tableName.trim() == rIndexes[j_idx].tableName.trim()) && (rIndexesFld[j_idx_fld].indexName.trim() == rIndexes[j_idx].name.trim())) {
+                                    if (rIndexes[j_idx].isPrimaryKey)
+                                        outTables.table.constraint.primaryKey.columns.push(rIndexesFld[j_idx_fld].columnName.trim());
+                                    else {
+                                        /*if (rIndexesFld[j_idx_fld].option === 0)  //0 =  ningun ordenamiento
+                                            outIndexes[outIndexes.length - 1].index.orderColumns.push('ASC');
+                                        else if (rIndexesFld[j_idx_fld].option === 1) //desending
+                                            outIndexes[outIndexes.length - 1].index.orderColumns.push('DESC');
+                                        else if (rIndexesFld[j_idx_fld].option === 2) //null last
+                                            outIndexes[outIndexes.length - 1].index.orderColumns.push('NULL LAST');
+                                        else if (rIndexesFld[j_idx_fld].option === 3) //desending con null last
+                                            outIndexes[outIndexes.length - 1].index.orderColumns.push('DESC NULL LAST');*/
+                                        if (rIndexesFld[j_idx_fld].option === 0)
+                                            aOrden = 'ASC';
+                                        else if (rIndexesFld[j_idx_fld].option === 1)
+                                            aOrden = 'DESC';
+                                        else if (rIndexesFld[j_idx_fld].option === 2)
+                                            aOrden = 'NULL LAST';
+                                        else if (rIndexesFld[j_idx_fld].option === 3)
+                                            aOrden = 'DESC NULL LAST';
+                                        outIndexes[outIndexes.length - 1].index.columns.push({ name: rIndexesFld[j_idx_fld].columnName.trim(), order: aOrden });
+                                    }
                                     j_idx_fld++;
                                 }
                             }
-
                             j_idx++;
                         }
                     }
-                    // TABLENAME,CONST_NAME,CONST_TYPE, INDEXNAME, INDEXTYPE, REF_TABLE, REF_INDEX, REF_UPDATE,
+                    // TABLENAME,CONST_NAME,CONST_TYPE, INDEXNAME, INDEXTYPE, REF_TABLE, REF_INDEX, REF_UPDATE, 
                     //   REF_DELETE, DESCRIPTION, CHECK_SOURCE
-                    
+                    /*
                     j_const= rCheckConst.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rTables[i].OBJECT_NAME.trim()));
                     if (j_const !== -1) {
                         while ((j_const < rCheckConst.length) && (rCheckConst[j_const].OBJECT_NAME.trim() == rTables[i].OBJECT_NAME.trim())) {
@@ -827,34 +880,34 @@ function FieldType(aParam) {
         //fecha y hora
         case 'timestamp':
         case 'timestamp without time zone':
-            if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = 'timestamp(' + aParam.APrecision.toString() + ')';
-            else
-                ft = 'timestamp';
+            /*if (aParam.APrecision !== null || aParam.APrecision > 0)
+                ft = 'timestamp('+aParam.APrecision.toString()+')';
+            else*/
+            ft = 'timestamp';
             break;
         case 'timestamp with time zone':
         case 'timestamptz':
-            if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = aParam.AType + '(' + aParam.APrecision.toString() + ')';
-            else
-                ft = aParam.AType;
+            /*if (aParam.APrecision !== null || aParam.APrecision > 0)
+                ft = aParam.AType+'('+aParam.APrecision.toString()+')';
+            else*/
+            ft = aParam.AType;
             break;
         case 'date':
             ft = aParam.AType;
             break;
         case 'time':
         case 'time without time zone':
-            if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = 'time(' + aParam.APrecision.toString() + ')';
-            else
-                ft = 'time';
+            /*if (aParam.APrecision !== null || aParam.APrecision > 0)
+                ft = 'time('+aParam.APrecision.toString()+')';
+            else*/
+            ft = 'time';
             break;
         case 'time with time zone':
         case 'timetz':
-            if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = aParam.AType + '(' + aParam.APrecision.toString() + ')';
-            else
-                ft = aParam.AType;
+            /*if (aParam.APrecision !== null || aParam.APrecision > 0)
+                ft = aParam.AType+'('+aParam.APrecision.toString()+')';
+            else*/
+            ft = aParam.AType;
             break;
         case 'interval':
             if (aParam.APrecision !== null || aParam.APrecision > 0)

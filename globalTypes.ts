@@ -188,8 +188,8 @@ export interface iTablesCheckType {
 export interface iTablesIndexesType {
 	index:{
 		active: boolean,
-		computedBy?: string,
-		columns: Array<string>,		  
+		computedBy?: string,		
+		columns: Array<any | string>,		  
 		name: string,
 		unique: boolean,
 		descending?: boolean;
@@ -234,7 +234,8 @@ export function emptyTablesIndexesType() {
 	return {
 		index:{
 			active: true,
-			columns: [],		  
+			columns: [],
+			orderColumns: [],		  
 			name: '',
 			unique: false	
 		}	
