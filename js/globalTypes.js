@@ -78,7 +78,8 @@ exports.emptyProcedureYamlType = emptyProcedureYamlType;
 ;
 ;
 function emptyTablesYamlType() {
-    return { table: {
+    return {
+        table: {
             name: '',
             columns: [],
             constraint: { primaryKey: { columns: [] } }
@@ -88,7 +89,8 @@ function emptyTablesYamlType() {
 exports.emptyTablesYamlType = emptyTablesYamlType;
 ;
 function emptyTablesFieldYamlType() {
-    return { column: {
+    return {
+        column: {
             name: ''
         }
     };
@@ -100,7 +102,6 @@ function emptyTablesIndexesType() {
         index: {
             active: true,
             columns: [],
-            orderColumns: [],
             name: '',
             unique: false
         }

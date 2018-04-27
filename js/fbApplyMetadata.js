@@ -247,18 +247,21 @@ class fbApplyMetadata {
     //******************************************************************* */
     async applyGenerators() {
         let genName = '';
-        let genBody = '';
+        let genBody = [];
         let fileYaml;
         try {
             for (let i in this.sources.generatorsArrayYaml) {
                 fileYaml = this.sources.generatorsArrayYaml[i];
+                genBody = [];
                 genName = fileYaml.generator.name;
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
-                    genBody = 'CREATE SEQUENCE ' + fileYaml.generator.name + ';';
+                    genBody.push('CREATE SEQUENCE ' + fileYaml.generator.name + ' INCREMENT BY ' + fileYaml.generator.increment.toString() + ';');
+                    if ('description' in fileYaml.generator)
+                        genBody.push('COMMENT ON GENERATOR ' + fileYaml.generator.name + ' IS ' + fileYaml.generator.description);
                     if (!this.fb.inTransaction())
                         await this.fb.startTransaction(false);
                     if (!(await this.fb.validate('SELECT 1 FROM RDB$GENERATORS WHERE RDB$GENERATOR_NAME=?', [genName]))) {
-                        await this.applyChange(GlobalTypes.ArrayobjectType[3], genName, Array(genBody));
+                        await this.applyChange(GlobalTypes.ArrayobjectType[3], genName, genBody);
                     }
                 }
             }

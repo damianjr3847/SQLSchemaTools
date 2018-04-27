@@ -4,7 +4,7 @@ const fs = require("fs");
 const fbClass = require("./classFirebird");
 const GlobalTypes = require("./globalTypes");
 const globalFunction = require("./globalFunction");
-const fbExtractMetadata = require("./fbExtractMetadata");
+const metadataQuerys = require("./fbMetadataQuerys");
 function outFileScript(aFields, aData, aTable, filesPath) {
     const saveTo = 10000;
     let insertQuery = '';
@@ -73,8 +73,8 @@ class fbExtractLoadData {
             await this.fb.connect();
             try {
                 await this.fb.startTransaction(true);
-                rTables = await this.fb.query(this.analyzeQuery(fbExtractMetadata.queryTablesView, objectName, GlobalTypes.ArrayobjectType[2]), []);
-                rFields = await this.fb.query(this.analyzeQuery(fbExtractMetadata.queryTablesViewFields, objectName, GlobalTypes.ArrayobjectType[5]), []);
+                rTables = await this.fb.query(this.analyzeQuery(metadataQuerys.queryTablesView, objectName, GlobalTypes.ArrayobjectType[2]), []);
+                rFields = await this.fb.query(this.analyzeQuery(metadataQuerys.queryTablesViewFields, objectName, GlobalTypes.ArrayobjectType[5]), []);
                 await this.fb.commit();
                 for (let i = 0; i < rTables.length; i++) {
                     tableName = rTables[i].OBJECT_NAME.trim();

@@ -6,215 +6,9 @@ const GlobalTypes = require("./globalTypes");
 const globalFunction = require("./globalFunction");
 const sources = require("./loadsource");
 const pg = require("pg");
-const queryProcedure = `SELECT * 
-     FROM ( SELECT TRIM(RDB$PROCEDURE_NAME) AS OBJECT_NAME,
-                RDB$PROCEDURE_SOURCE AS SOURCE,
-                RDB$DESCRIPTION AS DESCRIPTION
-            FROM RDB$PROCEDURES PPA
-            WHERE RDB$SYSTEM_FLAG=0
-            ORDER BY RDB$PROCEDURE_NAME)
-    {FILTER_OBJECT} `;
-const queryProcedureParameters = `SELECT *
-    FROM (SELECT 
-            TRIM(PPA.RDB$PROCEDURE_NAME) AS OBJECT_NAME, 
-            TRIM(PPA.RDB$PARAMETER_NAME) AS PARAMATER_NAME,
-            FLD.RDB$FIELD_TYPE AS FTYPE, 
-            FLD.RDB$FIELD_SUB_TYPE AS FSUB_TYPE,
-            FLD.RDB$FIELD_LENGTH AS FLENGTH, 
-            FLD.RDB$FIELD_PRECISION AS FPRECISION, 
-            FLD.RDB$FIELD_SCALE AS FSCALE, 
-            TRIM(COL.RDB$COLLATION_NAME) AS FCOLLATION_NAME,        /* COLLATE*/
-            PPA.RDB$DEFAULT_SOURCE AS FSOURCE,        /* DEFAULT*/
-            PPA.RDB$NULL_FLAG  AS FLAG,             /* NULLABLE*/
-            FLD.RDB$DESCRIPTION AS DESCRIPTION, 
-            PPA.RDB$PARAMETER_TYPE AS PARAMATER_TYPE         /* input / output*/
-        FROM RDB$PROCEDURE_PARAMETERS PPA 
-        LEFT OUTER JOIN RDB$FIELDS FLD ON FLD.RDB$FIELD_NAME = PPA.RDB$FIELD_SOURCE 
-        LEFT OUTER JOIN RDB$COLLATIONS COL ON (PPA.RDB$COLLATION_ID = COL.RDB$COLLATION_ID AND FLD.RDB$CHARACTER_SET_ID = COL.RDB$CHARACTER_SET_ID)             
-        ORDER BY PPA.RDB$PROCEDURE_NAME, PPA.RDB$PARAMETER_TYPE, PPA.RDB$PARAMETER_NUMBER)
-    {FILTER_OBJECT} `;
-exports.queryTablesView = `SELECT * 
-    FROM (SELECT
-        CONCAT(table_catalog, '.', table_schema)                    AS "parent",
-        table_catalog                                               AS "catalog",
-        table_schema                                                AS "schema",
-        table_name                                                  AS "table",
-        CONCAT(table_schema, '.', table_name)                       AS "fullname",
-        CONCAT(table_catalog, '.', table_schema, '.', table_name)   AS "fullCatalogName",
-        pg_catalog.obj_description(c.oid, 'pg_class')               AS "description",
-        relkind                                                     AS "type"
-        --r = ordinary table, i = index, S = sequence, v = view, m = materialized view, c = composite type, t = TOAST table, f = foreign table
-    FROM information_schema.tables x
-    INNER JOIN pg_catalog.pg_class c ON c.relname = table_name
-    WHERE table_schema = 'public' {RELTYPE}
-    ORDER BY table_catalog, table_schema, table_name) AS CC
-    {FILTER_OBJECT}`;
-exports.queryTablesViewFields = `SELECT * 
-    FROM (SELECT
-            CONCAT(table_catalog, '.', table_schema, '.', table_name)          AS "parent",
-            table_catalog                                                      AS "catalog",
-            table_schema                                                       AS "schema",
-            table_name                                                         AS "table",
-            column_name                                                        AS "columnName",
-            CONCAT(table_schema, '.', table_name, '.', column_name)            AS "fullName",
-            CONCAT(table_catalog, '.', table_schema, '.', table_name, '.', column_name) AS "fullCatalogName",
-            column_default                                                     AS "defaultWithTypeCast",
-            CASE WHEN column_default ILIKE 'nextval%' THEN TRUE ELSE FALSE END AS "isAutoIncrement",
-            CAST(is_nullable AS BOOLEAN)                                       AS "allowNull",
-            NOT CAST(is_nullable AS BOOLEAN)                                   AS "notNull",
-            CASE WHEN udt_name = 'hstore' THEN udt_name
-            ELSE LOWER(data_type) END                                          AS "type",
-            t.typcategory                                                      AS "typeCategory", -- See http://www.postgresql.org/docs/current/static/catalog-pg-type.html
-            CASE WHEN t.typcategory = 'E' THEN
-                (SELECT Array_agg(e.enumlabel)
-                FROM pg_catalog.pg_type t JOIN pg_catalog.pg_enum e ON t.oid = e.enumtypid
-                WHERE t.typname = udt_name)
-            ELSE NULL END                                                      AS "enumValues",
-            CASE WHEN LOWER(data_type) = 'array' THEN information_schema._pg_char_max_length(arraytype.oid, a.atttypmod)
-            ELSE character_maximum_length END                                  AS "length",
-            CASE WHEN LOWER(data_type) = 'array' THEN COALESCE(
-                information_schema._pg_datetime_precision(arraytype.oid, a.atttypmod),
-                information_schema._pg_numeric_precision(arraytype.oid, a.atttypmod))
-            WHEN datetime_precision IS NULL THEN numeric_precision
-            ELSE datetime_precision END                                        AS "precision",
-            CASE WHEN LOWER(data_type) = 'array' THEN information_schema._pg_numeric_scale(arraytype.oid, a.atttypmod)
-            ELSE numeric_scale END                                             AS "scale",
-            CASE WHEN LEFT(udt_name, 1) = '_' THEN LEFT(format_type(a.atttypid, NULL), -2)
-            ELSE NULL END                                                      AS "arrayType",
-            a.attndims                                                         AS "arrayDimension",
-            domain_catalog                                                     AS "domainCatalog",
-            domain_schema                                                      AS "domainSchema",
-            domain_name                                                        AS "domainName",
-            CASE WHEN domain_name IS NOT NULL THEN CONCAT(domain_schema, '.', domain_name)
-            ELSE NULL END                                                      AS "domainFullName",
-            CASE WHEN t.typcategory IN ('E', 'C') THEN format_type(a.atttypid, NULL)
-            ELSE NULL END                                                      AS "userDefinedType",
-            udt_name                                                           AS "udtName",      -- User Defined Types such as composite, enumerated etc.
-            ordinal_position                                                   AS "position",
-            pg_catalog.col_description(c.oid, columns.ordinal_position :: INT) AS "description"
-        FROM information_schema.columns
-            INNER JOIN pg_catalog.pg_attribute a ON a.attname = column_name
-            INNER JOIN pg_catalog.pg_class c ON c.oid = a.attrelid AND c.relname = table_name
-            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace AND pg_catalog.pg_table_is_visible(c.oid)
-            LEFT JOIN pg_catalog.pg_type arraytype ON arraytype.typname = RIGHT(udt_name, -1)
-            INNER JOIN pg_type t ON a.atttypid = t.oid
-        WHERE table_schema = 'public' {RELTYPE}    
-        ORDER BY table_schema, table_name, ordinal_position) CC
-    {FILTER_OBJECT}`;
-/*
--- NOTE: I tried to avoid joins by using information_schema.columns views's content as CTE after adding below selections.
--- However performance of CTE seems much worse then view with joins. 550 ms vs 80 ms.
-
--- OID of array's elements' type. (NOT array type itself):
---COLAESCE(bt.typelem, t.typelem)
-
--- Array's elements' character length:
---information_schema._pg_char_max_length(COALESCE(bt.typelem, t.typelem), a.atttypmod) AS "array_character_maximum_length",
-
--- Array's elements' precision:
---COALESCE(
---    information_schema._pg_datetime_precision(COALESCE(bt.typelem, t.typelem), a.atttypmod),
---    information_schema._pg_numeric_precision(COALESCE(bt.typelem, t.typelem), a.atttypmod)
---) as "array_precision",
-
--- Array's elements' scale:
---information_schema._pg_numeric_scale(COALESCE(bt.typelem, t.typelem), a.atttypmod) AS "array_scale",
-
---Array's elements' type. LEFT(.., -2) removes [] from end of data type such as integer[].
---CASE WHEN RIGHT(format_type(a.atttypid, NULL), 2) = '[]' THEN LEFT(format_type(a.atttypid, NULL), -2) ELSE NULL END AS "array_data_type",
-
--- Array dimesnion:
---CASE WHEN a.attndims = 0 THEN NULL ELSE a.attndims END as "array_dimension",
-
--- Column description at position attnum:
---pg_catalog.col_description(c.oid, a.attnum::information_schema.cardinal_number) AS "description",
-
--- Enum values
---(SELECT Array_agg(e.enumlabel) FROM pg_catalog.pg_enum e WHERE t.oid = e.enumtypid) AS "enum_values",
-*/
-const queryTablesIndexes = `SELECT * 
-    FROM (SELECT
-                current_database()                                                          AS "catalog",
-                ns.nspname                                                                  AS "schema",
-                CONCAT(ns.nspname, '.', i.relname) 				                            AS "fullName",
-                CONCAT(current_database(), '.', ns.nspname, '.', i.relname) 				AS "fullCatalogName",
-                CONCAT(current_database(), '.', ns.nspname, '.', t.relname) 				AS "tableFullCatalogName",
-                current_database() 															AS "tableCatalog",
-                ns.nspname 																	AS "tableSchema",
-                t.relname 																	AS "tableName",
-                i.relname 																	AS "name",
-                ix.indisunique 																AS "isUnique",
-                ix.indisprimary																AS "isPrimaryKey",	
-	            pg_get_expr(ix.indexprs, t.oid, true)                                       AS "expresion" 	
-            FROM pg_index ix
-            INNER JOIN pg_class t ON (t.oid = ix.indrelid AND t.relkind = 'r')	-- Tables only from pg_class, r: ordinary table
-            INNER JOIN pg_class i ON (i.oid = ix.indexrelid AND i.relkind = 'i')	-- Indexes only from pg_class, i: indexes
-            INNER JOIN pg_namespace ns ON (ns.oid = t.relnamespace)
-            WHERE ns.nspname = 'public' 
-            ORDER BY t.relname,i.relname) CC
-    {FILTER_OBJECT}`;
-const queryTableIndexesField = `SELECT * 
-    FROM (SELECT
-                CONCAT(current_database(), '.', ns.nspname, '.', t.relname, '.', a.attname) AS "columnFullCatalogName",
-                CONCAT(current_database(), '.', ns.nspname, '.', i.relname) 				AS "indexFullCatalogName",
-                CONCAT(current_database(), '.', ns.nspname, '.', t.relname) 				AS "tableFullCatalogName",
-                current_database() 															AS "tableCatalog",
-                ns.nspname 																	AS "tableSchema",
-                t.relname 																	AS "tableName",
-                a.attname 																	AS "columnName",
-                i.relname 																	AS "indexName",
-                ix.indisunique 																AS "isUnique",
-                ix.indisprimary																AS "isPrimaryKey",
-                ix.indoption[(SELECT MIN(CASE WHEN ix.indkey[i] = a.attnum THEN i ELSE NULL END)::int
-                    FROM generate_series(ARRAY_LOWER(ix.indkey, 1), ARRAY_UPPER(ix.indkey, 1)) i)] as "option",
-                (SELECT MIN(CASE WHEN ix.indkey[i] = a.attnum THEN i ELSE NULL END)::int
-                    FROM generate_series(ARRAY_LOWER(ix.indkey, 1), ARRAY_UPPER(ix.indkey, 1)) i) AS "position"
-            
-            FROM pg_index ix
-            INNER JOIN pg_class t ON (t.oid = ix.indrelid AND t.relkind = 'r')	-- Tables only from pg_class, r: ordinary table
-            INNER JOIN pg_class i ON (i.oid = ix.indexrelid AND i.relkind = 'i')	-- Indexes only from pg_class, i: indexes
-            INNER JOIN pg_attribute a ON (a.attrelid = t.oid AND a.attnum = ANY(ix.indkey))
-            INNER JOIN pg_namespace ns ON (ns.oid = t.relnamespace)
-            WHERE ns.nspname = 'public'
-            ORDER BY t.relname,i.relname, 11) CC
-    {FILTER_OBJECT}`;
-const queryTableCheckConstraint = `SELECT *
-    FROM (SELECT REL.RDB$RELATION_NAME AS OBJECT_NAME, CON.RDB$CONSTRAINT_NAME AS CONST_NAME, CON.RDB$CONSTRAINT_TYPE AS CONST_TYPE, 
-                 CON.RDB$INDEX_NAME AS INDEXNAME, 
-                 IDX.RDB$INDEX_TYPE AS INDEXTYPE,
-                 RLC.RDB$RELATION_NAME AS REF_TABLE,
-                 RLC.RDB$INDEX_NAME AS REF_INDEX,
-                 REF.RDB$UPDATE_RULE AS REF_UPDATE,
-                 REF.RDB$DELETE_RULE AS REF_DELETE,
-                 IDX.RDB$DESCRIPTION AS DESCRIPTION,
-                 (SELECT RTR.RDB$TRIGGER_SOURCE
-                  FROM RDB$CHECK_CONSTRAINTS RCH
-                  INNER JOIN RDB$TRIGGERS RTR ON RTR.RDB$TRIGGER_NAME=RCH.RDB$TRIGGER_NAME AND RTR.RDB$TRIGGER_TYPE=1
-                  WHERE RCH.RDB$CONSTRAINT_NAME=CON.RDB$CONSTRAINT_NAME) AS CHECK_SOURCE
-        FROM RDB$RELATIONS REL
-        LEFT OUTER JOIN RDB$RELATION_CONSTRAINTS CON ON CON.RDB$RELATION_NAME=REL.RDB$RELATION_NAME
-        LEFT OUTER JOIN RDB$INDICES IDX ON IDX.RDB$INDEX_NAME=CON.RDB$INDEX_NAME
-        LEFT OUTER JOIN RDB$REF_CONSTRAINTS REF ON REF.RDB$CONSTRAINT_NAME=CON.RDB$CONSTRAINT_NAME
-        LEFT OUTER JOIN RDB$RELATION_CONSTRAINTS RLC ON RLC.RDB$CONSTRAINT_NAME=REF.RDB$CONST_NAME_UQ
-        WHERE REL.RDB$SYSTEM_FLAG=0 AND CON.RDB$CONSTRAINT_TYPE IN ('CHECK','FOREIGN KEY','PRIMARY KEY')
-        ORDER BY CON.RDB$RELATION_NAME, CON.RDB$CONSTRAINT_TYPE, CON.RDB$CONSTRAINT_NAME)
-     {FILTER_OBJECT} `;
-const queryGenerator = `SELECT *
-     FROM (SELECT RDB$GENERATOR_NAME AS OBJECT_NAME, RDB$DESCRIPTION AS DESCRIPTION
-          FROM RDB$GENERATORS 
-          WHERE RDB$SYSTEM_FLAG = 0 
-          ORDER BY RDB$GENERATOR_NAME)
-     {FILTER_OBJECT}`;
-const queryTrigger = `SELECT *
-    FROM (SELECT  TRG.RDB$TRIGGER_NAME AS OBJECT_NAME, TRG.RDB$RELATION_NAME AS TABLENAME, TRG.RDB$TRIGGER_SOURCE AS SOURCE, 
-                  TRG.RDB$TRIGGER_SEQUENCE AS SEQUENCE,
-                  TRG.RDB$TRIGGER_TYPE AS TTYPE, TRG.RDB$TRIGGER_INACTIVE AS INACTIVE, TRG.RDB$DESCRIPTION AS DESCRIPTION
-          FROM RDB$TRIGGERS TRG
-          LEFT OUTER JOIN RDB$CHECK_CONSTRAINTS CON ON (CON.RDB$TRIGGER_NAME = TRG.RDB$TRIGGER_NAME)
-          WHERE ((TRG.RDB$SYSTEM_FLAG = 0) OR (TRG.RDB$SYSTEM_FLAG IS NULL)) AND (CON.RDB$TRIGGER_NAME IS NULL)
-          ORDER BY TRG.RDB$TRIGGER_NAME)
-    {FILTER_OBJECT}`;
+const metadataQuerys = require("./pgMetadataQuerys");
 ;
+const defaultSchema = 'public';
 class pgExtractMetadata {
     constructor() {
         //****************************************************************** */
@@ -244,6 +38,8 @@ class pgExtractMetadata {
         let aRet = aQuery;
         let namesArray = [];
         let aux = '';
+        //va con RegExp porque el replace cambia solo la primer ocurrencia.        
+        aRet = aRet.replace(new RegExp('{FILTER_SCHEMA}', 'g'), "'" + defaultSchema + "'");
         if (aObjectName !== '')
             aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(OBJECT_NAME)) = '" + aObjectName.toUpperCase() + "'");
         else {
@@ -274,7 +70,7 @@ class pgExtractMetadata {
                 }
                 if (namesArray.length > 0) {
                     aux = globalFunction.arrayToString(namesArray, ',');
-                    aRet = aRet.replace('{FILTER_OBJECT}', function (x) { return 'WHERE TRIM(CC.OBJECT_NAME) NOT IN (' + aux + ')'; });
+                    aRet = aRet.replace('{FILTER_OBJECT}', function (x) { return 'WHERE TRIM(CC.table) NOT IN (' + aux + ')'; });
                     //                    console.log(aux);
                     //aRet= aRet.replace('{FILTER_OBJECT}', 'WHERE UPPER(TRIM(OBJECT_NAME)) NOT IN (' + aux+')');                                    
                 }
@@ -288,7 +84,7 @@ class pgExtractMetadata {
         if (aObjectType === GlobalTypes.ArrayobjectType[2])
             aRet = aRet.replace('{RELTYPE}', " AND relkind IN ('r','t','f') ");
         else if (aObjectType === GlobalTypes.ArrayobjectType[4])
-            aRet = aRet.replace('{RELTYPE}', " AND relkind IN ('v','m'");
+            aRet = aRet.replace('{RELTYPE}', " AND relkind IN ('v','m') ");
         return aRet;
     }
     async extractMetadataProcedures(objectName, aRetYaml = false, openTr = true) {
@@ -415,27 +211,28 @@ class pgExtractMetadata {
             if (openTr) {
                 await this.pgDb.query('BEGIN');
             }
-            rQuery = await this.pgDb.query(this.analyzeQuery(exports.queryTablesView, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTablesView, objectName, GlobalTypes.ArrayobjectType[2]), []);
             rTables = rQuery.rows;
-            rQuery = await this.pgDb.query(this.analyzeQuery(exports.queryTablesViewFields, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTablesViewFields, objectName, GlobalTypes.ArrayobjectType[2]), []);
             rFields = rQuery.rows;
-            rQuery = await this.pgDb.query(this.analyzeQuery(queryTablesIndexes, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTablesIndexes, objectName, GlobalTypes.ArrayobjectType[2]), []);
             rIndexes = rQuery.rows;
-            rQuery = await this.pgDb.query(this.analyzeQuery(queryTableIndexesField, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTableIndexesField, objectName, GlobalTypes.ArrayobjectType[2]), []);
             rIndexesFld = rQuery.rows;
-            //rCheckConst = await this.pgDbfb.query(this.analyzeQuery(queryTableCheckConstraint, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTableCheckConstraint, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rCheckConst = rQuery.rows;
             for (let i = 0; i < rTables.length; i++) {
-                tableName = rTables[i].table.trim();
-                if (tableName === 'aaaa')
+                tableName = rTables[i].tableName.trim();
+                if (tableName === 'art_arch')
                     tableName = tableName;
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
                     outTables.table.name = tableName;
                     if (rTables[i].description !== null)
-                        outTables.table.description = rTables[i].description;
+                        outTables.table.description = rTables[i].description.trim();
                     //fields
-                    j_fld = rFields.findIndex(aItem => (aItem.table.trim() === rTables[i].table.trim()));
+                    j_fld = rFields.findIndex(aItem => (aItem.tableName.trim() === tableName));
                     if (j_fld !== -1) {
-                        while ((j_fld < rFields.length) && (rFields[j_fld].table.trim() == tableName)) {
+                        while ((j_fld < rFields.length) && (rFields[j_fld].tableName.trim() == tableName)) {
                             if (globalFunction.includeObject(this.excludeObject, 'fields', rFields[j_fld].columnName.trim())) {
                                 outFields.push(GlobalTypes.emptyTablesFieldYamlType());
                                 outFields[outFields.length - 1].column.name = rFields[j_fld].columnName.trim();
@@ -461,9 +258,13 @@ class pgExtractMetadata {
                         while ((j_idx < rIndexes.length) && (rIndexes[j_idx].tableName.trim() == tableName)) {
                             if (rIndexes[j_idx].isPrimaryKey) {
                                 outTables.table.constraint.primaryKey.name = rIndexes[j_idx].name.trim();
+                                if (rIndexes[j_idx].description !== null)
+                                    outTables.table.constraint.primaryKey.description = rIndexes[j_idx].description.trim();
                             }
                             else {
                                 outIndexes.push(GlobalTypes.emptyTablesIndexesType());
+                                if (rIndexes[j_idx].description !== null)
+                                    outIndexes[outIndexes.length - 1].index.description = rIndexes[j_idx].description.trim();
                                 outIndexes[outIndexes.length - 1].index.name = rIndexes[j_idx].name.trim();
                                 if (rIndexes[j_idx].expresion !== null)
                                     outIndexes[outIndexes.length - 1].index.computedBy = rIndexes[j_idx].expresion;
@@ -477,14 +278,6 @@ class pgExtractMetadata {
                                     if (rIndexes[j_idx].isPrimaryKey)
                                         outTables.table.constraint.primaryKey.columns.push(rIndexesFld[j_idx_fld].columnName.trim());
                                     else {
-                                        /*if (rIndexesFld[j_idx_fld].option === 0)  //0 =  ningun ordenamiento
-                                            outIndexes[outIndexes.length - 1].index.orderColumns.push('ASC');
-                                        else if (rIndexesFld[j_idx_fld].option === 1) //desending
-                                            outIndexes[outIndexes.length - 1].index.orderColumns.push('DESC');
-                                        else if (rIndexesFld[j_idx_fld].option === 2) //null last
-                                            outIndexes[outIndexes.length - 1].index.orderColumns.push('NULL LAST');
-                                        else if (rIndexesFld[j_idx_fld].option === 3) //desending con null last
-                                            outIndexes[outIndexes.length - 1].index.orderColumns.push('DESC NULL LAST');*/
                                         if (rIndexesFld[j_idx_fld].option === 0)
                                             aOrden = 'ASC';
                                         else if (rIndexesFld[j_idx_fld].option === 1)
@@ -501,59 +294,37 @@ class pgExtractMetadata {
                             j_idx++;
                         }
                     }
-                    // TABLENAME,CONST_NAME,CONST_TYPE, INDEXNAME, INDEXTYPE, REF_TABLE, REF_INDEX, REF_UPDATE, 
-                    //   REF_DELETE, DESCRIPTION, CHECK_SOURCE
-                    /*
-                    j_const= rCheckConst.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rTables[i].OBJECT_NAME.trim()));
+                    //"constraintSchema", "constraintName","constraintType","constraintDescription","columnName","tableSchema",
+                    //"tableName","position","uniqueConstraintPosition","isDeferrable","initiallyDeferred","matchOption","updateRule",
+                    //"deleteRule","referencedTableSchema","referencedTableName","referencedColumnName","check_source"
+                    j_const = rCheckConst.findIndex(aItem => (aItem.tableName.trim() === tableName));
                     if (j_const !== -1) {
-                        while ((j_const < rCheckConst.length) && (rCheckConst[j_const].OBJECT_NAME.trim() == rTables[i].OBJECT_NAME.trim())) {
-                            if (rCheckConst[j_const].CONST_TYPE.toString().trim().toUpperCase() === 'CHECK') {
+                        while ((j_const < rCheckConst.length) && (rCheckConst[j_const].tableName.trim() == tableName)) {
+                            if (rCheckConst[j_const].constraintType.toString().trim().toUpperCase() === 'CHECK') {
                                 outcheck.push({ check: { name: '', expresion: '' } });
-
-                                outcheck[outcheck.length - 1].check.name = rCheckConst[j_const].CONST_NAME.trim();
-                                outcheck[outcheck.length - 1].check.expresion = await fbClass.getBlob(rCheckConst[j_const].CHECK_SOURCE);
+                                outcheck[outcheck.length - 1].check.name = rCheckConst[j_const].constraintName.trim();
+                                outcheck[outcheck.length - 1].check.expresion = rCheckConst[j_const].check_source;
+                                if (rCheckConst[j_const].constraintDescription !== null)
+                                    outcheck[outcheck.length - 1].check.description = rCheckConst[j_const].constraintDescription.trim();
                             }
-                            else if (rCheckConst[j_const].CONST_TYPE.toString().trim().toUpperCase() === 'FOREIGN KEY') {
+                            else if (rCheckConst[j_const].constraintType.toString().trim().toUpperCase() === 'FOREIGN KEY') {
                                 outforeignk.push({ foreignkey: { name: '' } });
-                                outforeignk[outforeignk.length - 1].foreignkey.name = rCheckConst[j_const].CONST_NAME.trim();
-
-                                //busco el campo del indice de la FK en la tabla origen
-                                j_fkf = rIndexesFld.findIndex(aItem => (aItem.OBJECT_NAME.trim() == rCheckConst[j_const].OBJECT_NAME.trim()) && (aItem.INDEXNAME.trim() == rCheckConst[j_const].INDEXNAME.trim()));
-                                if (j_fkf > -1) {
-                                    outforeignk[outforeignk.length - 1].foreignkey.onColumn = rIndexesFld[j_fkf].FLDNAME.trim();
+                                outforeignk[outforeignk.length - 1].foreignkey.name = rCheckConst[j_const].constraintName.trim();
+                                outforeignk[outforeignk.length - 1].foreignkey.onColumn = rCheckConst[j_const].columnName.trim();
+                                outforeignk[outforeignk.length - 1].foreignkey.toTable = rCheckConst[j_const].referencedTableName.trim();
+                                outforeignk[outforeignk.length - 1].foreignkey.toColumn = rCheckConst[j_const].referencedColumnName.trim();
+                                if (rCheckConst[j_const].constraintDescription !== null)
+                                    outforeignk[outcheck.length - 1].foreignkey.description = rCheckConst[j_const].constraintDescription.trim();
+                                if (rCheckConst[j_const].updateRule.toString().trim() !== 'RESTRICT') {
+                                    outforeignk[outforeignk.length - 1].foreignkey.updateRole = rCheckConst[j_const].updateRule.toString().trim();
                                 }
-
-                                outforeignk[outforeignk.length - 1].foreignkey.toTable = rCheckConst[j_const].REF_TABLE.trim();
-
-                                //busco el campo del indice de la FK en la tabla destino
-                                j_fkf = rIndexesFld.findIndex(aItem => (aItem.OBJECT_NAME.trim() == rCheckConst[j_const].REF_TABLE.trim()) && (aItem.INDEXNAME.trim() == rCheckConst[j_const].REF_INDEX.trim()));
-                                if (j_fkf > -1) {
-                                    outforeignk[outforeignk.length - 1].foreignkey.toColumn = rIndexesFld[j_fkf].FLDNAME.trim();
-                                }
-
-                                if (rCheckConst[j_const].REF_UPDATE.toString().trim() !== 'RESTRICT') {
-                                    outforeignk[outforeignk.length - 1].foreignkey.updateRole = rCheckConst[j_const].REF_UPDATE.toString().trim();
-                                }
-                                if (rCheckConst[j_const].REF_DELETE.toString().trim() !== 'RESTRICT') {
-                                    outforeignk[outforeignk.length - 1].foreignkey.deleteRole = rCheckConst[j_const].REF_DELETE.toString().trim();
-                                }
-                            }
-                            else if (rCheckConst[j_const].CONST_TYPE.toString().trim().toUpperCase() === 'PRIMARY KEY') {
-
-                                outTables.table.constraint.primaryKey.name = rCheckConst[j_const].CONST_NAME.trim();
-                                //busco el/los campos de la clave primaria
-                                j_fkf = rIndexesFld.findIndex(aItem => (aItem.OBJECT_NAME.trim() == rCheckConst[j_const].OBJECT_NAME.trim()) && (aItem.INDEXNAME.trim() == rCheckConst[j_const].INDEXNAME.trim()));
-                                if (j_fkf > -1) {
-                                    while ((j_fkf < rIndexesFld.length) && (rIndexesFld[j_fkf].OBJECT_NAME.trim() == rCheckConst[j_const].OBJECT_NAME.trim()) && (rIndexesFld[j_fkf].INDEXNAME.trim() == rCheckConst[j_const].INDEXNAME.trim())) {
-                                        //TABLENAME, INDEXNAME, FPOSITION, FLDNAME
-                                        outTables.table.constraint.primaryKey.columns.push(rIndexesFld[j_fkf].FLDNAME.trim())
-                                        j_fkf++;
-                                    }
+                                if (rCheckConst[j_const].deleteRule.toString().trim() !== 'RESTRICT') {
+                                    outforeignk[outforeignk.length - 1].foreignkey.deleteRole = rCheckConst[j_const].deleteRule.toString().trim();
                                 }
                             }
                             j_const++;
                         }
-                    }*/
+                    }
                     outTables.table.columns = outFields;
                     if (outIndexes.length > 0) {
                         outTables.table.indexes = outIndexes;
@@ -673,103 +444,88 @@ class pgExtractMetadata {
          }*/
     }
     async extractMetadataViews(objectName, aRetYaml = false, openTr = true) {
-        /* let rViews: Array<any>;
-         let rFields: Array<any>;
- 
-         let outViewYalm: Array<any> = [];
-         let outViews: GlobalTypes.iViewYamlType = GlobalTypes.emptyViewYamlType();
- 
-         let j_fld: number = 0;
- 
-         let viewName: string = '';
-         let body: string = '';
- 
-         try {
-             if (openTr) {
-                 await this.fb.startTransaction(true);
-             }
- 
-             rViews = await this.fb.query(this.analyzeQuery(queryTablesView, objectName, GlobalTypes.ArrayobjectType[4]), []);
-             rFields = await this.fb.query(this.analyzeQuery(queryTablesViewFields, objectName, GlobalTypes.ArrayobjectType[4]), []);
- 
- 
-             for (let i = 0; i < rViews.length; i++) {
-                 //FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
-                 //FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION
-                 viewName = rViews[i].OBJECT_NAME.trim();
-                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[4], viewName)) {
-                     outViews.view.name = viewName;
- 
-                     if (rViews[i].DESCRIPTION !== null)
-                         outViews.view.description = await fbClass.getBlob(rViews[i].DESCRIPTION);
- 
-                     if (rViews[i].SOURCE !== null)
-                         body = await fbClass.getBlob(rViews[i].SOURCE);
- 
-                     outViews.view.body = body.replace(/\r/g, '');
-                     //fields
-                     j_fld= rFields.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rViews[i].OBJECT_NAME.trim()));
-                     if (j_fld !== -1) {
-                         while ((j_fld < rFields.length) && (rFields[j_fld].OBJECT_NAME.trim() == rViews[i].OBJECT_NAME.trim())) {
-                             outViews.view.columns.push(rFields[j_fld].FIELDNAME.trim());
-                             j_fld++;
-                         }
-                     }
- 
-                     if (aRetYaml) {
-                         outViewYalm.push(outViews);
-                     }
-                     else {
-                         this.saveToFile(outViews,GlobalTypes.ArrayobjectType[4],viewName);
-                         console.log(('generado view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
-                     }
-                     outViews = GlobalTypes.emptyViewYamlType();
-                 }
-             }
-             if (openTr) {
-                 await this.fb.commit();
-             }
-             if (aRetYaml) {
-                 return outViewYalm;
-             }
-         } catch (err) {
-             throw new Error('Error generando view ' + viewName + '.' + err.message);
-         }
- */
+        let rViews;
+        let rFields;
+        let rQuery;
+        let outViewYalm = [];
+        let outViews = GlobalTypes.emptyViewYamlType();
+        let j_fld = 0;
+        let viewName = '';
+        let body = '';
+        try {
+            if (openTr) {
+                await this.pgDb.query('BEGIN');
+            }
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTablesView, objectName, GlobalTypes.ArrayobjectType[4]), []);
+            rViews = rQuery.rows;
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTablesViewFields, objectName, GlobalTypes.ArrayobjectType[4]), []);
+            rFields = rQuery.rows;
+            for (let i = 0; i < rViews.length; i++) {
+                viewName = rViews[i].tableName.trim();
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[4], viewName)) {
+                    outViews.view.name = viewName;
+                    if (rViews[i].description !== null)
+                        outViews.view.description = rViews[i].description.trim();
+                    if (rViews[i].view_source !== null)
+                        body = rViews[i].view_source;
+                    outViews.view.body = body.replace(/\r/g, '');
+                    //fields
+                    j_fld = rFields.findIndex(aItem => (aItem.tableName.trim() === viewName));
+                    if (j_fld !== -1) {
+                        while ((j_fld < rFields.length) && (rFields[j_fld].tableName.trim() == viewName)) {
+                            outViews.view.columns.push(rFields[j_fld].columnName.trim());
+                            j_fld++;
+                        }
+                    }
+                    if (aRetYaml) {
+                        outViewYalm.push(outViews);
+                    }
+                    else {
+                        this.saveToFile(outViews, GlobalTypes.ArrayobjectType[4], viewName);
+                        console.log(('generado view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
+                    }
+                    outViews = GlobalTypes.emptyViewYamlType();
+                }
+            }
+            if (openTr) {
+                await this.pgDb.query('COMMIT');
+            }
+            if (aRetYaml) {
+                return outViewYalm;
+            }
+        }
+        catch (err) {
+            throw new Error('Error generando view ' + viewName + '.' + err.message);
+        }
     }
     async extractMetadataGenerators(objectName) {
-        /*  let rGenerator: Array<any>;
-          let outGenerator: GlobalTypes.iGeneratorYamlType = { generator: { name: '' } };
-          let genName: string = '';
-  
-          let j: number = 0;
-  
-          try {
-              await this.fb.startTransaction(true);
-  
-              rGenerator = await this.fb.query(this.analyzeQuery(queryGenerator, objectName, GlobalTypes.ArrayobjectType[3]), []);
-  
-              for (let i = 0; i < rGenerator.length; i++) {
-  
-                  genName = rGenerator[i].OBJECT_NAME.trim();
-                  if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
-                      outGenerator.generator.name = genName;
-  
-                      if (rGenerator[i].DESCRIPTION !== null) {
-                          outGenerator.generator.description = await fbClass.getBlob(rGenerator[i].DESCRIPTION);
-                      }
-  
-                      this.saveToFile(outGenerator,GlobalTypes.ArrayobjectType[3],genName);
-  
-                      console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
-                      outGenerator = { generator: { name: '' } };
-                  }
-              }
-              await this.fb.commit();
-          }
-          catch (err) {
-              throw new Error('Error generando procedimiento ' + genName + '. ' + err.message);
-          }*/
+        let rGenerator;
+        let rQuery;
+        let outGenerator = { generator: { name: '' } };
+        let genName = '';
+        let j = 0;
+        try {
+            await this.pgDb.query('BEGIN');
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryGenerator, objectName, GlobalTypes.ArrayobjectType[2]), []);
+            rGenerator = rQuery.rows;
+            for (let i = 0; i < rGenerator.length; i++) {
+                genName = rGenerator[i].name.trim();
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
+                    outGenerator.generator.name = genName;
+                    outGenerator.generator.increment = Number(rGenerator[i].increment);
+                    if (rGenerator[i].description !== null) {
+                        outGenerator.generator.description = rGenerator[i].description;
+                    }
+                    this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
+                    console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                    outGenerator = { generator: { name: '' } };
+                }
+            }
+            await this.pgDb.query('COMMIT');
+        }
+        catch (err) {
+            throw new Error('Error generando procedimiento ' + genName + '. ' + err.message);
+        }
     }
     async writeYalm(ahostName, aportNumber, adatabase, adbUser, adbPassword, objectType, objectName) {
         this.connectionString.host = ahostName;
@@ -789,13 +545,13 @@ class pgExtractMetadata {
                 }
                 /*if (objectType === GlobalTypes.ArrayobjectType[1] || objectType === '') {
                     await this.extractMetadataTriggers(objectName);
-                }
+                }*/
                 if (objectType === GlobalTypes.ArrayobjectType[3] || objectType === '') {
                     await this.extractMetadataGenerators(objectName);
                 }
                 if (objectType === GlobalTypes.ArrayobjectType[4] || objectType === '') {
                     await this.extractMetadataViews(objectName);
-                }*/
+                }
             }
             finally {
                 await this.pgDb.end();
@@ -829,8 +585,10 @@ function FieldType(aParam) {
             break;
         //numericos con decimales
         case 'numeric':
+            ft = aParam.AType + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
+            break;
         case 'decimal':
-            ft = aParam.AType + ' (' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
+            ft = aParam.AType + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
             break;
         case 'double precision':
         case 'float8':
@@ -946,6 +704,6 @@ function FieldType(aParam) {
         default:
             throw new Error('tipo de dato desconocido ' + aParam.AType);
     }
-    return ft;
+    return ft.toUpperCase();
 }
 //# sourceMappingURL=pgExtractMetadata.js.map

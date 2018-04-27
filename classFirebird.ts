@@ -3,9 +3,11 @@ import * as libfirebird from 'node-firebird';
 type SequentialCallback = (row: any, index: number) => void;
 
 
-export function getBlob(blobField: any) {
+export function getBlob(blobField: any, blobType:string) {
     let value: any;
-
+    if (blobType === 'text')
+        value = '';
+        
     return new Promise<any>((resolve, reject) => {
         blobField(async function(err: any, name: string, e: any){
             if (err) return reject(err);

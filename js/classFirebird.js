@@ -1,8 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const libfirebird = require("node-firebird");
-function getBlob(blobField) {
+function getBlob(blobField, blobType) {
     let value;
+    if (blobType === 'text')
+        value = '';
     return new Promise((resolve, reject) => {
         blobField(async function (err, name, e) {
             if (err)

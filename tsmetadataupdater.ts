@@ -380,6 +380,9 @@ console.log('p '+params.outscript)
     
     beginTime= new Date();
 
+    if (!(pathSave.endsWith('/'))) 
+        pathSave+='/';
+        
     if (dbDriver === 'fb') {                
  
         if (operation === 'writemetadata') {

@@ -302,6 +302,8 @@ console.log('p '+params.outscript)
     let pgam;
     let pgem;
     beginTime = new Date();
+    if (!(pathSave.endsWith('/')))
+        pathSave += '/';
     if (dbDriver === 'fb') {
         if (operation === 'writemetadata') {
             fbem = new fbExtractMetadata.fbExtractMetadata;

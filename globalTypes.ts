@@ -1,7 +1,7 @@
 
-export const ArrayDbDriver:string[] = ['pg','fb'];
+export const ArrayDbDriver: string[] = ['pg', 'fb'];
 
-export const ArrayobjectType:string[] = ['procedures','triggers','tables','generators','views','fields'];
+export const ArrayobjectType: string[] = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields'];
 
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 
@@ -11,10 +11,10 @@ export const yamlExportOptions = {
 	indent: 2,
 	skipInvalid: false,
 	flowLevel: -1,
-	sortKeys: false, 
-	lineWidth: 180, 
-	noRefs: false, 
-	noCompatMode: false, 
+	sortKeys: false,
+	lineWidth: 180,
+	noRefs: false,
+	noCompatMode: false,
 	condenseFlow: false
 };
 
@@ -24,8 +24,8 @@ export const yamlFileSaveOptions = {
 	flag: 'w'*/
 };
 
-export const CR:any = String.fromCharCode(10);
-export const TAB:any = String.fromCharCode(9);
+export const CR: any = String.fromCharCode(10);
+export const TAB: any = String.fromCharCode(9);
 
 /**************************************************************************************** */
 /**********             T R I G G E R S      I N T E R F A C E                           */
@@ -33,56 +33,56 @@ export const TAB:any = String.fromCharCode(9);
 
 export interface iTriggerTable {
 	trigger: {
-		name:string,
-		table?:string,
-		fires?:string,
-		events:Array<string>,			
-		active?:boolean,
-		position?:number,
-		description?:string
-	}	
-};
-			  
-export interface iTriggerYamlType {
-    triggerFunction: {
-		name:string,
-		ensure?: string, //present: crea si no esta pero no actualisa, absent: si es lo borra, latest: que este la ultima version 
-		triggers: Array<iTriggerTable>,		
-		function: { 
-        	language?: string,
-        	resultType?: string,
-        	options: {
-          		optimization?:{
-            		type?: string,
-					returnNullonNullInput?: boolean
-				  }	
-			},	
-          	executionCost?:number,
-			resultRows?:number,
-			body?:string
-		}		
-    }
+		name: string,
+		table?: string,
+		fires?: string,
+		events: Array<string>,
+		active?: boolean,
+		position?: number,
+		description?: string
+	}
 };
 
-export function emptyTriggerYamlType () {
-	return { 
+export interface iTriggerYamlType {
+	triggerFunction: {
+		name: string,
+		ensure?: string, //present: crea si no esta pero no actualisa, absent: si es lo borra, latest: que este la ultima version 
+		triggers: Array<iTriggerTable>,
+		function: {
+			language?: string,
+			resultType?: string,
+			options: {
+				optimization?: {
+					type?: string,
+					returnNullonNullInput?: boolean
+				}
+			},
+			executionCost?: number,
+			resultRows?: number,
+			body?: string
+		}
+	}
+};
+
+export function emptyTriggerYamlType() {
+	return {
 		triggerFunction: {
-			name:'',
+			name: '',
 			ensure: '',
-			triggers: [],		
+			triggers: [],
 			function: {
-				language:'plpgsql',
-				resultType:'TABLE',
+				language: 'plpgsql',
+				resultType: 'TABLE',
 				options: {
-					optimization:{
-						type:'STABLE',
-						returnNullonNullInput:false
-					}	
-				},	
-				executionCost:100,
-				resultRows:1000,
-				body:''			
-			}		
+					optimization: {
+						type: 'STABLE',
+						returnNullonNullInput: false
+					}
+				},
+				executionCost: 100,
+				resultRows: 1000,
+				body: ''
+			}
 		}
 	}
 };
@@ -91,61 +91,61 @@ export function emptyTriggerYamlType () {
 /**********             P R O C E D U R E     I N T E R F A C E                           */
 /***************************************************************************************** */
 
-export interface iProcedureParameter{
-	param:{
-		name:string,
-		type:string
+export interface iProcedureParameter {
+	param: {
+		name: string,
+		type: string
 	}
 };
 
-export interface iProcedureVariable{
-	var:{
-		name:string,
-		type:string,
-		cursor?:string
+export interface iProcedureVariable {
+	var: {
+		name: string,
+		type: string,
+		cursor?: string
 	}
 };
 
 export interface iProcedureYamlType {
-    procedure: {
-        name:string,
-        inputs?: Array<iProcedureParameter>,    
+	procedure: {
+		name: string,
+		inputs?: Array<iProcedureParameter>,
 		outputs?: Array<iProcedureParameter>,
 		ensure?: string, //present: crea si no esta pero no actualisa, absent: si es lo borra, latest: que este la ultima version 
-		pg: { 
-        	language?: string,
-        	resultType?: string,
-        	options: {
-          		optimization?:{
-            		type?: string,
+		pg: {
+			language?: string,
+			resultType?: string,
+			options: {
+				optimization?: {
+					type?: string,
 					returnNullonNullInput?: boolean
-				  }	
-			},	
-          	executionCost?:number,
-			resultRows?:number,			
-		},	  		
-		body?:string
-    }
-};
- 
-export function emptyProcedureYamlType () {
-	return { 
-		procedure:{
-			name:'',
-			ensure:'', 
-			pg: {
-				language:'plpgsql',
-				resultType:'TABLE',
-				options: {
-					optimization:{
-						type:'STABLE',
-						returnNullonNullInput:false
-					}	
-				},	
-				executionCost:100,
-				resultRows:1000			
+				}
 			},
-			body:''
+			executionCost?: number,
+			resultRows?: number,
+		},
+		body?: string
+	}
+};
+
+export function emptyProcedureYamlType() {
+	return {
+		procedure: {
+			name: '',
+			ensure: '',
+			pg: {
+				language: 'plpgsql',
+				resultType: 'TABLE',
+				options: {
+					optimization: {
+						type: 'STABLE',
+						returnNullonNullInput: false
+					}
+				},
+				executionCost: 100,
+				resultRows: 1000
+			},
+			body: ''
 		}
 	}
 };
@@ -159,41 +159,44 @@ export interface iTablesFieldYamlType {
 		collate?: string,
 		computed?: string,
 		description?: string,
-		default?:string,
+		default?: string,
 		name: string,
-		nullable?: boolean,	
+		nullable?: boolean,
 		type?: string,
 		present?: boolean
-	}	
+	}
 };
 
 export interface iTablesFKYamlType {
-	foreignkey:{
+	foreignkey: {
 		name: string,
 		onColumn?: string,
 		toTable?: string,
 		toColumn?: string,
 		updateRole?: string,
-		deleteRole?: string
-	}	
+		deleteRole?: string,
+		description?: string
+	}
 };
 
 export interface iTablesCheckType {
-	check:{
-		name?:string,
-		expresion?: string
-	}	
+	check: {
+		name: string,
+		expresion: string,
+		description?: string
+	}
 }
 
 export interface iTablesIndexesType {
-	index:{
+	index: {
 		active: boolean,
-		computedBy?: string,		
-		columns: Array<any | string>,		  
+		computedBy?: string,
+		columns: Array<any | string>,
 		name: string,
 		unique: boolean,
 		descending?: boolean;
-	}	
+		description?: string
+	}
 };
 
 export interface iTablesYamlType {
@@ -201,13 +204,14 @@ export interface iTablesYamlType {
 		name: string,
 		temporaryType?: string,
 		columns: Array<iTablesFieldYamlType>,
-		description?: string,	
-		constraint: { 
+		description?: string,
+		constraint: {
 			foreignkeys?: Array<iTablesFKYamlType>,
 			checks?: Array<iTablesCheckType>
 			primaryKey: {
 				name?: string,
-				columns: Array<string>
+				columns: Array<string>,
+				description?: string
 			}
 		},
 		indexes?: Array<iTablesIndexesType>
@@ -215,30 +219,31 @@ export interface iTablesYamlType {
 };
 
 export function emptyTablesYamlType() {
-	return {table: {
-					name: '',
-					columns: [],
-					constraint: {primaryKey:{columns:[]}}		
-					}
-			}
+	return {
+		table: {
+			name: '',
+			columns: [],
+			constraint: { primaryKey: { columns: [] } }
+		}
+	}
 };
 
-export function emptyTablesFieldYamlType() {	
-	return { column:{
-				name: ''
-				}
-			}
+export function emptyTablesFieldYamlType() {
+	return {
+		column: {
+			name: ''
+		}
+	}
 };
 
 export function emptyTablesIndexesType() {
 	return {
-		index:{
+		index: {
 			active: true,
 			columns: [],
-			orderColumns: [],		  
 			name: '',
-			unique: false	
-		}	
+			unique: false
+		}
 	};
 };
 
@@ -247,10 +252,11 @@ export function emptyTablesIndexesType() {
 /**************************************************************************************** */
 
 export interface iGeneratorYamlType {
-	generator: {						
+	generator: {
 		name: string,
-		description?: string
-	}	
+		description?: string,
+		increment?: number
+	}
 };
 
 /**************************************************************************************** */
@@ -259,9 +265,9 @@ export interface iGeneratorYamlType {
 
 export interface iViewYamlType {
 	view: {
-		name: string,		
+		name: string,
 		columns: Array<string>,
-		description?: string,			
+		description?: string,
 		body?: string
 	}
 };
@@ -269,7 +275,7 @@ export interface iViewYamlType {
 export function emptyViewYamlType() {
 	return {
 		view: {
-			name: '',		
+			name: '',
 			columns: []
 		}
 	};
