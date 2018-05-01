@@ -109,14 +109,15 @@ export interface iProcedureVariable {
 export interface iProcedureYamlType {
 	procedure: {
 		name: string,
+		description?: string,
 		inputs?: Array<iProcedureParameter>,
 		outputs?: Array<iProcedureParameter>,
-		ensure?: string, //present: crea si no esta pero no actualisa, absent: si es lo borra, latest: que este la ultima version 
+		ensure?: string, //present: crea si no esta pero no actualiza, absent: si es lo borra, latest: que este la ultima version 
 		pg: {
 			language?: string,
 			resultType?: string,
 			options: {
-				optimization?: {
+				optimization: {
 					type?: string,
 					returnNullonNullInput?: boolean
 				}

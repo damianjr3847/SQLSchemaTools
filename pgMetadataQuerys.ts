@@ -1,12 +1,27 @@
 export const queryProcedure: string =
     `SELECT * 
-     FROM ( SELECT TRIM(RDB$PROCEDURE_NAME) AS OBJECT_NAME,
-                RDB$PROCEDURE_SOURCE AS SOURCE,
-                RDB$DESCRIPTION AS DESCRIPTION
-            FROM RDB$PROCEDURES PPA
-            WHERE RDB$SYSTEM_FLAG=0
-            ORDER BY RDB$PROCEDURE_NAME)
-    {FILTER_OBJECT} `;
+     FROM (select 
+            ns.nspname										as "schema", 
+            p.proname										as "functionName",
+            p.proname										as "objectName",
+            l.lanname										as "languageName", 
+            p.procost 										as "cost", 
+            p.prorows 										as "rows",
+            p.proisstrict 									as "isStrict",
+            t.typname										as "returnType",
+            case p.provolatile when 'i' then 'inmutable'
+                                when 's' then 'stable'
+                                when 'v' then 'volatile'	
+            end 											as "volatility",
+            p.prosrc										as "source",
+            pg_catalog.obj_description(p.oid, 'pg_proc')    AS "description"
+            
+        from pg_namespace ns
+        left outer join pg_proc p on p.pronamespace = ns.oid
+        left outer join pg_language l on p.prolang = l.oid
+        left outer join pg_type t on t.oid=p.prorettype
+        where ns.nspname = {FILTER_SCHEMA}) cc
+    {FILTER_OBJECT}`;
 
 export const queryProcedureParameters: string =
     `SELECT *
@@ -36,6 +51,7 @@ export const queryTablesView: string =
         table_catalog                                               AS "catalog",
         table_schema                                                AS "schema",
         table_name                                                  AS "tableName",
+        table_name                                                  AS "objectName",
         CONCAT(table_schema, '.', table_name)                       AS "fullname",
         CONCAT(table_catalog, '.', table_schema, '.', table_name)   AS "fullCatalogName",
         pg_catalog.obj_description(c.oid, 'pg_class')               AS "description",
@@ -55,6 +71,7 @@ export const queryTablesViewFields: string =
             table_catalog                                                      AS "catalog",
             table_schema                                                       AS "schema",
             table_name                                                         AS "tableName",
+            table_name                                                         AS "objectName",            
             column_name                                                        AS "columnName",
             CONCAT(table_schema, '.', table_name, '.', column_name)            AS "fullName",
             CONCAT(table_catalog, '.', table_schema, '.', table_name, '.', column_name) AS "fullCatalogName",
@@ -143,7 +160,8 @@ export const queryTablesIndexes: string =
                 CONCAT(current_database(), '.', ns.nspname, '.', t.relname) 				AS "tableFullCatalogName",
                 current_database() 															AS "tableCatalog",
                 ns.nspname 																	AS "tableSchema",
-                t.relname 																	AS "tableName",
+                t.relname 																	AS "tableName",                
+                t.relname 																	AS "objectName",
                 i.relname 																	AS "name",
                 ix.indisunique 																AS "isUnique",
                 ix.indisprimary																AS "isPrimaryKey",	
@@ -166,6 +184,7 @@ export const queryTableIndexesField: string =
                 current_database() 															AS "tableCatalog",
                 ns.nspname 																	AS "tableSchema",
                 t.relname 																	AS "tableName",
+                t.relname 																	AS "objectName",
                 a.attname 																	AS "columnName",
                 i.relname 																	AS "indexName",
                 ix.indisunique 																AS "isUnique",
@@ -403,6 +422,7 @@ export const queryTableCheckConstraint: string =
             kcu.column_name                                                 AS "columnName",
             tc.table_schema                                                 AS "tableSchema",
             tc.table_name                                                   AS "tableName",
+            tc.table_name                                                   AS "objectName",
             kcu.ordinal_position                                            AS "position",
             kcu.position_in_unique_constraint                               AS "uniqueConstraintPosition",
             tc.is_deferrable                                                AS "isDeferrable",
@@ -459,7 +479,8 @@ export const queryGenerator: string =
             CONCAT(current_database(), '.', ns.nspname, '.', t.relname) 				AS "fullCatalogName",                
             current_database() 															AS "tableCatalog",
             ns.nspname 																	AS "tableSchema",
-            t.relname 																	AS "name",                
+            t.relname 																	AS "sequenceName",                
+            t.relname 																	AS "objectName",                
             pg_catalog.obj_description(sq.seqrelid, 'pg_class')                         AS "description",
             sq.seqincrement																AS "increment" 	
         FROM pg_catalog.pg_sequence sq
@@ -478,3 +499,6 @@ export const queryTrigger: string =
           WHERE ((TRG.RDB$SYSTEM_FLAG = 0) OR (TRG.RDB$SYSTEM_FLAG IS NULL)) AND (CON.RDB$TRIGGER_NAME IS NULL)
           ORDER BY TRG.RDB$TRIGGER_NAME)
     {FILTER_OBJECT}`;
+
+
+ 

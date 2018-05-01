@@ -41,7 +41,7 @@ class pgExtractMetadata {
         //va con RegExp porque el replace cambia solo la primer ocurrencia.        
         aRet = aRet.replace(new RegExp('{FILTER_SCHEMA}', 'g'), "'" + defaultSchema + "'");
         if (aObjectName !== '')
-            aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(OBJECT_NAME)) = '" + aObjectName.toUpperCase() + "'");
+            aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(cc.objectName)) = '" + aObjectName.toUpperCase() + "'");
         else {
             if (this.excludeFrom) {
                 if (!this.sources.loadYaml)
@@ -70,9 +70,7 @@ class pgExtractMetadata {
                 }
                 if (namesArray.length > 0) {
                     aux = globalFunction.arrayToString(namesArray, ',');
-                    aRet = aRet.replace('{FILTER_OBJECT}', function (x) { return 'WHERE TRIM(CC.table) NOT IN (' + aux + ')'; });
-                    //                    console.log(aux);
-                    //aRet= aRet.replace('{FILTER_OBJECT}', 'WHERE UPPER(TRIM(OBJECT_NAME)) NOT IN (' + aux+')');                                    
+                    aRet = aRet.replace('{FILTER_OBJECT}', function (x) { return 'WHERE TRIM(CC.objectName) NOT IN (' + aux + ')'; });
                 }
                 else
                     aRet = aRet.replace('{FILTER_OBJECT}', '');
@@ -81,107 +79,106 @@ class pgExtractMetadata {
                 aRet = aRet.replace('{FILTER_OBJECT}', '');
         }
         //r = ordinary table, i = index, S = sequence, v = view, m = materialized view, c = composite type, t = TOAST table, f = foreign table
-        if (aObjectType === GlobalTypes.ArrayobjectType[2])
+        if (aObjectType === GlobalTypes.ArrayobjectType[2]) //tabla
             aRet = aRet.replace('{RELTYPE}', " AND relkind IN ('r','t','f') ");
-        else if (aObjectType === GlobalTypes.ArrayobjectType[4])
+        else if (aObjectType === GlobalTypes.ArrayobjectType[4]) //vista
             aRet = aRet.replace('{RELTYPE}', " AND relkind IN ('v','m') ");
         return aRet;
     }
     async extractMetadataProcedures(objectName, aRetYaml = false, openTr = true) {
-        /* let rProcedures: Array<any>;
-         let rParamater: Array<any>;
- 
-         let outReturnYaml: Array<any> = [];
- 
-         let outProcedure: GlobalTypes.iProcedureYamlType = GlobalTypes.emptyProcedureYamlType();
-         let outProcedureParameterInput: GlobalTypes.iProcedureParameter[] = [];
-         let outProcedureParameterOutput: GlobalTypes.iProcedureParameter[] = [];
-         let j: number = 0;
-         let body: string = '';
-         let procedureName: string = '';
-         let ft: iFieldType = {};
- 
-         try {
- 
-             if (openTr) {
-                 await this.fb.startTransaction(true);
-             }
- 
-             rProcedures = await this.fb.query(this.analyzeQuery(queryProcedure, objectName, GlobalTypes.ArrayobjectType[0]), []);
-             rParamater = await this.fb.query(this.analyzeQuery(queryProcedureParameters, objectName, GlobalTypes.ArrayobjectType[0]), []);
- 
-             for (let i = 0; i < rProcedures.length; i++) {
- 
-                 procedureName = rProcedures[i].OBJECT_NAME;
-                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
- 
-                     outProcedure.procedure.name = procedureName;
- 
-                     j= rParamater.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rProcedures[i].OBJECT_NAME.trim()));
-                     if (j !== -1) {
-                         while ((j < rParamater.length) && (rParamater[j].OBJECT_NAME === rProcedures[i].OBJECT_NAME)) {
-                             ft.AName = rParamater[j].PARAMATER_NAME;
-                             ft.AType = rParamater[j].FTYPE;
-                             ft.ASubType = rParamater[j].FSUB_TYPE;
-                             ft.ALength = rParamater[j].FLENGTH;
-                             ft.APrecision = rParamater[j].FPRECISION;
-                             ft.AScale = rParamater[j].FSCALE;
-                             ft.ACharSet = null;
-                             ft.ACollate = rParamater[j].FCOLLATION_NAME;
-                             if (rParamater[j].FSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
-                                 ft.ADefault = await fbClass.getBlob(rParamater[j].FSOURCE);
-                             else
-                                 ft.ADefault = rParamater[j].FSOURCE;
-                             ft.ANotNull = rParamater[j].FLAG
-                             ft.AComputed = null;
- 
-                             if (rParamater[j].PARAMATER_TYPE == 0) {
-                                 outProcedureParameterInput.push({ param: { name: "", type: "" } });
-                                 outProcedureParameterInput[outProcedureParameterInput.length - 1].param.name = rParamater[j].PARAMATER_NAME;
-                                 outProcedureParameterInput[outProcedureParameterInput.length - 1].param.type = FieldType(ft);
-                             }
-                             else if (rParamater[j].PARAMATER_TYPE == 1) {
-                                 outProcedureParameterOutput.push({ param: { name: "", type: "" } });
-                                 outProcedureParameterOutput[outProcedureParameterOutput.length - 1].param.name = rParamater[j].PARAMATER_NAME;
-                                 outProcedureParameterOutput[outProcedureParameterOutput.length - 1].param.type = FieldType(ft);
-                             }
-                             j++;
-                         }
-                     }
- 
-                     body = await fbClass.getBlob(rProcedures[i].SOURCE);
- 
-                     outProcedure.procedure.body = body.replace(/\r/g, '');;
- 
-                     if (outProcedureParameterInput.length > 0)
-                         outProcedure.procedure.inputs = outProcedureParameterInput;
- 
-                     if (outProcedureParameterOutput.length > 0)
-                         outProcedure.procedure.outputs = outProcedureParameterOutput;
- 
-                     if (aRetYaml) {
-                         outReturnYaml.push(outProcedure);
-                     }
-                     else {
-                         this.saveToFile(outProcedure,GlobalTypes.ArrayobjectType[0],outProcedure.procedure.name);
-                         console.log(('generado procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
-                     }
- 
-                     outProcedure = GlobalTypes.emptyProcedureYamlType();
-                     outProcedureParameterInput = [];
-                     outProcedureParameterOutput = [];
-                 }
-             }
-             if (openTr) {
-                 await this.fb.commit();
-             }
-             if (aRetYaml) {
-                 return outReturnYaml;
-             }
-         }
-         catch (err) {
-             throw new Error('Error generando procedimiento ' + procedureName + '. ' + err.message);
-         }*/
+        let rProcedures;
+        let rParamater;
+        let rQuery;
+        let outReturnYaml = [];
+        let outProcedure = GlobalTypes.emptyProcedureYamlType();
+        let outProcedureParameterInput = [];
+        let outProcedureParameterOutput = [];
+        let j = 0;
+        let body = '';
+        let procedureName = '';
+        let ft = {};
+        try {
+            if (openTr) {
+                await this.pgDb.query('BEGIN');
+            }
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryProcedure, objectName, GlobalTypes.ArrayobjectType[0]), []);
+            rProcedures = rQuery.rows;
+            //rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryProcedureParameters, objectName, GlobalTypes.ArrayobjectType[0]), []);
+            //rParamater = rQuery.rows;
+            rParamater = [];
+            for (let i = 0; i < rProcedures.length; i++) {
+                //"schema", "functionName", "objectName","languageName","cost","rows",
+                //"isStrict","volatility","source", "description",returnType
+                procedureName = rProcedures[i].functionName;
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
+                    outProcedure.procedure.name = procedureName;
+                    if (rProcedures[i].description !== null)
+                        outProcedure.procedure.description = rProcedures[i].description;
+                    outProcedure.procedure.pg.executionCost = rProcedures[i].cost;
+                    outProcedure.procedure.pg.resultType = rProcedures[i].returnType;
+                    outProcedure.procedure.pg.language = rProcedures[i].languageName;
+                    outProcedure.procedure.pg.resultRows = rProcedures[i].rows;
+                    outProcedure.procedure.pg.options.optimization.type = rProcedures[i].volatility;
+                    outProcedure.procedure.pg.options.optimization.returnNullonNullInput = rProcedures[i].isStrict;
+                    j = rParamater.findIndex(aItem => (aItem.functionName.trim() === procedureName));
+                    if (j !== -1) {
+                        while ((j < rParamater.length) && (rParamater[j].functionName === procedureName)) {
+                            /*ft.AName = rParamater[j].PARAMATER_NAME;
+                            ft.AType = rParamater[j].FTYPE;
+                            ft.ASubType = rParamater[j].FSUB_TYPE;
+                            ft.ALength = rParamater[j].FLENGTH;
+                            ft.APrecision = rParamater[j].FPRECISION;
+                            ft.AScale = rParamater[j].FSCALE;
+                            ft.ACharSet = null;
+                            ft.ACollate = rParamater[j].FCOLLATION_NAME;
+                            if (rParamater[j].FSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
+                                ft.ADefault = await fbClass.getBlob(rParamater[j].FSOURCE);
+                            else
+                                ft.ADefault = rParamater[j].FSOURCE;
+                            ft.ANotNull = rParamater[j].FLAG
+                            ft.AComputed = null;
+
+                            if (rParamater[j].PARAMATER_TYPE == 0) {
+                                outProcedureParameterInput.push({ param: { name: "", type: "" } });
+                                outProcedureParameterInput[outProcedureParameterInput.length - 1].param.name = rParamater[j].PARAMATER_NAME;
+                                outProcedureParameterInput[outProcedureParameterInput.length - 1].param.type = FieldType(ft);
+                            }
+                            else if (rParamater[j].PARAMATER_TYPE == 1) {
+                                outProcedureParameterOutput.push({ param: { name: "", type: "" } });
+                                outProcedureParameterOutput[outProcedureParameterOutput.length - 1].param.name = rParamater[j].PARAMATER_NAME;
+                                outProcedureParameterOutput[outProcedureParameterOutput.length - 1].param.type = FieldType(ft);
+                            }*/
+                            j++;
+                        }
+                    }
+                    body = rProcedures[i].source;
+                    outProcedure.procedure.body = body; //.replace(/\r/g, '');;
+                    if (outProcedureParameterInput.length > 0)
+                        outProcedure.procedure.inputs = outProcedureParameterInput;
+                    if (outProcedureParameterOutput.length > 0)
+                        outProcedure.procedure.outputs = outProcedureParameterOutput;
+                    if (aRetYaml) {
+                        outReturnYaml.push(outProcedure);
+                    }
+                    else {
+                        this.saveToFile(outProcedure, GlobalTypes.ArrayobjectType[0], outProcedure.procedure.name);
+                        console.log(('generado procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
+                    }
+                    outProcedure = GlobalTypes.emptyProcedureYamlType();
+                    outProcedureParameterInput = [];
+                    outProcedureParameterOutput = [];
+                }
+            }
+            if (openTr) {
+                await this.pgDb.query('COMMIT');
+            }
+            if (aRetYaml) {
+                return outReturnYaml;
+            }
+        }
+        catch (err) {
+            throw new Error('Error generando procedimiento ' + procedureName + '. ' + err.message);
+        }
     }
     async extractMetadataTables(objectName, aRetYaml = false, openTr = true) {
         let rTables;
@@ -278,13 +275,13 @@ class pgExtractMetadata {
                                     if (rIndexes[j_idx].isPrimaryKey)
                                         outTables.table.constraint.primaryKey.columns.push(rIndexesFld[j_idx_fld].columnName.trim());
                                     else {
-                                        if (rIndexesFld[j_idx_fld].option === 0)
+                                        if (rIndexesFld[j_idx_fld].option === 0) //0 =  ningun ordenamiento 
                                             aOrden = 'ASC';
-                                        else if (rIndexesFld[j_idx_fld].option === 1)
+                                        else if (rIndexesFld[j_idx_fld].option === 1) //desending
                                             aOrden = 'DESC';
-                                        else if (rIndexesFld[j_idx_fld].option === 2)
+                                        else if (rIndexesFld[j_idx_fld].option === 2) //null last
                                             aOrden = 'NULL LAST';
-                                        else if (rIndexesFld[j_idx_fld].option === 3)
+                                        else if (rIndexesFld[j_idx_fld].option === 3) //desending con null last
                                             aOrden = 'DESC NULL LAST';
                                         outIndexes[outIndexes.length - 1].index.columns.push({ name: rIndexesFld[j_idx_fld].columnName.trim(), order: aOrden });
                                     }
@@ -509,7 +506,7 @@ class pgExtractMetadata {
             rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryGenerator, objectName, GlobalTypes.ArrayobjectType[2]), []);
             rGenerator = rQuery.rows;
             for (let i = 0; i < rGenerator.length; i++) {
-                genName = rGenerator[i].name.trim();
+                genName = rGenerator[i].sequenceName.trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
                     outGenerator.generator.name = genName;
                     outGenerator.generator.increment = Number(rGenerator[i].increment);
@@ -537,9 +534,9 @@ class pgExtractMetadata {
         try {
             await this.pgDb.connect();
             try {
-                /*if (objectType === GlobalTypes.ArrayobjectType[0] || objectType === '') {
+                if (objectType === GlobalTypes.ArrayobjectType[0] || objectType === '') {
                     await this.extractMetadataProcedures(objectName);
-                }*/
+                }
                 if (objectType === GlobalTypes.ArrayobjectType[2] || objectType === '') {
                     await this.extractMetadataTables(objectName);
                 }

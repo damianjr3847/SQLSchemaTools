@@ -79,9 +79,9 @@ class fbExtractMetadata {
             else
                 aRet = aRet.replace('{FILTER_OBJECT}', '');
         }
-        if (aObjectType === GlobalTypes.ArrayobjectType[2])
+        if (aObjectType === GlobalTypes.ArrayobjectType[2]) //tabla
             aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL)');
-        else if (aObjectType === GlobalTypes.ArrayobjectType[4])
+        else if (aObjectType === GlobalTypes.ArrayobjectType[4]) //vista
             aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE=1)');
         return aRet;
     }
@@ -117,7 +117,7 @@ class fbExtractMetadata {
                             ft.AScale = rParamater[j].FSCALE;
                             ft.ACharSet = null;
                             ft.ACollate = rParamater[j].FCOLLATION_NAME;
-                            if (rParamater[j].FSOURCE !== null)
+                            if (rParamater[j].FSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
                                 ft.ADefault = await fbClass.getBlob(rParamater[j].FSOURCE, 'text');
                             else
                                 ft.ADefault = rParamater[j].FSOURCE;
@@ -136,6 +136,8 @@ class fbExtractMetadata {
                             j++;
                         }
                     }
+                    if (rParamater[j].DESCRIPTION !== null)
+                        outProcedure.procedure.description = await fbClass.getBlob(rProcedures[i].DESCRIPTION, 'text');
                     body = await fbClass.getBlob(rProcedures[i].SOURCE, 'text');
                     outProcedure.procedure.body = body.replace(/\r/g, '');
                     ;
@@ -231,7 +233,7 @@ class fbExtractMetadata {
                                         outFields[outFields.length - 1].column.collate = rFields[j_fld].FCOLLATION.trim();
                                     if (rFields[j_fld].DESCRIPTION !== null)
                                         outFields[outFields.length - 1].column.description = await fbClass.getBlob(rFields[j_fld].DESCRIPTION, 'text');
-                                    if (rFields[j_fld].DEFSOURCE !== null) {
+                                    if (rFields[j_fld].DEFSOURCE !== null) { // al ser blob si es nulo no devuelve una funcion si no null
                                         outFields[outFields.length - 1].column.default = await fbClass.getBlob(rFields[j_fld].DEFSOURCE, 'text');
                                         //outFields[outFields.length-1].column.default = txtAux.trim();//.replace('DEFAULT','');                           
                                     }
@@ -615,7 +617,7 @@ function extractVariablesForBody(aBody) {
             variableType = '';
             //reveer esto por tema de cursores
             txt.split(' ').forEach(function (word) {
-                if (['DECLARE', 'VARIABLE'].indexOf(word) === -1) {
+                if (['DECLARE', 'VARIABLE'].indexOf(word) === -1) { //si no es
                     if (variableName === '')
                         variableName = word;
                     else

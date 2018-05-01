@@ -40,11 +40,11 @@ class fbExtractLoadData {
             aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(OBJECT_NAME)) = '" + aObjectName.toUpperCase() + "'");
         else
             aRet = aRet.replace('{FILTER_OBJECT}', '');
-        if (aObjectType === GlobalTypes.ArrayobjectType[5]) {
+        if (aObjectType === GlobalTypes.ArrayobjectType[5]) { //field  COMPUTED_SOURCE campos calculados
             aRet = aRet.replace('SELECT *', 'SELECT OBJECT_NAME, FIELDNAME, FTYPE, SUBTYPE ');
             aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL) AND FLD.RDB$COMPUTED_SOURCE IS NULL');
         }
-        else
+        else //table RELATION_TYPE teporales 
             aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE NOT IN (1,5,4) OR REL.RDB$RELATION_TYPE IS NULL)');
         return aRet;
     }
@@ -93,7 +93,7 @@ class fbExtractLoadData {
                                     iField.AType = rFields[j].FTYPE;
                                     iField.ASubType = rFields[j].SUBTYPE;
                                     qFields.push(iField);
-                                    if (iField.AType === 261)
+                                    if (iField.AType === 261) //blobs solamente para hacer mas rapida la busqueda en el callback
                                         qBlobFields.push(iField);
                                 }
                                 j++;
@@ -109,8 +109,8 @@ class fbExtractLoadData {
                                 let value;
                                 if (qBlobFields.length > 0) {
                                     for (let i in qBlobFields) {
-                                        if (row[qBlobFields[i].AName] !== null || row[qBlobFields[i].AName] instanceof Function) {
-                                            if (qBlobFields[i].ASubType === 0)
+                                        if (row[qBlobFields[i].AName] !== null || row[qBlobFields[i].AName] instanceof Function) { //me aseguro que es un blob                                            
+                                            if (qBlobFields[i].ASubType === 0) //binario                                            
                                                 value = new Buffer(row[qBlobFields[i].AName]).toString('base64');
                                             row[qBlobFields[i].AName] = value;
                                         }

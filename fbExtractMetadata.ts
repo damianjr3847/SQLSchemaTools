@@ -159,6 +159,9 @@ export class fbExtractMetadata {
                         }
                     }
 
+                    if (rParamater[j].DESCRIPTION !== null)    
+                        outProcedure.procedure.description = await fbClass.getBlob(rProcedures[i].DESCRIPTION, 'text');    
+
                     body = await fbClass.getBlob(rProcedures[i].SOURCE, 'text');
 
                     outProcedure.procedure.body = body.replace(/\r/g, '');;
