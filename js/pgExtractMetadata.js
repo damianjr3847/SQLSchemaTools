@@ -43,6 +43,7 @@ class pgExtractMetadata {
         if (aObjectName !== '')
             aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(cc.objectName)) = '" + aObjectName.toUpperCase() + "'");
         else {
+            //PARA EXCLUIR OBJETOS EXPECIFICADOS POR EL USUARIO DEL METADATA A EXPORTAR    
             if (this.excludeFrom) {
                 if (!this.sources.loadYaml)
                     this.sources.readSource('', '');
@@ -70,7 +71,7 @@ class pgExtractMetadata {
                 }
                 if (namesArray.length > 0) {
                     aux = globalFunction.arrayToString(namesArray, ',');
-                    aRet = aRet.replace('{FILTER_OBJECT}', function (x) { return 'WHERE TRIM(CC.objectName) NOT IN (' + aux + ')'; });
+                    aRet = aRet.replace('{FILTER_OBJECT}', function (x) { return 'WHERE TRIM(CC."objectName") NOT IN (' + aux + ')'; });
                 }
                 else
                     aRet = aRet.replace('{FILTER_OBJECT}', '');
@@ -79,10 +80,14 @@ class pgExtractMetadata {
                 aRet = aRet.replace('{FILTER_OBJECT}', '');
         }
         //r = ordinary table, i = index, S = sequence, v = view, m = materialized view, c = composite type, t = TOAST table, f = foreign table
-        if (aObjectType === GlobalTypes.ArrayobjectType[2]) //tabla
+        if (aObjectType === GlobalTypes.ArrayobjectType[2])
             aRet = aRet.replace('{RELTYPE}', " AND relkind IN ('r','t','f') ");
-        else if (aObjectType === GlobalTypes.ArrayobjectType[4]) //vista
+        else if (aObjectType === GlobalTypes.ArrayobjectType[4])
             aRet = aRet.replace('{RELTYPE}', " AND relkind IN ('v','m') ");
+        else if (aObjectType === GlobalTypes.ArrayobjectType[0])
+            aRet = aRet.replace('{RELTYPE}', " and lower(format_type(p.prorettype,null)) <> 'trigger'  ");
+        else if (aObjectType === GlobalTypes.ArrayobjectType[1])
+            aRet = aRet.replace('{RELTYPE}', " and lower(format_type(p.prorettype,null)) = 'trigger'  ");
         return aRet;
     }
     async extractMetadataProcedures(objectName, aRetYaml = false, openTr = true) {
@@ -101,11 +106,10 @@ class pgExtractMetadata {
             if (openTr) {
                 await this.pgDb.query('BEGIN');
             }
-            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryProcedure, objectName, GlobalTypes.ArrayobjectType[0]), []);
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryProcedureTrigger, objectName, GlobalTypes.ArrayobjectType[0]), []);
             rProcedures = rQuery.rows;
-            //rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryProcedureParameters, objectName, GlobalTypes.ArrayobjectType[0]), []);
-            //rParamater = rQuery.rows;
-            rParamater = [];
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryProcedureParameters, objectName, GlobalTypes.ArrayobjectType[0]), []);
+            rParamater = rQuery.rows;
             for (let i = 0; i < rProcedures.length; i++) {
                 //"schema", "functionName", "objectName","languageName","cost","rows",
                 //"isStrict","volatility","source", "description",returnType
@@ -120,39 +124,26 @@ class pgExtractMetadata {
                     outProcedure.procedure.pg.resultRows = rProcedures[i].rows;
                     outProcedure.procedure.pg.options.optimization.type = rProcedures[i].volatility;
                     outProcedure.procedure.pg.options.optimization.returnNullonNullInput = rProcedures[i].isStrict;
+                    //"schema","functionName","objectName","proArgModes","proArgType","proArgNames",
+                    //"proArgTypeName","proArgPosition" 
                     j = rParamater.findIndex(aItem => (aItem.functionName.trim() === procedureName));
                     if (j !== -1) {
                         while ((j < rParamater.length) && (rParamater[j].functionName === procedureName)) {
-                            /*ft.AName = rParamater[j].PARAMATER_NAME;
-                            ft.AType = rParamater[j].FTYPE;
-                            ft.ASubType = rParamater[j].FSUB_TYPE;
-                            ft.ALength = rParamater[j].FLENGTH;
-                            ft.APrecision = rParamater[j].FPRECISION;
-                            ft.AScale = rParamater[j].FSCALE;
-                            ft.ACharSet = null;
-                            ft.ACollate = rParamater[j].FCOLLATION_NAME;
-                            if (rParamater[j].FSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
-                                ft.ADefault = await fbClass.getBlob(rParamater[j].FSOURCE);
-                            else
-                                ft.ADefault = rParamater[j].FSOURCE;
-                            ft.ANotNull = rParamater[j].FLAG
-                            ft.AComputed = null;
-
-                            if (rParamater[j].PARAMATER_TYPE == 0) {
+                            if (rParamater[j].proArgModes == 'in') {
                                 outProcedureParameterInput.push({ param: { name: "", type: "" } });
-                                outProcedureParameterInput[outProcedureParameterInput.length - 1].param.name = rParamater[j].PARAMATER_NAME;
-                                outProcedureParameterInput[outProcedureParameterInput.length - 1].param.type = FieldType(ft);
+                                outProcedureParameterInput[outProcedureParameterInput.length - 1].param.name = rParamater[j].proArgNames;
+                                outProcedureParameterInput[outProcedureParameterInput.length - 1].param.type = GlobalTypes.convertDataType(rParamater[j].proArgTypeName);
                             }
-                            else if (rParamater[j].PARAMATER_TYPE == 1) {
+                            else if (rParamater[j].proArgModes == 'out' || rParamater[j].proArgModes == 'table') {
                                 outProcedureParameterOutput.push({ param: { name: "", type: "" } });
-                                outProcedureParameterOutput[outProcedureParameterOutput.length - 1].param.name = rParamater[j].PARAMATER_NAME;
-                                outProcedureParameterOutput[outProcedureParameterOutput.length - 1].param.type = FieldType(ft);
-                            }*/
+                                outProcedureParameterOutput[outProcedureParameterOutput.length - 1].param.name = rParamater[j].proArgNames;
+                                outProcedureParameterOutput[outProcedureParameterOutput.length - 1].param.type = GlobalTypes.convertDataType(rParamater[j].proArgTypeName);
+                            }
                             j++;
                         }
                     }
                     body = rProcedures[i].source;
-                    outProcedure.procedure.body = body; //.replace(/\r/g, '');;
+                    outProcedure.procedure.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
                     if (outProcedureParameterInput.length > 0)
                         outProcedure.procedure.inputs = outProcedureParameterInput;
                     if (outProcedureParameterOutput.length > 0)
@@ -275,13 +266,13 @@ class pgExtractMetadata {
                                     if (rIndexes[j_idx].isPrimaryKey)
                                         outTables.table.constraint.primaryKey.columns.push(rIndexesFld[j_idx_fld].columnName.trim());
                                     else {
-                                        if (rIndexesFld[j_idx_fld].option === 0) //0 =  ningun ordenamiento 
+                                        if (rIndexesFld[j_idx_fld].option === 0)
                                             aOrden = 'ASC';
-                                        else if (rIndexesFld[j_idx_fld].option === 1) //desending
+                                        else if (rIndexesFld[j_idx_fld].option === 1)
                                             aOrden = 'DESC';
-                                        else if (rIndexesFld[j_idx_fld].option === 2) //null last
+                                        else if (rIndexesFld[j_idx_fld].option === 2)
                                             aOrden = 'NULL LAST';
-                                        else if (rIndexesFld[j_idx_fld].option === 3) //desending con null last
+                                        else if (rIndexesFld[j_idx_fld].option === 3)
                                             aOrden = 'DESC NULL LAST';
                                         outIndexes[outIndexes.length - 1].index.columns.push({ name: rIndexesFld[j_idx_fld].columnName.trim(), order: aOrden });
                                     }
@@ -358,87 +349,88 @@ class pgExtractMetadata {
         }
     }
     async extractMetadataTriggers(objectName, aRetYaml = false, openTr = true) {
-        /*NAME, TABLENAME, SOURCE, SEQUENCE, TTYPE, INACTIVE,  DESCRIPTION */
-        /* let rTrigger: Array<any>;
-         let outReturnYaml: Array<any> = [];
-         let outTrigger: GlobalTypes.iTriggerYamlType = GlobalTypes.emptyTriggerYamlType();
-         let outTriggerTables: GlobalTypes.iTriggerTable[] = [];
-         let j: number = 0;
-         let body: string = '';
-         let triggerName: string = '';
- 
-         try {
-             if (openTr) {
-                 await this.fb.startTransaction(true);
-             }
- 
-             rTrigger = await this.fb.query(this.analyzeQuery(queryTrigger, objectName, GlobalTypes.ArrayobjectType[1]), []);
- 
-             for (let i = 0; i < rTrigger.length; i++) {
- 
-                 triggerName = rTrigger[i].OBJECT_NAME.trim();
-                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[1], triggerName)) {
-                     outTrigger.triggerFunction.name = triggerName;
- 
-                     outTriggerTables.push({ trigger: { name: '', events: [] } });
- 
-                     outTriggerTables[outTriggerTables.length - 1].trigger.name = triggerName;
-                     outTriggerTables[outTriggerTables.length - 1].trigger.table = rTrigger[i].TABLENAME.trim();
- 
- 
- 
-                     outTriggerTables[outTriggerTables.length - 1].trigger.active = rTrigger[i].INACTIVE === 0;
- 
-                     if ([1, 3, 5, 17, 25, 27, 113].indexOf(rTrigger[i].TTYPE) !== -1) {
-                         outTriggerTables[outTriggerTables.length - 1].trigger.fires = 'BEFORE';
-                     }
-                     else if ([2, 4, 6, 18, 26, 28, 114].indexOf(rTrigger[i].TTYPE) !== -1) {
-                         outTriggerTables[outTriggerTables.length - 1].trigger.fires = 'AFTER';
-                     }
-                     if ([1, 2, 17, 18, 25, 26, 113, 114].indexOf(rTrigger[i].TTYPE) !== -1) {
-                         outTriggerTables[outTriggerTables.length - 1].trigger.events.push('INSERT');
-                     }
-                     if ([3, 4, 17, 18, 27, 28, 113, 114].indexOf(rTrigger[i].TTYPE) !== -1) {
-                         outTriggerTables[outTriggerTables.length - 1].trigger.events.push('UPDATE');
-                     }
-                     if ([5, 6, 25, 26, 27, 28, 113, 114].indexOf(rTrigger[i].TTYPE) !== -1) {
-                         outTriggerTables[outTriggerTables.length - 1].trigger.events.push('DELETE');
-                     }
- 
-                     if (rTrigger[i].DESCRIPTION !== null) {
-                         outTriggerTables[outTriggerTables.length - 1].trigger.description = await fbClass.getBlob(rTrigger[i].DESCRIPTION);
-                     }
- 
-                     outTriggerTables[outTriggerTables.length - 1].trigger.position = rTrigger[i].SEQUENCE;
- 
-                     body = await fbClass.getBlob(rTrigger[i].SOURCE);
- 
-                     outTrigger.triggerFunction.function.body = body.replace(/\r/g, '');;
- 
-                     outTrigger.triggerFunction.triggers = outTriggerTables;
- 
-                     if (aRetYaml) {
-                         outReturnYaml.push(outTrigger);
-                     }
-                     else {
-                         this.saveToFile(outTrigger,GlobalTypes.ArrayobjectType[1],triggerName);
-                         console.log(('generado trigger ' + triggerName + '.yaml').padEnd(70, '.') + 'OK');
-                     }
- 
-                     outTrigger = GlobalTypes.emptyTriggerYamlType();
-                     outTriggerTables = [];
-                 }
-             }
-             if (openTr) {
-                 await this.fb.commit();
-             }
-             if (aRetYaml) {
-                 return outReturnYaml;
-             }
-         }
-         catch (err) {
-             throw new Error('Error generando trigger ' + triggerName + '. ' + err.message);
-         }*/
+        let rTrigger;
+        let rTriggerFunction;
+        let rQuery;
+        let outReturnYaml = [];
+        let outTrigger = GlobalTypes.emptyTriggerYamlType();
+        let outTriggerTables = [];
+        let j = 0;
+        let body = '';
+        let triggerFunctionName = '';
+        try {
+            if (openTr) {
+                await this.pgDb.query('BEGIN');
+            }
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTrigger, objectName, GlobalTypes.ArrayobjectType[1]), []);
+            rTrigger = rQuery.rows;
+            rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryProcedureTrigger, objectName, GlobalTypes.ArrayobjectType[1]), []);
+            rTriggerFunction = rQuery.rows;
+            for (let i = 0; i < rTriggerFunction.length; i++) {
+                // ****rtrigger
+                //oid,"triggerName", "objectName","triggerFire", "triggerEvent","functionName","schema",
+                //"fullTableName","tableName","description","enabled","triggerLevel"
+                // ****rtriggerfunction
+                //"schema", "functionName", "objectName","languageName","cost","rows",
+                //"isStrict","volatility","source", "description",returnType
+                triggerFunctionName = rTriggerFunction[i].functionName.trim();
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[1], triggerFunctionName)) {
+                    outTrigger.triggerFunction.name = triggerFunctionName;
+                    j = rTrigger.findIndex(aItem => (aItem.functionName.trim() === triggerFunctionName));
+                    if (j !== -1) {
+                        while ((j < rTrigger.length) && (rTrigger[j].functionName.trim() == triggerFunctionName)) {
+                            outTriggerTables.push({ trigger: { name: '', events: [] } });
+                            outTriggerTables[outTriggerTables.length - 1].trigger.name = rTrigger[j].triggerName.trim();
+                            outTriggerTables[outTriggerTables.length - 1].trigger.table = rTrigger[j].tableName.trim();
+                            outTriggerTables[outTriggerTables.length - 1].trigger.active = rTrigger[j].enabled;
+                            outTriggerTables[outTriggerTables.length - 1].trigger.fires = rTrigger[j].triggerFire;
+                            if (String(rTrigger[j].triggerEvent).indexOf('INSERT') !== -1) {
+                                outTriggerTables[outTriggerTables.length - 1].trigger.events.push('INSERT');
+                            }
+                            if (String(rTrigger[j].triggerEvent).indexOf('UPDATE') !== -1) {
+                                outTriggerTables[outTriggerTables.length - 1].trigger.events.push('UPDATE');
+                            }
+                            if (String(rTrigger[j].triggerEvent).indexOf('DELETE') !== -1) {
+                                outTriggerTables[outTriggerTables.length - 1].trigger.events.push('DELETE');
+                            }
+                            if (rTrigger[i].description !== null) {
+                                outTriggerTables[outTriggerTables.length - 1].trigger.description = rTrigger[j].description;
+                            }
+                            //outTriggerTables[outTriggerTables.length - 1].trigger.position = rTrigger[i].SEQUENCE;
+                            j++;
+                        }
+                    }
+                    body = rTriggerFunction[i].source;
+                    outTrigger.triggerFunction.function.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
+                    if (rTriggerFunction[i].description !== null)
+                        outTrigger.triggerFunction.function.description = rTriggerFunction[i].description;
+                    outTrigger.triggerFunction.function.executionCost = rTriggerFunction[i].cost;
+                    outTrigger.triggerFunction.function.language = rTriggerFunction[i].languageName;
+                    outTrigger.triggerFunction.function.resultRows = rTriggerFunction[i].rows;
+                    outTrigger.triggerFunction.function.options.optimization.type = rTriggerFunction[i].volatility;
+                    outTrigger.triggerFunction.function.options.optimization.returnNullonNullInput = rTriggerFunction[i].isStrict;
+                    outTrigger.triggerFunction.triggers = outTriggerTables;
+                    if (aRetYaml) {
+                        outReturnYaml.push(outTrigger);
+                    }
+                    else {
+                        this.saveToFile(outTrigger, GlobalTypes.ArrayobjectType[1], triggerFunctionName);
+                        console.log(('generado trigger ' + triggerFunctionName + '.yaml').padEnd(70, '.') + 'OK');
+                    }
+                    outTrigger = GlobalTypes.emptyTriggerYamlType();
+                    outTriggerTables = [];
+                }
+            }
+            if (openTr) {
+                await this.pgDb.query('COMMIT');
+            }
+            if (aRetYaml) {
+                return outReturnYaml;
+            }
+        }
+        catch (err) {
+            throw new Error('Error generando trigger ' + triggerFunctionName + '. ' + err.message);
+        }
     }
     async extractMetadataViews(objectName, aRetYaml = false, openTr = true) {
         let rViews;
@@ -465,7 +457,8 @@ class pgExtractMetadata {
                         outViews.view.description = rViews[i].description.trim();
                     if (rViews[i].view_source !== null)
                         body = rViews[i].view_source;
-                    outViews.view.body = body.replace(/\r/g, '');
+                    outViews.view.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
+                    //body.replace(/\r/g, '');
                     //fields
                     j_fld = rFields.findIndex(aItem => (aItem.tableName.trim() === viewName));
                     if (j_fld !== -1) {
@@ -540,9 +533,9 @@ class pgExtractMetadata {
                 if (objectType === GlobalTypes.ArrayobjectType[2] || objectType === '') {
                     await this.extractMetadataTables(objectName);
                 }
-                /*if (objectType === GlobalTypes.ArrayobjectType[1] || objectType === '') {
+                if (objectType === GlobalTypes.ArrayobjectType[1] || objectType === '') {
                     await this.extractMetadataTriggers(objectName);
-                }*/
+                }
                 if (objectType === GlobalTypes.ArrayobjectType[3] || objectType === '') {
                     await this.extractMetadataGenerators(objectName);
                 }
@@ -563,122 +556,32 @@ class pgExtractMetadata {
 exports.pgExtractMetadata = pgExtractMetadata;
 function FieldType(aParam) {
     let ft = '';
+    ft = GlobalTypes.convertDataType(aParam.AType);
     switch (aParam.AType) {
+        //binarios
         case 'bit':
         case 'bit varying':
-            ft = aParam.AType + '(' + aParam.ALength.toString() + ')';
-            break;
-        //tipo de datos string
+        //texto
         case 'character':
         case 'char':
-            ft = 'char(' + aParam.ALength.toString() + ')';
-            break;
         case 'character varying':
         case 'varchar':
-            ft = 'varchar(' + aParam.ALength.toString() + ')';
-            break;
-        case 'text':
-            ft = 'blob text';
+            ft += '(' + aParam.ALength.toString() + ')';
             break;
         //numericos con decimales
         case 'numeric':
-            ft = aParam.AType + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
-            break;
         case 'decimal':
-            ft = aParam.AType + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
-            break;
-        case 'double precision':
-        case 'float8':
-            ft = 'double precision';
-            break;
-        case 'real':
-        case 'float4':
-            ft = 'real';
-            break;
-        //monetarios
-        case 'money':
-            ft = aParam.AType;
-            break;
-        //enteros
-        case 'bigint':
-        case 'int8':
-            ft = 'bigint';
-            break;
-        case 'bigserial':
-        case 'serial8':
-            ft = 'bigserial';
-            break;
-        case 'integer':
-        case 'int':
-        case 'int4':
-            ft = 'integer';
-            break;
-        case 'smallint':
-        case 'int2':
-            ft = 'smallint';
-            break;
-        case 'smallserial':
-        case 'serial2':
-            ft = 'smallserial';
-            break;
-        case 'serial':
-        case 'serial4':
-            ft = 'serial';
-            break;
-        //network
-        case 'inet': //direcciones ip v4 y v6
-        case 'cidr': //hostname
-        case 'macaddr':
-        case 'macaddr8':
-            ft = aParam.AType;
-            break;
-        //fecha y hora
-        case 'timestamp':
-        case 'timestamp without time zone':
-            /*if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = 'timestamp('+aParam.APrecision.toString()+')';
-            else*/
-            ft = 'timestamp';
-            break;
-        case 'timestamp with time zone':
-        case 'timestamptz':
-            /*if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = aParam.AType+'('+aParam.APrecision.toString()+')';
-            else*/
-            ft = aParam.AType;
-            break;
-        case 'date':
-            ft = aParam.AType;
-            break;
-        case 'time':
-        case 'time without time zone':
-            /*if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = 'time('+aParam.APrecision.toString()+')';
-            else*/
-            ft = 'time';
-            break;
-        case 'time with time zone':
-        case 'timetz':
-            /*if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = aParam.AType+'('+aParam.APrecision.toString()+')';
-            else*/
-            ft = aParam.AType;
+            ft += '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
             break;
         case 'interval':
             if (aParam.APrecision !== null || aParam.APrecision > 0)
-                ft = aParam.AType + '(' + aParam.APrecision.toString() + ')';
-            else
-                ft = aParam.AType;
+                ft += '(' + aParam.APrecision.toString() + ')';
             break;
         //binarios    
         case 'bytea':
-            ft = 'blob binary';
-            break;
         //booleanos     
         case 'boolean':
         case 'bool':
-            ft = 'boolean';
-            break;
         //geometricos
         case 'box':
         case 'circle':
@@ -687,8 +590,6 @@ function FieldType(aParam) {
         case 'lseg':
         case 'point':
         case 'path':
-            ft = aParam.AType;
-            break;
         //otros    	 	    	
         case 'tsquery':
         case 'tsvector':
@@ -696,11 +597,48 @@ function FieldType(aParam) {
         case 'uuid':
         case 'json':
         case 'xml':
-            ft = aParam.AType;
+        case 'text':
+        //numericos    
+        case 'double precision':
+        case 'float8':
+        case 'real':
+        case 'float4':
+        //monetarios
+        case 'money':
+        //enteros
+        case 'bigint':
+        case 'int8':
+        case 'bigserial':
+        case 'serial8':
+        case 'integer':
+        case 'int':
+        case 'int4':
+        case 'smallint':
+        case 'int2':
+        case 'smallserial':
+        case 'serial2':
+        case 'serial':
+        case 'serial4':
+        //network
+        case 'inet': //direcciones ip v4 y v6
+        case 'cidr': //hostname
+        case 'macaddr':
+        case 'macaddr8':
+        //fecha y hora
+        case 'timestamp':
+        case 'timestamp without time zone':
+        case 'timestamp with time zone':
+        case 'timestamptz':
+        case 'date':
+        case 'time':
+        case 'time without time zone':
+        case 'time with time zone':
+        case 'timetz':
+            ft = GlobalTypes.convertDataType(aParam.AType);
             break;
         default:
             throw new Error('tipo de dato desconocido ' + aParam.AType);
     }
-    return ft.toUpperCase();
+    return ft;
 }
 //# sourceMappingURL=pgExtractMetadata.js.map

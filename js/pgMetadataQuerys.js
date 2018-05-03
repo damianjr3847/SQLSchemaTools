@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.queryProcedure = `SELECT * 
+exports.queryProcedureTrigger = `SELECT * 
      FROM (select 
             ns.nspname										as "schema", 
             p.proname										as "functionName",
@@ -11,8 +11,8 @@ exports.queryProcedure = `SELECT *
             p.proisstrict 									as "isStrict",
             t.typname										as "returnType",
             case p.provolatile when 'i' then 'inmutable'
-                                when 's' then 'stable'
-                                when 'v' then 'volatile'	
+                               when 's' then 'stable'
+                               when 'v' then 'volatile'	
             end 											as "volatility",
             p.prosrc										as "source",
             pg_catalog.obj_description(p.oid, 'pg_proc')    AS "description"
@@ -21,27 +21,30 @@ exports.queryProcedure = `SELECT *
         left outer join pg_proc p on p.pronamespace = ns.oid
         left outer join pg_language l on p.prolang = l.oid
         left outer join pg_type t on t.oid=p.prorettype
-        where ns.nspname = {FILTER_SCHEMA}) cc
+        where ns.nspname = {FILTER_SCHEMA}  {RELTYPE}) cc
     {FILTER_OBJECT}`;
 exports.queryProcedureParameters = `SELECT *
-    FROM (SELECT 
-            TRIM(PPA.RDB$PROCEDURE_NAME) AS OBJECT_NAME, 
-            TRIM(PPA.RDB$PARAMETER_NAME) AS PARAMATER_NAME,
-            FLD.RDB$FIELD_TYPE AS FTYPE, 
-            FLD.RDB$FIELD_SUB_TYPE AS FSUB_TYPE,
-            FLD.RDB$FIELD_LENGTH AS FLENGTH, 
-            FLD.RDB$FIELD_PRECISION AS FPRECISION, 
-            FLD.RDB$FIELD_SCALE AS FSCALE, 
-            TRIM(COL.RDB$COLLATION_NAME) AS FCOLLATION_NAME,        /* COLLATE*/
-            PPA.RDB$DEFAULT_SOURCE AS FSOURCE,        /* DEFAULT*/
-            PPA.RDB$NULL_FLAG  AS FLAG,             /* NULLABLE*/
-            FLD.RDB$DESCRIPTION AS DESCRIPTION, 
-            PPA.RDB$PARAMETER_TYPE AS PARAMATER_TYPE         /* input / output*/
-        FROM RDB$PROCEDURE_PARAMETERS PPA 
-        LEFT OUTER JOIN RDB$FIELDS FLD ON FLD.RDB$FIELD_NAME = PPA.RDB$FIELD_SOURCE 
-        LEFT OUTER JOIN RDB$COLLATIONS COL ON (PPA.RDB$COLLATION_ID = COL.RDB$COLLATION_ID AND FLD.RDB$CHARACTER_SET_ID = COL.RDB$CHARACTER_SET_ID)             
-        ORDER BY PPA.RDB$PROCEDURE_NAME, PPA.RDB$PARAMETER_TYPE, PPA.RDB$PARAMETER_NUMBER)
-    {FILTER_OBJECT} `;
+    FROM (select 
+        ns.nspname										as "schema", 
+        p.proname										as "functionName",
+        p.proname										as "objectName",
+        case param.proargmodes
+            when 'i' then 'in'
+            when 'o' then 'out' 
+            when 'b' then 'inout'
+            when 'v' then 'variadic'
+            when 't' then 'table' end 					as "proArgModes",
+        param.proallargtypes							as "proArgType",
+        param.proargnames								as "proArgNames",
+        format_type(param.proallargtypes,null)			as "proArgTypeName",
+        array_position(p.proargnames, param.proargnames) as "proArgPosition"
+    from pg_namespace ns
+    left outer join pg_proc p on p.pronamespace = ns.oid
+    inner join (select oid, pronamespace, unnest(proargmodes) as proargmodes,unnest(proallargtypes) as proallargtypes,unnest(proargnames) as proargnames
+                from pg_proc where proallargtypes is not null) param on param.pronamespace=p.pronamespace and p.oid=param.oid
+    where ns.nspname = {FILTER_SCHEMA}) cc
+    {FILTER_OBJECT} 
+    order by cc.schema, cc."functionName", cc."proArgModes", cc."proArgPosition"`;
 exports.queryTablesView = `SELECT * 
     FROM (SELECT
         CONCAT(table_catalog, '.', table_schema)                    AS "parent",
@@ -476,12 +479,41 @@ exports.queryGenerator = `SELECT *
         WHERE ns.nspname = {FILTER_SCHEMA} ) CC
      {FILTER_OBJECT}`;
 exports.queryTrigger = `SELECT *
-    FROM (SELECT  TRG.RDB$TRIGGER_NAME AS OBJECT_NAME, TRG.RDB$RELATION_NAME AS TABLENAME, TRG.RDB$TRIGGER_SOURCE AS SOURCE, 
-                  TRG.RDB$TRIGGER_SEQUENCE AS SEQUENCE,
-                  TRG.RDB$TRIGGER_TYPE AS TTYPE, TRG.RDB$TRIGGER_INACTIVE AS INACTIVE, TRG.RDB$DESCRIPTION AS DESCRIPTION
-          FROM RDB$TRIGGERS TRG
-          LEFT OUTER JOIN RDB$CHECK_CONSTRAINTS CON ON (CON.RDB$TRIGGER_NAME = TRG.RDB$TRIGGER_NAME)
-          WHERE ((TRG.RDB$SYSTEM_FLAG = 0) OR (TRG.RDB$SYSTEM_FLAG IS NULL)) AND (CON.RDB$TRIGGER_NAME IS NULL)
-          ORDER BY TRG.RDB$TRIGGER_NAME)
+    FROM (select    trg.oid											as oid, 
+                    trg.tgname										as "triggerName",
+                    trg.tgname										as "objectName",
+                    CASE trg.tgtype::integer & 66
+                        WHEN 2 THEN 'BEFORE'
+                        WHEN 64 THEN 'INSTEAD OF'
+                        ELSE 'AFTER'
+                    end 											as "triggerFire",
+                    case trg.tgtype::integer & cast(28 as int2)
+                        when 16 then 'UPDATE'
+                        when  8 then 'DELETE'
+                        when  4 then 'INSERT'
+                        when 20 then 'INSERT, UPDATE'
+                        when 28 then 'INSERT, UPDATE, DELETE'
+                        when 24 then 'UPDATE, DELETE'
+                        when 12 then 'INSERT, DELETE'
+                    end 											as "triggerEvent",
+                    pgpr.proname									as "functionName",
+                    ns.nspname 									    as "schema",
+                    ns.nspname||'.'||tbl.relname				    as "fullTableName",
+                    tbl.relname 									as "tableName",
+                    obj_description(trg.oid) 					    as "description",
+                    case
+                    when trg.tgenabled='O' then true
+                        else false
+                    end 										    as "enabled",
+                    case trg.tgtype::integer & 1
+                    when 1 then 'row'::text
+                    else 'statement'::text
+                    end 										    as "triggerLevel"
+            FROM pg_trigger trg
+            INNER JOIN pg_class tbl on trg.tgrelid = tbl.oid
+            INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+            INNER JOIN pg_proc pgpr on pgpr.oid=trg.tgfoid 
+            WHERE trg.tgisinternal = false
+        order by pgpr.proname ) cc
     {FILTER_OBJECT}`;
 //# sourceMappingURL=pgMetadataQuerys.js.map

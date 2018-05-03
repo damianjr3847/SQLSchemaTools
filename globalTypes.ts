@@ -49,16 +49,16 @@ export interface iTriggerYamlType {
 		ensure?: string, //present: crea si no esta pero no actualisa, absent: si es lo borra, latest: que este la ultima version 
 		triggers: Array<iTriggerTable>,
 		function: {
-			language?: string,
-			resultType?: string,
+			language?: string,			
 			options: {
-				optimization?: {
+				optimization: {
 					type?: string,
 					returnNullonNullInput?: boolean
 				}
 			},
 			executionCost?: number,
 			resultRows?: number,
+			description?: string, //solo se llena en postgre si la hay
 			body?: string
 		}
 	}
@@ -72,7 +72,6 @@ export function emptyTriggerYamlType() {
 			triggers: [],
 			function: {
 				language: 'plpgsql',
-				resultType: 'TABLE',
 				options: {
 					optimization: {
 						type: 'STABLE',
@@ -281,3 +280,138 @@ export function emptyViewYamlType() {
 		}
 	};
 };
+
+/**************************************************************************************** */
+/**********                 D A T A   T Y P E S                                           */
+/**************************************************************************************** */
+
+export function convertDataType(aName: string): string {
+	let ft: string = '';
+	
+	switch (aName.toLowerCase()) {
+		case 'bit':
+		case 'bit varying':
+			ft = 'bit';
+			break;
+		//tipo de datos string
+		case 'character':
+		case 'char':
+			ft = 'char';
+			break;
+		case 'character varying':
+		case 'varchar':
+			ft = 'varchar';
+			break;
+		case 'blob sub_type 1':	
+		case 'text':
+			ft = 'blob text';
+			break;
+		//numericos con decimales
+		case 'numeric':
+			ft = 'numeric';
+			break;
+		case 'decimal':
+			ft = 'decimal';
+			break;
+		case 'double precision':
+		case 'float8':
+			ft = 'double precision';
+			break;
+		case 'real':
+		case 'float4':
+			ft = 'real';
+			break;
+		//monetarios
+		case 'money':
+			ft = 'money';
+			break;
+		//enteros
+		case 'bigint':
+		case 'int8':
+			ft = 'bigint';
+			break;
+		case 'bigserial':
+		case 'serial8':
+			ft = 'bigserial';
+			break;
+		case 'integer':
+		case 'int':
+		case 'int4':
+			ft = 'integer';
+			break;
+		case 'smallint':
+		case 'int2':
+			ft = 'smallint';
+			break;
+		case 'smallserial':
+		case 'serial2':
+			ft = 'smallserial';
+			break;
+		case 'serial':
+		case 'serial4':
+			ft = 'serial';
+			break;
+		//network
+		case 'inet': //direcciones ip v4 y v6
+		case 'cidr': //hostname
+		case 'macaddr':
+		case 'macaddr8':
+			ft = aName;
+			break;
+		//fecha y hora
+		case 'timestamp':
+		case 'timestamp without time zone':            
+			ft = 'timestamp';
+			break;
+		case 'timestamp with time zone':
+		case 'timestamptz':            
+			ft = aName;
+			break;
+		case 'date':
+			ft = 'date';
+			break;
+		case 'time':
+		case 'time without time zone':            
+			ft = 'time';
+			break;
+		case 'time with time zone':
+		case 'timetz':            
+			ft = aName;
+			break;
+		case 'interval':
+			ft = 'interval';
+			break;
+		//binarios 
+		case 'blob sub_type 0':
+		case 'bytea':
+			ft = 'blob binary';
+			break;
+		//booleanos     
+		case 'boolean':
+		case 'bool':
+			ft = 'boolean';
+			break;
+		//geometricos
+		case 'box':
+		case 'circle':
+		case 'polygon':
+		case 'line':
+		case 'lseg':
+		case 'point':
+		case 'path':
+			ft = aName;
+			break;
+		//otros    	 	    	
+		case 'tsquery':
+		case 'tsvector':
+		case 'txid_snapshot':
+		case 'uuid':
+		case 'json':
+		case 'xml':
+			ft = aName;
+			break;
+		default:
+			ft = aName; //throw new Error('tipo de dato desconocido ' + aName)
+	}
+	return ft;
+}

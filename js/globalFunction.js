@@ -69,15 +69,15 @@ function varToSql(aValue, AType, ASubType) {
                 ft = aValue.toString().replace(',', '.');
                 break;
             case 37:
-            case 14: //varchar-char
-                if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+            case 14://varchar-char
+                if (aValue === undefined)
                     ft = "''";
                 else
                     ft = "'" + aValue.replace("'", "''") + "'";
                 break;
-            case 261: //blob
+            case 261://blob
                 if (ASubType === 1) {
-                    if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+                    if (aValue === undefined)
                         ft = "''";
                     else {
                         ft = "'" + aValue.replace("'", "''") + "'";
@@ -87,15 +87,15 @@ function varToSql(aValue, AType, ASubType) {
                     ft = "'" + aValue.replace("'", "''") + "'";
                 }
                 break;
-            case 12: //date
+            case 12://date
                 aDate = new Date(aValue).toJSON();
                 ft = "'" + aDate.substr(0, aDate.indexOf('T')) + "'";
                 break;
-            case 13: //time
+            case 13://time
                 aDate = new Date(aValue).toJSON();
                 ft = "'" + aDate.substr(aDate.indexOf('T') + 1).replace('Z', '') + "'";
                 break;
-            case 35: //timestamp 
+            case 35://timestamp 
                 aDate = new Date(aValue).toJSON();
                 ft = "'" + aDate.replace('T', ' ').replace('Z', '') + "'";
                 break;
@@ -116,31 +116,31 @@ function varToJSON(aValue, AType, ASubType) {
             case 7:
             case 8:
             case 16:
-                if (ASubType == 1) //numeric
+                if (ASubType == 1)
                     ft = aValue;
-                else if (ASubType == 2) //decimal
+                else if (ASubType == 2)
                     ft = aValue;
-                else if (ASubType == 7) //small
+                else if (ASubType == 7)
                     ft = { $numberint: aValue };
-                else if (ASubType == 8) //int
+                else if (ASubType == 8)
                     ft = { $numberint: aValue };
                 else
                     ft = { $numberlong: aValue };
                 break;
             case 10: //float
-            case 27: //double precision
+            case 27://double precision
                 ft = aValue;
                 break;
             case 37:
-            case 14: //varchar-char
-                if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+            case 14://varchar-char
+                if (aValue === undefined)
                     ft = '';
                 else
                     ft = aValue.toString();
                 break;
-            case 261: //blob
+            case 261://blob
                 if (ASubType === 1) {
-                    if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+                    if (aValue === undefined)
                         ft = '';
                     else {
                         ft = aValue.toString();
@@ -150,17 +150,17 @@ function varToJSON(aValue, AType, ASubType) {
                     ft = { $binary: aValue.toString() };
                 }
                 break;
-            case 12: //date
+            case 12://date
                 aDate = new Date(aValue).toLocaleDateString();
                 ft = aDate;
                 break;
-            case 13: //time 
+            case 13://time 
                 aDate = new Date(aValue).toLocaleString();
                 ft = aDate.substr(aDate.indexOf(' ') + 1);
                 break;
             /*case 12: //date
             case 13: //time    */
-            case 35: //timestamp 
+            case 35://timestamp 
                 ft = { $date: new Date(aValue).toJSON() };
                 break;
             default:

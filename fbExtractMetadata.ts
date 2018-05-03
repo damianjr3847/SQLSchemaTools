@@ -159,12 +159,13 @@ export class fbExtractMetadata {
                         }
                     }
 
-                    if (rParamater[j].DESCRIPTION !== null)    
-                        outProcedure.procedure.description = await fbClass.getBlob(rProcedures[i].DESCRIPTION, 'text');    
+                    if (rParamater[j].DESCRIPTION !== null)
+                        outProcedure.procedure.description = await fbClass.getBlob(rProcedures[i].DESCRIPTION, 'text');
 
                     body = await fbClass.getBlob(rProcedures[i].SOURCE, 'text');
 
-                    outProcedure.procedure.body = body.replace(/\r/g, '');;
+                    outProcedure.procedure.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
+                    //body.replace(/\r/g, '');;
 
                     if (outProcedureParameterInput.length > 0)
                         outProcedure.procedure.inputs = outProcedureParameterInput;
@@ -478,7 +479,8 @@ export class fbExtractMetadata {
 
                     body = await fbClass.getBlob(rTrigger[i].SOURCE, 'text');
 
-                    outTrigger.triggerFunction.function.body = body.replace(/\r/g, '');;
+                    outTrigger.triggerFunction.function.body = body.replace(new RegExp(String.fromCharCode(9), 'g'),'    ');
+                    //body.replace(/\r/g, '');;
 
                     outTrigger.triggerFunction.triggers = outTriggerTables;
 
@@ -540,7 +542,8 @@ export class fbExtractMetadata {
                     if (rViews[i].SOURCE !== null)
                         body = await fbClass.getBlob(rViews[i].SOURCE, 'text');
 
-                    outViews.view.body = body.replace(/\r/g, '');
+                    outViews.view.body = body.replace(new RegExp(String.fromCharCode(9), 'g'),'    ');
+                    //body.replace(/\r/g, '');
                     //fields
                     j_fld = rFields.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rViews[i].OBJECT_NAME.trim()));
                     if (j_fld !== -1) {
@@ -677,44 +680,45 @@ function FieldType(aParam: iFieldType) {
         case 16:
             aParam.AScale = -aParam.AScale;
             if (aParam.ASubType == 1)
-                ft = 'NUMERIC(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')'
+                ft = GlobalTypes.convertDataType('NUMERIC')+'(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')'
             else if (aParam.ASubType == 2)
-                ft = 'DECIMAL(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')'
+                ft = GlobalTypes.convertDataType('DECIMAL')+'(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')'
             else if (aParam.AType == 7)
-                ft = 'SMALLINT'
+                ft = GlobalTypes.convertDataType('SMALLINT')
             else if (aParam.AType == 8)
-                ft = 'INTEGER'
+                ft = GlobalTypes.convertDataType('INTEGER')
             else
-                ft = 'BIGINT';
+                ft = GlobalTypes.convertDataType('BIGINT');
             break;
         case 10:
-            ft = 'FLOAT';
+            ft = GlobalTypes.convertDataType('FLOAT');
             break;
         case 12:
-            ft = 'DATE';
+            ft = GlobalTypes.convertDataType('DATE');
             break;
         case 13:
-            ft = 'TIME';
+            ft = GlobalTypes.convertDataType('TIME');
             break;
         case 14:
-            ft = 'CHAR(' + aParam.ALength.toString() + ')';
+            ft = GlobalTypes.convertDataType('CHAR')+'(' + aParam.ALength.toString() + ')';
             break;
         case 27:
-            ft = 'DOUBLE PRECISION';
+            ft = GlobalTypes.convertDataType('DOUBLE PRECISION');
             break;
         case 35:
-            ft = 'TIMESTAMP';
+            ft = GlobalTypes.convertDataType('TIMESTAMP');
             break;
         case 37:
-            ft = 'VARCHAR(' + aParam.ALength.toString() + ')';
+            ft = GlobalTypes.convertDataType('VARCHAR')+'(' + aParam.ALength.toString() + ')';
             break;
         case 261:
             if (aParam.ASubType == 0)
-                ft = 'BLOB BINARY'
+                ft = 'BLOB SUB_TYPE 0'
             else if (aParam.ASubType == 1)
-                ft = 'BLOB TEXT'
+                ft = 'BLOB SUB_TYPE 1'
             else
-                ft = 'BLOB UNKNOWN';
+                ft = 'UNKNOWN';
+            ft=GlobalTypes.convertDataType(ft);
             break;
         default:
             ft = 'UNKNOWN';

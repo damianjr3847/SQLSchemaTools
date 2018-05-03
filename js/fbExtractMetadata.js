@@ -79,9 +79,9 @@ class fbExtractMetadata {
             else
                 aRet = aRet.replace('{FILTER_OBJECT}', '');
         }
-        if (aObjectType === GlobalTypes.ArrayobjectType[2]) //tabla
+        if (aObjectType === GlobalTypes.ArrayobjectType[2])
             aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL)');
-        else if (aObjectType === GlobalTypes.ArrayobjectType[4]) //vista
+        else if (aObjectType === GlobalTypes.ArrayobjectType[4])
             aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE=1)');
         return aRet;
     }
@@ -117,7 +117,7 @@ class fbExtractMetadata {
                             ft.AScale = rParamater[j].FSCALE;
                             ft.ACharSet = null;
                             ft.ACollate = rParamater[j].FCOLLATION_NAME;
-                            if (rParamater[j].FSOURCE !== null) // al ser blob si es nulo no devuelve una funcion si no null
+                            if (rParamater[j].FSOURCE !== null)
                                 ft.ADefault = await fbClass.getBlob(rParamater[j].FSOURCE, 'text');
                             else
                                 ft.ADefault = rParamater[j].FSOURCE;
@@ -139,8 +139,8 @@ class fbExtractMetadata {
                     if (rParamater[j].DESCRIPTION !== null)
                         outProcedure.procedure.description = await fbClass.getBlob(rProcedures[i].DESCRIPTION, 'text');
                     body = await fbClass.getBlob(rProcedures[i].SOURCE, 'text');
-                    outProcedure.procedure.body = body.replace(/\r/g, '');
-                    ;
+                    outProcedure.procedure.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
+                    //body.replace(/\r/g, '');;
                     if (outProcedureParameterInput.length > 0)
                         outProcedure.procedure.inputs = outProcedureParameterInput;
                     if (outProcedureParameterOutput.length > 0)
@@ -233,7 +233,7 @@ class fbExtractMetadata {
                                         outFields[outFields.length - 1].column.collate = rFields[j_fld].FCOLLATION.trim();
                                     if (rFields[j_fld].DESCRIPTION !== null)
                                         outFields[outFields.length - 1].column.description = await fbClass.getBlob(rFields[j_fld].DESCRIPTION, 'text');
-                                    if (rFields[j_fld].DEFSOURCE !== null) { // al ser blob si es nulo no devuelve una funcion si no null
+                                    if (rFields[j_fld].DEFSOURCE !== null) {
                                         outFields[outFields.length - 1].column.default = await fbClass.getBlob(rFields[j_fld].DEFSOURCE, 'text');
                                         //outFields[outFields.length-1].column.default = txtAux.trim();//.replace('DEFAULT','');                           
                                     }
@@ -398,8 +398,8 @@ class fbExtractMetadata {
                     }
                     outTriggerTables[outTriggerTables.length - 1].trigger.position = rTrigger[i].SEQUENCE;
                     body = await fbClass.getBlob(rTrigger[i].SOURCE, 'text');
-                    outTrigger.triggerFunction.function.body = body.replace(/\r/g, '');
-                    ;
+                    outTrigger.triggerFunction.function.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
+                    //body.replace(/\r/g, '');;
                     outTrigger.triggerFunction.triggers = outTriggerTables;
                     if (aRetYaml) {
                         outReturnYaml.push(outTrigger);
@@ -447,7 +447,8 @@ class fbExtractMetadata {
                         outViews.view.description = await fbClass.getBlob(rViews[i].DESCRIPTION, 'text');
                     if (rViews[i].SOURCE !== null)
                         body = await fbClass.getBlob(rViews[i].SOURCE, 'text');
-                    outViews.view.body = body.replace(/\r/g, '');
+                    outViews.view.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
+                    //body.replace(/\r/g, '');
                     //fields
                     j_fld = rFields.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rViews[i].OBJECT_NAME.trim()));
                     if (j_fld !== -1) {
@@ -548,44 +549,45 @@ function FieldType(aParam) {
         case 16:
             aParam.AScale = -aParam.AScale;
             if (aParam.ASubType == 1)
-                ft = 'NUMERIC(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
+                ft = GlobalTypes.convertDataType('NUMERIC') + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
             else if (aParam.ASubType == 2)
-                ft = 'DECIMAL(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
+                ft = GlobalTypes.convertDataType('DECIMAL') + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')';
             else if (aParam.AType == 7)
-                ft = 'SMALLINT';
+                ft = GlobalTypes.convertDataType('SMALLINT');
             else if (aParam.AType == 8)
-                ft = 'INTEGER';
+                ft = GlobalTypes.convertDataType('INTEGER');
             else
-                ft = 'BIGINT';
+                ft = GlobalTypes.convertDataType('BIGINT');
             break;
         case 10:
-            ft = 'FLOAT';
+            ft = GlobalTypes.convertDataType('FLOAT');
             break;
         case 12:
-            ft = 'DATE';
+            ft = GlobalTypes.convertDataType('DATE');
             break;
         case 13:
-            ft = 'TIME';
+            ft = GlobalTypes.convertDataType('TIME');
             break;
         case 14:
-            ft = 'CHAR(' + aParam.ALength.toString() + ')';
+            ft = GlobalTypes.convertDataType('CHAR') + '(' + aParam.ALength.toString() + ')';
             break;
         case 27:
-            ft = 'DOUBLE PRECISION';
+            ft = GlobalTypes.convertDataType('DOUBLE PRECISION');
             break;
         case 35:
-            ft = 'TIMESTAMP';
+            ft = GlobalTypes.convertDataType('TIMESTAMP');
             break;
         case 37:
-            ft = 'VARCHAR(' + aParam.ALength.toString() + ')';
+            ft = GlobalTypes.convertDataType('VARCHAR') + '(' + aParam.ALength.toString() + ')';
             break;
         case 261:
             if (aParam.ASubType == 0)
-                ft = 'BLOB BINARY';
+                ft = 'BLOB SUB_TYPE 0';
             else if (aParam.ASubType == 1)
-                ft = 'BLOB TEXT';
+                ft = 'BLOB SUB_TYPE 1';
             else
-                ft = 'BLOB UNKNOWN';
+                ft = 'UNKNOWN';
+            ft = GlobalTypes.convertDataType(ft);
             break;
         default:
             ft = 'UNKNOWN';
@@ -617,7 +619,7 @@ function extractVariablesForBody(aBody) {
             variableType = '';
             //reveer esto por tema de cursores
             txt.split(' ').forEach(function (word) {
-                if (['DECLARE', 'VARIABLE'].indexOf(word) === -1) { //si no es
+                if (['DECLARE', 'VARIABLE'].indexOf(word) === -1) {
                     if (variableName === '')
                         variableName = word;
                     else

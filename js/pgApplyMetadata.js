@@ -125,7 +125,7 @@ class pgApplyMetadata {
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
                     j = dbYaml.findIndex(aItem => (aItem.table.name === tableName));
                     tableScript = [];
-                    if (j === -1) { //NO EXISTE TABLA
+                    if (j === -1) {
                         tableScript = this.newTableYamltoString(fileYaml.table);
                     }
                     else {
@@ -192,10 +192,10 @@ class pgApplyMetadata {
         for (let j = 0; j < aFileColumnsYaml.length; j++) {
             if (globalFunction.includeObject(this.excludeObject, 'fields', aFileColumnsYaml[j].column.name)) {
                 i = aDbColumnsYaml.findIndex(aItem => (aItem.column.name === aFileColumnsYaml[j].column.name));
-                if (i === -1) { //no existe campo
+                if (i === -1) {
                     retArray.push('ALTER TABLE ' + aTableName + ' ADD ' + fieldToSql(aFileColumnsYaml[j].column) + ';');
                 }
-                else { //existe campo 
+                else {
                     if (!("computed" in aFileColumnsYaml[j].column)) {
                         if (aFileColumnsYaml[j].column.type.toUpperCase() !== aDbColumnsYaml[i].column.type.toUpperCase()) {
                             retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + aFileColumnsYaml[j].column.name + ' TYPE ' + aFileColumnsYaml[j].column.type + ';');
@@ -227,7 +227,7 @@ class pgApplyMetadata {
                         retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + aFileColumnsYaml[j].column.name + ' COMPUTED BY ' + aFileColumnsYaml[j].column.computed + ';');
                     }
                     //present?: boolean
-                    if (i !== j) { //difiere posicion del campo
+                    if (i !== j) {
                         retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + aFileColumnsYaml[j].column.name + ' POSITION ' + (j + 1) + ';');
                     }
                 }
@@ -247,7 +247,7 @@ class pgApplyMetadata {
                 iDB = arrayAux.findIndex(aItem => (aItem.foreignkey.name === aFileConstraintYaml.foreignkeys[j].foreignkey.name));
                 if (iDB === -1)
                     retArray.push(globalFunction.arrayToString(foreignkeysToSql(aTableName, Array(aFileConstraintYaml.foreignkeys[j]))));
-                else { /* || or && and*/
+                else {
                     if (String(aFileConstraintYaml.foreignkeys[j].foreignkey.onColumn).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.onColumn).trim().toUpperCase() ||
                         String(aFileConstraintYaml.foreignkeys[j].foreignkey.toTable).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.toTable).trim().toUpperCase() ||
                         String(aFileConstraintYaml.foreignkeys[j].foreignkey.toColumn).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase() ||
@@ -265,7 +265,7 @@ class pgApplyMetadata {
                 iDB = arrayAux.findIndex(aItem => (aItem.check.name === aFileConstraintYaml.checks[j].check.name));
                 if (iDB === -1)
                     retArray.push(globalFunction.arrayToString(checkToSql(aTableName, Array(aFileConstraintYaml.checks[j]))));
-                else { /* || or && and*/
+                else {
                     if (String(aFileConstraintYaml.checks[j].expresion).trim().toUpperCase() !== String(aDbConstraintYaml.checks[iDB].expresion).trim().toUpperCase()) {
                         retArray.push('ALTER TABLE ' + aTableName + ' DROP CONSTRAINT ' + aFileConstraintYaml[j].foreignkey.name + ';' + GlobalTypes.CR);
                         retArray.push(globalFunction.arrayToString(checkToSql(aTableName, Array(aFileConstraintYaml.foreignkeys[j]))));
