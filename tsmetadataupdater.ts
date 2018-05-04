@@ -19,43 +19,45 @@ https://github.com/hgourvest/node-firebird
 
 */
 
-import * as fs                  from 'fs';
-import * as params              from 'commander';
-import * as fbExtractMetadata   from './fbExtractMetadata';
-import * as fbApplyMetadata     from './fbApplyMetadata';
-import * as GlobalTypes         from './globalTypes';
-import * as fbExtractLoadData   from './fbExtractLoadData';
-import * as pgApplyMetadata     from './pgApplyMetadata';
-import * as pgExtractMetadata   from './pgExtractMetadata';
+import * as fs from 'fs';
+import * as params from 'commander';
+import * as fbExtractMetadata from './fbExtractMetadata';
+import * as fbApplyMetadata from './fbApplyMetadata';
+import * as GlobalTypes from './globalTypes';
+import * as fbExtractLoadData from './fbExtractLoadData';
+import * as pgApplyMetadata from './pgApplyMetadata';
+import * as pgExtractMetadata from './pgExtractMetadata';
 
-let operation:string        = '';
-let source1:string          = '';
-let source2:string          = '';
+let operation: string = '';
+let source1: string = '';
+let source2: string = '';
 
-let pathSave:string         = '';
-let dbDriver:string         = '';
-let dbPath:string           = '';
-let dbHost:string           = '';
-let dbPort:number           = 0;
-let dbUser:string           = '';
-let dbPass:string           = '';
-let objectType:string       = '';
-let objectName:string       = '';
-let pathfilescript:string   = '';
-let excludeObject:any;
-let excludeObjectStr:string = '';
-let saveToLog: string       = 'X';
-let excludefrom: string     = '';
+let pathSave: string = '';
+let dbDriver: string = '';
+let dbPath: string = '';
+let dbHost: string = '';
+let dbPort: number = 0;
+let dbUser: string = '';
+let dbPass: string = '';
+let objectType: string = '';
+let objectName: string = '';
+let pathfilescript: string = '';
+let excludeObject: any;
+let excludeObjectStr: string = '';
+let saveToLog: string = 'X';
+let excludefrom: string = '';
 
-let object:string           = '';
-let elements:string         = '';
-let nofolders:boolean       = false;
-let fileconf:string         = '';
-let aParam:string           = '';
-let aValue:string           = '';
+let object: string = '';
+let elements: string = '';
+let nofolders: boolean = false;
+let fileconf: string = '';
+let aParam: string = '';
+let aValue: string = '';
 let beginTime: any;
 let endTime: any;
-let textTime:string         = '';
+let textTime: string = '';
+let dbRole: string = '';
+
 /**********para pruebas */
 /*let actionYalm:string       = 'write';
 let source1:string          = './export/';
@@ -96,6 +98,7 @@ params.option('-o, --dbport <dbport>', 'puerto DB');
 params.option('-c, --dbpath <dbpath>', 'path DB');
 params.option('-u, --dbuser <dbuser>', 'User DB');
 params.option('-p, --dbpass <dbpass>', 'Password DB');
+params.option('--dbrole <dbrole>', 'Role DB solo para Postgres');
 
 params.option('-t, --objecttype <objecttype>', 'opcional, especifica que tipo de cambios se aplican (procedures,triggers,tables,generators,views)');
 params.option('-n, --objectname <objectname>', 'opcional, nombre particular del ObjectType que se desea aplicar');
@@ -114,224 +117,237 @@ params.parse(process.argv);
 // validacion de parametros
 
 if (params.conf) {
-    if (! fs.existsSync(params.conf)) {
+    if (!fs.existsSync(params.conf)) {
         console.log('el archivo conf no existe');
         process.exit(1);
-    }    
-    fileconf= fs.readFileSync(params.conf, GlobalTypes.yamlFileSaveOptions.encoding);
+    }
+    fileconf = fs.readFileSync(params.conf, GlobalTypes.yamlFileSaveOptions.encoding);
     fileconf.split(/\r?\n/).forEach(function (line) {
-        aParam= line.substr(0,line.indexOf('=')).trim().toLowerCase();
-        aValue= line.substr(line.indexOf('=')+1);
+        aParam = line.substr(0, line.indexOf('=')).trim().toLowerCase();
+        aValue = line.substr(line.indexOf('=') + 1);
         switch (aParam) {
             case 'operation':
-                operation= aValue;
-            break;
+                operation = aValue;
+                break;
             case 'source1':
-                source1= aValue;
-            break;
+                source1 = aValue;
+                break;
             case 'source2':
-                source2= aValue;
-            break;
+                source2 = aValue;
+                break;
             case 'pathsave':
-                pathSave= aValue;
-            break;
+                pathSave = aValue;
+                break;
             case 'nofolders':
-                nofolders= true;
-            break;
+                nofolders = true;
+                break;
             case 'dbdriver':
-                dbDriver= aValue;
-            break;
+                dbDriver = aValue;
+                break;
             case 'dbhost':
-                dbHost= aValue;
-            break;
+                dbHost = aValue;
+                break;
             case 'dbport':
                 dbPort = parseInt(aValue);
-            break;
+                break;
             case 'dbpath':
-                dbPath= aValue;
-            break;
+                dbPath = aValue;
+                break;
             case 'dbuser':
-                dbUser= aValue;
-            break;
+                dbUser = aValue;
+                break;
             case 'dbpass':
-                dbPass= aValue;
-            break;
+                dbPass = aValue;
+                break;
+            case 'dbrole':
+                dbRole = aValue;
+                break;    
             case 'objecttype':
-                objectType= aValue;
-            break;
+                objectType = aValue;
+                break;
             case 'objectname':
-                objectName= aValue;
-            break;
+                objectName = aValue;
+                break;
             case 'outscript':
-                pathfilescript= aValue;
-            break;
+                pathfilescript = aValue;
+                break;
             case 'exclude':
-                excludeObjectStr= aValue;    
-            break;
+                excludeObjectStr = aValue;
+                break;
             case 'excludefrom':
-                excludefrom= aValue;
-            break;
+                excludefrom = aValue;
+                break;
             case 'savetolog':
-                saveToLog= aValue;
-            break;
-        }    
+                saveToLog = aValue;
+                break;
+        }
     });
 
 }
 
-if (params.operation) 
+if (params.operation)
     operation = params.operation;
 
 if (!(operation === 'readmetadata' || operation === 'writemetadata' || operation === 'extractdata' || operation === 'importdata')) {
     console.log('debe haber una operacion valida para continuar <readmetadata/writemetadata/extractdata/importdata>');
-    process.exit(1);    
-}    
-
-if (params.dbdriver) 
-    dbDriver = params.dbdriver;
-
-if (dbDriver !== '') {
-    if (GlobalTypes.ArrayDbDriver.indexOf(dbDriver) === -1) {           
-        console.log('dbdriver puede ser ps=PostgreSql o fb=firebird');
-        process.exit(1);    
-    }    
-}
-else {
-    console.log('debe especificar un driver de base de datos');    
-    process.exit(1);        
-}
-
-if (params.pathsave) 
-    pathSave= params.pathsave;    
-
-if (pathSave !== '') {   
-    if (! fs.existsSync(pathSave)) {
-        console.log('el path %j no existe', pathSave);
-        process.exit(1);
-    }    
-}
-else if (operation === 'writemetadata' || operation === 'extractdata') {
-    console.log('debe haber un Path de salida');    
     process.exit(1);
 }
 
-if (params.source1) 
-    source1= params.source1;
+if (params.dbdriver)
+    dbDriver = params.dbdriver;
 
-if (source1 !== '') {     
-    if (! fs.existsSync(source1)) {
+if (dbDriver !== '') {
+    if (GlobalTypes.ArrayDbDriver.indexOf(dbDriver) === -1) {
+        console.log('dbdriver puede ser pg=PostgreSql o fb=firebird');
+        process.exit(1);
+    }
+}
+else {
+    console.log('debe especificar un driver de base de datos');
+    process.exit(1);
+}
+
+if (params.dbrole)
+    dbRole = params.dbrole;
+
+if (dbDriver === 'pg') {
+    if (dbRole === '') {
+        console.log('debe haber un dbrole si el dbDriver es postgres');
+        process.exit(1);
+    }
+}
+
+if (params.pathsave)
+    pathSave = params.pathsave;
+
+if (pathSave !== '') {
+    if (!fs.existsSync(pathSave)) {
+        console.log('el path %j no existe', pathSave);
+        process.exit(1);
+    }
+}
+else if (operation === 'writemetadata' || operation === 'extractdata') {
+    console.log('debe haber un Path de salida');
+    process.exit(1);
+}
+
+if (params.source1)
+    source1 = params.source1;
+
+if (source1 !== '') {
+    if (!fs.existsSync(source1)) {
         console.log('el path source1 %j no existe', source1);
         process.exit(1);
     }
 }
 else if (operation === 'readmetadata' || operation === 'importdata') {
-    console.log('si usa readmetadata debe haber un path en source1');    
+    console.log('si usa readmetadata debe haber un path en source1');
     process.exit(1);
 }
 
-if (params.source2) 
-    source2= params.source2;
+if (params.source2)
+    source2 = params.source2;
 
 if (source2 !== '') {
-    if (! fs.existsSync(source2)) {
-        console.log('el path source2 %j no existe',source2);
+    if (!fs.existsSync(source2)) {
+        console.log('el path source2 %j no existe', source2);
         process.exit(1);
     }
 }
 
 
-if (params.dbuser) 
-    dbUser = params.dbuser; 
+if (params.dbuser)
+    dbUser = params.dbuser;
 
 if (dbUser === '') {
     console.log('falta dbuser');
     process.exit(1);
 }
 
-if (params.dbpass) 
-    dbPass = params.dbpass; 
+if (params.dbpass)
+    dbPass = params.dbpass;
 
 if (dbPass === '') {
     console.log('falta dbpass');
     process.exit(1);
 }
 
-if (params.dbhost ) 
-    dbHost = params.dbhost; 
+if (params.dbhost)
+    dbHost = params.dbhost;
 
 if (dbHost === '') {
     console.log('falta dbhost');
     process.exit(1);
 }
 
-if (params.dbport ) 
-    dbPort = params.dbport; 
+if (params.dbport)
+    dbPort = params.dbport;
 
 if (dbPort === 0) {
     console.log('falta dbport');
     process.exit(1);
 }
 
-if (params.dbpath ) 
-    dbPath = params.dbpath; 
+if (params.dbpath)
+    dbPath = params.dbpath;
 
 if (dbPath === '') {
     console.log('falta dbpath');
     process.exit(1);
 }
 
-if (params.objecttype) 
+if (params.objecttype)
     objectType = params.objecttype;
 
-if (objectType !== '') {    
+if (objectType !== '') {
     if (GlobalTypes.ArrayobjectType.indexOf(objectType) === -1) {
         console.log('objecType solo pueden ser (procedures,triggers,tables,generators,views)');
         process.exit(1);
     }
     if (operation === 'extractdata' && objectType !== 'tables') {
         console.log('si utiliza extractdata el objectType valido es tables');
-        process.exit(1);    
+        process.exit(1);
     }
 }
 
-if (params.objectname) 
-    objectName=params.objectname;
+if (params.objectname)
+    objectName = params.objectname;
 
 if (objectName !== '') {
     if (objectType === '') {
         console.log('si usa objectname debe haber un objecttype');
         process.exit(1);
-    }    
+    }
 }
 
-if (params.outscript) 
-    pathfilescript= params.outscript;
+if (params.outscript)
+    pathfilescript = params.outscript;
 
-if (params.exclude) 
-    excludeObjectStr=params.exclude;
+if (params.exclude)
+    excludeObjectStr = params.exclude;
 
 if (excludeObjectStr !== '') {
-    
-    excludeObject={tables:[],procedures:[],triggers:[],views:[],fields:[]};
+
+    excludeObject = { tables: [], procedures: [], triggers: [], views: [], fields: [], generators: [] };
 
     excludeObjectStr.split(';').forEach(function (line) {
-        object= line.substr(0,line.indexOf(':')).trim();
-        elements= line.substr(line.indexOf(':')+1).trim();
+        object = line.substr(0, line.indexOf(':')).trim();
+        elements = line.substr(line.indexOf(':') + 1).trim();
         elements.split(',').forEach(function (element) {
             if (object !== '*') {
                 excludeObject[object].push(element);
-            }    
+            }
             else {
-                for(let i in excludeObject) { 
-                    excludeObject[i].push(element);    
+                for (let i in excludeObject) {
+                    excludeObject[i].push(element);
                 }
-            }    
+            }
         })
     });
-}    
+}
 
-if (params.savetolog) 
-    saveToLog= params.savetolog.trim().toUpperCase();
+if (params.savetolog)
+    saveToLog = params.savetolog.trim().toUpperCase();
 
 if (operation === 'writemetdata' || saveToLog === '') {
     console.log('savetolog debe estar acompañado del nombre de tabla');
@@ -341,18 +357,18 @@ else if (saveToLog === 'X')
     saveToLog = '';
 
 
-if (params.excludefrom) 
-    excludefrom= params.excludefrom;
+if (params.excludefrom)
+    excludefrom = params.excludefrom;
 
 if (excludefrom !== '') {
-    if (! fs.existsSync(excludefrom)) {
-        console.log('el path excludefrom %j no existe',excludefrom);
+    if (!fs.existsSync(excludefrom)) {
+        console.log('el path excludefrom %j no existe', excludefrom);
         process.exit(1);
     }
 }
 
-if (params.nofolders) 
-    nofolders=true;
+if (params.nofolders)
+    nofolders = true;
 
 /*console.log('actionYalm: %j',actionYalm);
 console.log('pathYalm: %j',pathSave);
@@ -371,20 +387,20 @@ console.log('p '+params.outscript)
 
 
 (async () => {
-    let fbem:   fbExtractMetadata.fbExtractMetadata;  
-    let fbam:   fbApplyMetadata.fbApplyMetadata;
+    let fbem: fbExtractMetadata.fbExtractMetadata;
+    let fbam: fbApplyMetadata.fbApplyMetadata;
     let fbdata: fbExtractLoadData.fbExtractLoadData;
 
-    let pgam:   pgApplyMetadata.pgApplyMetadata;
-    let pgem:   pgExtractMetadata.pgExtractMetadata;  
-    
-    beginTime= new Date();
+    let pgam: pgApplyMetadata.pgApplyMetadata;
+    let pgem: pgExtractMetadata.pgExtractMetadata;
 
-    if (!(pathSave.endsWith('/'))) 
-        pathSave+='/';
-        
-    if (dbDriver === 'fb') {                
- 
+    beginTime = new Date();
+
+    if (!(pathSave.endsWith('/')))
+        pathSave += '/';
+
+    if (dbDriver === 'fb') {
+
         if (operation === 'writemetadata') {
             fbem = new fbExtractMetadata.fbExtractMetadata;
             fbem.filesPath = pathSave;
@@ -393,31 +409,31 @@ console.log('p '+params.outscript)
 
             if (excludefrom !== '') {
                 fbem.sources.pathSource1 = excludefrom;
-                fbem.excludeFrom= true;
-            }    
-            await fbem.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
+                fbem.excludeFrom = true;
+            }
+            await fbem.writeYalm(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);
         }
         else if (operation === 'readmetadata') {
             fbam = new fbApplyMetadata.fbApplyMetadata;
             fbam.sources.pathSource1 = source1;
             fbam.sources.pathSource2 = source2;
-            fbam.pathFileScript= pathfilescript;
+            fbam.pathFileScript = pathfilescript;
             fbam.excludeObject = excludeObject;
             fbam.saveToLog = saveToLog;
             if (pathfilescript !== '')
                 if (fs.existsSync(pathfilescript)) {
                     fs.unlinkSync(pathfilescript);
                 }
-            await fbam.applyYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
+            await fbam.applyYalm(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);
         }
         else if (operation === 'extractdata') {
             fbdata = new fbExtractLoadData.fbExtractLoadData;
             fbdata.filesPath = pathSave;
             fbdata.excludeObject = excludeObject;
-               
-            await fbdata.extractData(dbHost,dbPort,dbPath,dbUser,dbPass, objectName);
-        }      
-     
+
+            await fbdata.extractData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName);
+        }
+
     }
     else {
         if (operation === 'writemetadata') {
@@ -428,30 +444,30 @@ console.log('p '+params.outscript)
 
             if (excludefrom !== '') {
                 pgem.sources.pathSource1 = excludefrom;
-                pgem.excludeFrom= true;
-            }    
-            await pgem.writeYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);        
+                pgem.excludeFrom = true;
+            }
+            await pgem.writeYalm(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);
         }
         else if (operation === 'readmetadata') {
             pgam = new pgApplyMetadata.pgApplyMetadata;
             pgam.sources.pathSource1 = source1;
             pgam.sources.pathSource2 = source2;
-            pgam.pathFileScript= pathfilescript;
+            pgam.pathFileScript = pathfilescript;
             pgam.excludeObject = excludeObject;
-            pgam.saveToLog = saveToLog;
+            pgam.saveToLog = saveToLog.toLowerCase();
             if (pathfilescript !== '')
                 if (fs.existsSync(pathfilescript)) {
                     fs.unlinkSync(pathfilescript);
                 }
-            await pgam.applyYalm(dbHost,dbPort,dbPath,dbUser,dbPass, objectType, objectName);    
+            await pgam.applyYalm(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);
         }
         else if (operation === 'extractdata') {
-            
-        }      
+
+        }
 
     }
-    endTime= new Date();    
-    textTime=new Date(endTime-beginTime).toJSON();
-    console.log('Tiempo total: '+textTime.substr(textTime.indexOf('T')+1).replace('Z',''));
-})();  
+    endTime = new Date();
+    textTime = new Date(endTime - beginTime).toJSON();
+    console.log('Tiempo total: ' + textTime.substr(textTime.indexOf('T') + 1).replace('Z', ''));
+})();
 

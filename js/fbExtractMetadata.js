@@ -104,6 +104,8 @@ class fbExtractMetadata {
             rParamater = await this.fb.query(this.analyzeQuery(metadataQuerys.queryProcedureParameters, objectName, GlobalTypes.ArrayobjectType[0]), []);
             for (let i = 0; i < rProcedures.length; i++) {
                 procedureName = rProcedures[i].OBJECT_NAME;
+                if (procedureName === 'CON_ELIGE_COTIZACION')
+                    procedureName = procedureName;
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
                     outProcedure.procedure.name = procedureName;
                     j = rParamater.findIndex(aItem => (aItem.OBJECT_NAME.trim() === rProcedures[i].OBJECT_NAME.trim()));
@@ -136,7 +138,7 @@ class fbExtractMetadata {
                             j++;
                         }
                     }
-                    if (rParamater[j].DESCRIPTION !== null)
+                    if (rProcedures[i].DESCRIPTION !== null)
                         outProcedure.procedure.description = await fbClass.getBlob(rProcedures[i].DESCRIPTION, 'text');
                     body = await fbClass.getBlob(rProcedures[i].SOURCE, 'text');
                     outProcedure.procedure.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');

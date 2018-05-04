@@ -27,7 +27,7 @@ export class pgExtractMetadata {
     //        D E C L A R A C I O N E S    P R I V A D A S
     //******************************************************************* */
     private connectionString: pg.ClientConfig = {};
-    private pgDb: pg.Client | any;
+    public pgDb: pg.Client | any;
 
     public sources: sources.tSource | any;
 
@@ -43,7 +43,7 @@ export class pgExtractMetadata {
         }
     }
 
-    private analyzeQuery(aQuery: string, aObjectName: string, aObjectType: string) {
+    analyzeQuery(aQuery: string, aObjectName: string, aObjectType: string) {
         let aRet: string = aQuery;
         let namesArray: Array<string> = [];
         let aux: string = '';
@@ -584,16 +584,18 @@ export class pgExtractMetadata {
         }
     }
 
-    private async extractMetadataGenerators(objectName: string) {
+    async extractMetadataGenerators(objectName: string, aRetYaml: boolean = false, openTr: boolean = true): Promise<any> {
         let rGenerator: Array<any>;
         let rQuery: any;
         let outGenerator: GlobalTypes.iGeneratorYamlType = { generator: { name: '' } };
         let genName: string = '';
+        let outGenYalm: Array<any> = [];
 
         let j: number = 0;
 
         try {
-            await this.pgDb.query('BEGIN');
+            if (openTr) 
+                await this.pgDb.query('BEGIN');
 
             rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryGenerator, objectName, GlobalTypes.ArrayobjectType[2]), []);
             rGenerator = rQuery.rows;
@@ -610,13 +612,19 @@ export class pgExtractMetadata {
                         outGenerator.generator.description = rGenerator[i].description;
                     }
 
-                    this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
-
-                    console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                    if (aRetYaml)
+                        outGenYalm.push(outGenerator);
+                    else  {
+                        this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
+                        console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                    }    
                     outGenerator = { generator: { name: '' } };
                 }
             }
-            await this.pgDb.query('COMMIT');
+            if (openTr) 
+                await this.pgDb.query('COMMIT');
+            if (aRetYaml) 
+                return outGenYalm;
         }
         catch (err) {
             throw new Error('Error generando procedimiento ' + genName + '. ' + err.message);

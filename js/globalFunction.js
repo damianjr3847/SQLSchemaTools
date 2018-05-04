@@ -1,6 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs = require("fs");
+const GlobalTypes = require("./globalTypes");
+//esta funcion devuelve falso si el valor de aName esta dentro de los objetos a excluir
+//devuelve true si se puede aplicar el cambio
 function includeObject(aObjExclude, aType, aName) {
     var element = '';
     var ret = false;
@@ -185,4 +188,38 @@ function ifThen(aCondition, aTrue, aFalse) {
         return aFalse;
 }
 exports.ifThen = ifThen;
+function outFileScript(aType, aScript, pathFileScript) {
+    switch (aType) {
+        case GlobalTypes.ArrayobjectType[2]:
+            if (aScript.length > 0) {
+                fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
+                for (let i = 0; i < aScript.length; i++) {
+                    fs.appendFileSync(pathFileScript, aScript[i] + GlobalTypes.CR, 'utf8');
+                }
+            }
+            break;
+        case GlobalTypes.ArrayobjectType[0]:
+        case GlobalTypes.ArrayobjectType[1]:
+        case GlobalTypes.ArrayobjectType[4]:
+            fs.appendFileSync(pathFileScript, GlobalTypes.CR + 'SET TERM ^;' + GlobalTypes.CR, 'utf8');
+            fs.appendFileSync(pathFileScript, aScript, 'utf8');
+            fs.appendFileSync(pathFileScript, GlobalTypes.CR + 'SET TERM ;^' + GlobalTypes.CR, 'utf8');
+            break;
+        case GlobalTypes.ArrayobjectType[3]:
+            if (aScript instanceof String) {
+                fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
+                fs.appendFileSync(pathFileScript, aScript, 'utf8');
+                fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
+            }
+            else {
+                for (let i = 0; i < aScript.length; i++) {
+                    fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
+                    fs.appendFileSync(pathFileScript, aScript[i], 'utf8');
+                    fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
+                }
+            }
+            break;
+    }
+}
+exports.outFileScript = outFileScript;
 //# sourceMappingURL=globalFunction.js.map

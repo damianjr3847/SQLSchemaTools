@@ -121,8 +121,11 @@ export class fbExtractMetadata {
             rParamater = await this.fb.query(this.analyzeQuery(metadataQuerys.queryProcedureParameters, objectName, GlobalTypes.ArrayobjectType[0]), []);
 
             for (let i = 0; i < rProcedures.length; i++) {
-
+                
                 procedureName = rProcedures[i].OBJECT_NAME;
+
+                if (procedureName==='CON_ELIGE_COTIZACION')
+                    procedureName=procedureName;
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
 
                     outProcedure.procedure.name = procedureName;
@@ -142,6 +145,7 @@ export class fbExtractMetadata {
                                 ft.ADefault = await fbClass.getBlob(rParamater[j].FSOURCE, 'text');
                             else
                                 ft.ADefault = rParamater[j].FSOURCE;
+
                             ft.ANotNull = rParamater[j].FLAG
                             ft.AComputed = null;
 
@@ -159,7 +163,7 @@ export class fbExtractMetadata {
                         }
                     }
 
-                    if (rParamater[j].DESCRIPTION !== null)
+                    if (rProcedures[i].DESCRIPTION !== null)
                         outProcedure.procedure.description = await fbClass.getBlob(rProcedures[i].DESCRIPTION, 'text');
 
                     body = await fbClass.getBlob(rProcedures[i].SOURCE, 'text');

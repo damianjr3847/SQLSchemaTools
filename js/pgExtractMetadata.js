@@ -488,14 +488,16 @@ class pgExtractMetadata {
             throw new Error('Error generando view ' + viewName + '.' + err.message);
         }
     }
-    async extractMetadataGenerators(objectName) {
+    async extractMetadataGenerators(objectName, aRetYaml = false, openTr = true) {
         let rGenerator;
         let rQuery;
         let outGenerator = { generator: { name: '' } };
         let genName = '';
+        let outGenYalm = [];
         let j = 0;
         try {
-            await this.pgDb.query('BEGIN');
+            if (openTr)
+                await this.pgDb.query('BEGIN');
             rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryGenerator, objectName, GlobalTypes.ArrayobjectType[2]), []);
             rGenerator = rQuery.rows;
             for (let i = 0; i < rGenerator.length; i++) {
@@ -506,12 +508,19 @@ class pgExtractMetadata {
                     if (rGenerator[i].description !== null) {
                         outGenerator.generator.description = rGenerator[i].description;
                     }
-                    this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
-                    console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                    if (aRetYaml)
+                        outGenYalm.push(outGenerator);
+                    else {
+                        this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
+                        console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                    }
                     outGenerator = { generator: { name: '' } };
                 }
             }
-            await this.pgDb.query('COMMIT');
+            if (openTr)
+                await this.pgDb.query('COMMIT');
+            if (aRetYaml)
+                return outGenYalm;
         }
         catch (err) {
             throw new Error('Error generando procedimiento ' + genName + '. ' + err.message);

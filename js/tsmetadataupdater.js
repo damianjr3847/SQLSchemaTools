@@ -35,6 +35,7 @@ let aValue = '';
 let beginTime;
 let endTime;
 let textTime = '';
+let dbRole = '';
 /**********para pruebas */
 /*let actionYalm:string       = 'write';
 let source1:string          = './export/';
@@ -69,6 +70,7 @@ params.option('-o, --dbport <dbport>', 'puerto DB');
 params.option('-c, --dbpath <dbpath>', 'path DB');
 params.option('-u, --dbuser <dbuser>', 'User DB');
 params.option('-p, --dbpass <dbpass>', 'Password DB');
+params.option('--dbrole <dbrole>', 'Role DB solo para Postgres');
 params.option('-t, --objecttype <objecttype>', 'opcional, especifica que tipo de cambios se aplican (procedures,triggers,tables,generators,views)');
 params.option('-n, --objectname <objectname>', 'opcional, nombre particular del ObjectType que se desea aplicar');
 params.option('-s, --outscript <pathfilescript>', 'opcional, devuelve un archivo con las sentencias sql en vez de ejecutarlas en la base de datos');
@@ -121,6 +123,9 @@ if (params.conf) {
             case 'dbpass':
                 dbPass = aValue;
                 break;
+            case 'dbrole':
+                dbRole = aValue;
+                break;
             case 'objecttype':
                 objectType = aValue;
                 break;
@@ -152,13 +157,21 @@ if (params.dbdriver)
     dbDriver = params.dbdriver;
 if (dbDriver !== '') {
     if (GlobalTypes.ArrayDbDriver.indexOf(dbDriver) === -1) {
-        console.log('dbdriver puede ser ps=PostgreSql o fb=firebird');
+        console.log('dbdriver puede ser pg=PostgreSql o fb=firebird');
         process.exit(1);
     }
 }
 else {
     console.log('debe especificar un driver de base de datos');
     process.exit(1);
+}
+if (params.dbrole)
+    dbRole = params.dbrole;
+if (dbDriver === 'pg') {
+    if (dbRole === '') {
+        console.log('debe haber un dbrole si el dbDriver es postgres');
+        process.exit(1);
+    }
 }
 if (params.pathsave)
     pathSave = params.pathsave;
@@ -247,7 +260,7 @@ if (params.outscript)
 if (params.exclude)
     excludeObjectStr = params.exclude;
 if (excludeObjectStr !== '') {
-    excludeObject = { tables: [], procedures: [], triggers: [], views: [], fields: [] };
+    excludeObject = { tables: [], procedures: [], triggers: [], views: [], fields: [], generators: [] };
     excludeObjectStr.split(';').forEach(function (line) {
         object = line.substr(0, line.indexOf(':')).trim();
         elements = line.substr(line.indexOf(':') + 1).trim();
@@ -354,12 +367,12 @@ console.log('p '+params.outscript)
             pgam.sources.pathSource2 = source2;
             pgam.pathFileScript = pathfilescript;
             pgam.excludeObject = excludeObject;
-            pgam.saveToLog = saveToLog;
+            pgam.saveToLog = saveToLog.toLowerCase();
             if (pathfilescript !== '')
                 if (fs.existsSync(pathfilescript)) {
                     fs.unlinkSync(pathfilescript);
                 }
-            await pgam.applyYalm(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);
+            await pgam.applyYalm(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);
         }
         else if (operation === 'extractdata') {
         }
