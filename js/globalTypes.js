@@ -150,6 +150,7 @@ function convertDataType(aName) {
         case 'decimal':
             ft = 'decimal';
             break;
+        case 'float':
         case 'double precision':
         case 'float8':
             ft = 'double precision';

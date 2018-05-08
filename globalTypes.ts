@@ -313,6 +313,7 @@ export function convertDataType(aName: string): string {
 		case 'decimal':
 			ft = 'decimal';
 			break;
+		case 'float':	
 		case 'double precision':
 		case 'float8':
 			ft = 'double precision';

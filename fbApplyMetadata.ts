@@ -163,18 +163,18 @@ export class fbApplyMetadata {
 
                 fileYaml = this.sources.proceduresArrayYaml[i];
 
-                procedureName = fileYaml.procedure.name;
+                procedureName = fileYaml.procedure.name.toLowerCase().trim();
 
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
 
-                    j = dbYaml.findIndex(aItem => (aItem.procedure.name === procedureName));
+                    j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
 
                     procedureBody = procedureYamltoString(fileYaml);
                     if (j !== -1) {
                         procedureInDB = procedureYamltoString(dbYaml[j]);
                     }
 
-                    if (procedureInDB !== procedureBody)
+                    if (procedureInDB.toLowerCase() !== procedureBody.toLowerCase())
                         await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, Array(procedureBody));
 
                     procedureBody = '';
@@ -234,17 +234,17 @@ export class fbApplyMetadata {
 
                 fileYaml = this.sources.triggersArrayYaml[i];
 
-                triggerName = fileYaml.triggerFunction.name;
+                triggerName = fileYaml.triggerFunction.name.toLowerCase().trim();
 
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[1], triggerName)) {
-                    j = dbYaml.findIndex(aItem => (aItem.triggerFunction.name === triggerName));
+                    j = dbYaml.findIndex(aItem => (aItem.triggerFunction.name.toLowerCase().trim() === triggerName));
 
                     triggerBody = triggerYamltoString(fileYaml);
                     if (j !== -1) {
                         triggerInDb = triggerYamltoString(dbYaml[j]);
                     }
 
-                    if (triggerBody !== triggerInDb) {
+                    if (triggerBody.toLowerCase() !== triggerInDb.toLowerCase() {
                         await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, Array(triggerBody));
                     }
 
@@ -329,15 +329,15 @@ export class fbApplyMetadata {
             for (let i in this.sources.generatorsArrayYaml) {
                 fileYaml = this.sources.generatorsArrayYaml[i];
                 genBody = [];
-                genName = fileYaml.generator.name;
+                genName = fileYaml.generator.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
-                    genBody.push('CREATE SEQUENCE ' + fileYaml.generator.name + ' INCREMENT BY ' + fileYaml.generator.increment.toString() + ';');
+                    genBody.push('CREATE SEQUENCE ' + genName + ' INCREMENT BY ' + fileYaml.generator.increment.toString() + ';');
                     if ('description' in fileYaml.generator)
-                        genBody.push('COMMENT ON GENERATOR ' + fileYaml.generator.name + ' IS ' + fileYaml.generator.description);
+                        genBody.push('COMMENT ON GENERATOR ' + genName + ' IS ' + fileYaml.generator.description);
                     if (!this.fb.inTransaction())
                         await this.fb.startTransaction(false);
 
-                    if (!(await this.fb.validate('SELECT 1 FROM RDB$GENERATORS WHERE RDB$GENERATOR_NAME=?', [genName]))) {
+                    if (!(await this.fb.validate('SELECT 1 FROM RDB$GENERATORS WHERE LOWER(RDB$GENERATOR_NAME)=?', [genName]))) {
                         await this.applyChange(GlobalTypes.ArrayobjectType[3], genName, genBody);
                     }
                 }

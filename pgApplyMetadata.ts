@@ -228,7 +228,7 @@ export class pgApplyMetadata {
                         tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
                         tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint, this.schema));
                         tableScript = tableScript.concat(this.getTableDescriptionDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
-                        ver indices se cambio el formato de los campos que lo componen
+                        // ver indices se cambio el formato de los campos que lo componen
                         tableScript = tableScript.concat(this.getTableIndexesDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
                     }
 
@@ -304,7 +304,7 @@ export class pgApplyMetadata {
                 }
                 else { //existe campo 
                     if (!("computed" in aFileColumnsYaml[j].column)) {
-                        if (aFileColumnsYaml[j].column.type.toUpperCase() !== aDbColumnsYaml[i].column.type.toUpperCase()) {
+                        if (GlobalTypes.convertDataType(aFileColumnsYaml[j].column.type).toUpperCase() !== GlobalTypes.convertDataType(aDbColumnsYaml[i].column.type).toUpperCase()) {
                             retArray.push('ALTER TABLE ' + aSchema + '.' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' TYPE ' + aFileColumnsYaml[j].column.type + ';');
                         }
                     }
@@ -409,7 +409,7 @@ export class pgApplyMetadata {
         let arrayAux: Array<any> = [];
         let idxYL: string = '';
         let idxDB: string = '';
-        
+
         aTableName = globalFunction.quotedString(aTableName);
 
         if ('indexes' in aFileIdxYaml) {
@@ -620,23 +620,34 @@ function indexesToSql(aTableName: string, aIdx: any, aSchema: string): Array<str
     //CREATE INDEX ART_ARCH_IDX2 ON ART_ARCH COMPUTED BY (TRIM(FCODIGO))
     let aRet: Array<string> = [];
     let aText: string = '';
+    let aDescending: boolean = false;
 
-   
 
     for (let j = 0; j < aIdx.length; j++) {
         aText = '';
         if (aIdx[j].index.unique == true)
             aText = ' UNIQUE ';
         if (aIdx[j].index.descending == true)
-            aText = ' DESCENDING ';
+            aDescending = true;
         if ('computedBy' in aIdx[j].index)
             aText = 'CREATE ' + aText + ' INDEX ' + globalFunction.quotedString(aIdx[j].index.name) + ' ON ' + aSchema + '.' + aTableName + ' COMPUTED BY (' + aIdx[j].index.computedBy + ')';
         else {
             aText = 'CREATE ' + aText + ' INDEX ' + globalFunction.quotedString(aIdx[j].index.name) + ' ON ' + aSchema + '.' + aTableName + '(';
             for (let i = 0; i < aIdx[j].index.columns.length - 1; i++) {
-                aText += aIdx[j].index.columns[i] + ',';
+                //diferencia entre typeof e instanceof https://stackoverflow.com/questions/14839656/differences-between-typeof-and-instanceof-in-javascript                
+                if (typeof aIdx[j].index.columns[i] === 'string') {
+                    aText += aIdx[j].index.columns[i] + globalFunction.ifThen(aDescending, ' DESC ', ' ASC ') + ',';
+                }
+                else {
+                    aText += aIdx[j].index.columns[i].name + ' ' + aIdx[j].index.columns[i].order + ' ,';
+                }
             }
-            aText += aIdx[j].index.columns[aIdx[j].index.columns.length - 1] + ')'
+            if (typeof aIdx[j].index.columns[aIdx[j].index.columns.length - 1] === 'string') {
+                aText += aIdx[j].index.columns[aIdx[j].index.columns.length - 1] + globalFunction.ifThen(aDescending, ' DESC ', ' ASC') + ')'
+            }
+            else {
+                aText += aIdx[j].index.columns[aIdx[j].index.columns.length - 1].name + ' ' + aIdx[j].index.columns[aIdx[j].index.columns.length - 1].order + ')';
+            }
         }
         aRet.push(aText + ';');
 

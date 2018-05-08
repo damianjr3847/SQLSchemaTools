@@ -203,7 +203,7 @@ export const queryTableIndexesField: string =
             INNER JOIN pg_attribute a ON (a.attrelid = t.oid AND a.attnum = ANY(ix.indkey))
             INNER JOIN pg_namespace ns ON (ns.oid = t.relnamespace)
             WHERE ns.nspname = {FILTER_SCHEMA}
-            ORDER BY t.relname,i.relname, 11) CC
+            ORDER BY t.relname,i.relname, 11, 13) CC
     {FILTER_OBJECT}`;
 
 export const queryTableCheckConstraint: string =
