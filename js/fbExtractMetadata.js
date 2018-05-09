@@ -193,6 +193,7 @@ class fbExtractMetadata {
         let tableName = '';
         let txtAux = '';
         let ft = {}; // {AName:null, AType:null, ASubType:null, ALength:null, APrecision:null, AScale:null, ACharSet: null, ACollate:null, ADefault:null, ANotNull:null, AComputed:null};   
+        let includeIndex = false;
         try {
             if (openTr) {
                 await this.fb.startTransaction(true);
@@ -255,24 +256,39 @@ class fbExtractMetadata {
                     if (j_idx !== -1) {
                         while ((j_idx < rIndexes.length) && (rIndexes[j_idx].OBJECT_NAME.toLowerCase().trim() == rTables[i].OBJECT_NAME.toLowerCase().trim())) {
                             /*TABLENAME, INDEXNAME,  FUNIQUE, INACTIVE, TYPE, SOURCE,  DESCRIPTION*/
-                            outIndexes.push(GlobalTypes.emptyTablesIndexesType());
-                            outIndexes[outIndexes.length - 1].index.name = rIndexes[j_idx].INDEXNAME.toLowerCase().trim();
-                            outIndexes[outIndexes.length - 1].index.active = rIndexes[j_idx].INACTIVE !== 1;
-                            if (rIndexes[j_idx].SOURCE !== null) {
-                                outIndexes[outIndexes.length - 1].index.computedBy = await fbClass.getBlob(rIndexes[j_idx].SOURCE, 'text');
-                                outIndexes[outIndexes.length - 1].index.computedBy = String(outIndexes[outIndexes.length - 1].index.computedBy).toLowerCase().trim();
-                            }
-                            outIndexes[outIndexes.length - 1].index.unique = rIndexes[j_idx].FUNIQUE === 1;
-                            outIndexes[outIndexes.length - 1].index.descending = rIndexes[j_idx].FTYPE === 1;
-                            if (rIndexes[j_idx].DESCRIPTION !== null) {
-                                outIndexes[outIndexes.length - 1].index.description = await fbClass.getBlob(rIndexes[j_idx].DESCRIPTION, 'text');
-                            }
+                            // ******* SOLAMENTE PARA VALIDAR CAMPOS, SI ALGUNO ESTA EN LA EXCLUSION, EXCLUYO EL INDICE */
+                            includeIndex = true;
                             j_idx_fld = rIndexesFld.findIndex(aItem => (aItem.OBJECT_NAME.toLowerCase().trim() == rIndexes[j_idx].OBJECT_NAME.toLowerCase().trim()) && (aItem.INDEXNAME.toLowerCase().trim() == rIndexes[j_idx].INDEXNAME.toLowerCase().trim()));
                             if (j_idx_fld > -1) {
                                 while ((j_idx_fld < rIndexesFld.length) && (rIndexesFld[j_idx_fld].OBJECT_NAME.toLowerCase().trim() == rIndexes[j_idx].OBJECT_NAME.toLowerCase().trim()) && (rIndexesFld[j_idx_fld].INDEXNAME.toLowerCase().trim() == rIndexes[j_idx].INDEXNAME.toLowerCase().trim())) {
-                                    /*TABLENAME, INDEXNAME, FPOSITION, FLDNAME*/
-                                    outIndexes[outIndexes.length - 1].index.columns.push(rIndexesFld[j_idx_fld].FLDNAME.toLowerCase().trim());
+                                    if (!globalFunction.includeObject(this.excludeObject, 'fields', rIndexesFld[j_idx_fld].FLDNAME.toLowerCase().trim())) {
+                                        includeIndex = false;
+                                        break;
+                                    }
                                     j_idx_fld++;
+                                }
+                            }
+                            //************************************* */
+                            if (includeIndex) {
+                                outIndexes.push(GlobalTypes.emptyTablesIndexesType());
+                                outIndexes[outIndexes.length - 1].index.name = rIndexes[j_idx].INDEXNAME.toLowerCase().trim();
+                                outIndexes[outIndexes.length - 1].index.active = rIndexes[j_idx].INACTIVE !== 1;
+                                if (rIndexes[j_idx].SOURCE !== null) {
+                                    outIndexes[outIndexes.length - 1].index.computedBy = await fbClass.getBlob(rIndexes[j_idx].SOURCE, 'text');
+                                    outIndexes[outIndexes.length - 1].index.computedBy = String(outIndexes[outIndexes.length - 1].index.computedBy).toLowerCase().trim();
+                                }
+                                outIndexes[outIndexes.length - 1].index.unique = rIndexes[j_idx].FUNIQUE === 1;
+                                outIndexes[outIndexes.length - 1].index.descending = rIndexes[j_idx].FTYPE === 1;
+                                if (rIndexes[j_idx].DESCRIPTION !== null) {
+                                    outIndexes[outIndexes.length - 1].index.description = await fbClass.getBlob(rIndexes[j_idx].DESCRIPTION, 'text');
+                                }
+                                j_idx_fld = rIndexesFld.findIndex(aItem => (aItem.OBJECT_NAME.toLowerCase().trim() == rIndexes[j_idx].OBJECT_NAME.toLowerCase().trim()) && (aItem.INDEXNAME.toLowerCase().trim() == rIndexes[j_idx].INDEXNAME.toLowerCase().trim()));
+                                if (j_idx_fld > -1) {
+                                    while ((j_idx_fld < rIndexesFld.length) && (rIndexesFld[j_idx_fld].OBJECT_NAME.toLowerCase().trim() == rIndexes[j_idx].OBJECT_NAME.toLowerCase().trim()) && (rIndexesFld[j_idx_fld].INDEXNAME.toLowerCase().trim() == rIndexes[j_idx].INDEXNAME.toLowerCase().trim())) {
+                                        /*TABLENAME, INDEXNAME, FPOSITION, FLDNAME*/
+                                        outIndexes[outIndexes.length - 1].index.columns.push(rIndexesFld[j_idx_fld].FLDNAME.toLowerCase().trim());
+                                        j_idx_fld++;
+                                    }
                                 }
                             }
                             j_idx++;
@@ -492,13 +508,16 @@ class fbExtractMetadata {
             throw new Error('Error generando view ' + viewName + '.' + err.message);
         }
     }
-    async extractMetadataGenerators(objectName) {
+    async extractMetadataGenerators(objectName, aRetYaml = false, openTr = true) {
         let rGenerator;
         let outGenerator = { generator: { name: '' } };
         let genName = '';
+        let outGeneratorYalm = [];
         let j = 0;
         try {
-            await this.fb.startTransaction(true);
+            if (openTr) {
+                await this.fb.startTransaction(true);
+            }
             rGenerator = await this.fb.query(this.analyzeQuery(metadataQuerys.queryGenerator, objectName, GlobalTypes.ArrayobjectType[3]), []);
             for (let i = 0; i < rGenerator.length; i++) {
                 genName = rGenerator[i].OBJECT_NAME.toLowerCase().trim();
@@ -508,12 +527,21 @@ class fbExtractMetadata {
                     if (rGenerator[i].DESCRIPTION !== null) {
                         outGenerator.generator.description = await fbClass.getBlob(rGenerator[i].DESCRIPTION, 'text');
                     }
-                    this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
-                    console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                    if (aRetYaml) {
+                        outGeneratorYalm.push(outGenerator);
+                    }
+                    else {
+                        this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
+                        console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                    }
                     outGenerator = { generator: { name: '' } };
                 }
             }
-            await this.fb.commit();
+            if (openTr) {
+                await this.fb.commit();
+            }
+            if (aRetYaml)
+                return outGeneratorYalm;
         }
         catch (err) {
             throw new Error('Error generando procedimiento ' + genName + '. ' + err.message);
@@ -589,7 +617,7 @@ function FieldType(aParam) {
             ft = GlobalTypes.convertDataType('double precision');
             break;
         case 35:
-            ft = GlobalTypes.convertDataType('timstamp');
+            ft = GlobalTypes.convertDataType('timestamp');
             break;
         case 37:
             ft = GlobalTypes.convertDataType('varchar') + '(' + aParam.ALength.toString() + ')';

@@ -134,7 +134,7 @@ class pgApplyMetadata {
             }
         }
         catch (err) {
-            console.error('Error aplicando generador ' + genName + '. ', err.message);
+            throw new Error('Error aplicando generador ' + genName + '. ' + err.message);
         }
     }
     //****************************************************************** */
@@ -491,9 +491,9 @@ function primaryKeyToSql(aTableName, aPk, aSchema) {
     if (aPk.name !== undefined && aPk.name !== '' && aPk.columns.length > 0) {
         aText += 'ALTER TABLE ' + aSchema + '.' + aTableName + ' ADD CONSTRAINT ' + globalFunction.quotedString(aPk.name) + ' PRIMARY KEY (';
         for (let j = 0; j < aPk.columns.length - 1; j++) {
-            aText += aPk.columns[j] + ',';
+            aText += globalFunction.quotedString(aPk.columns[j]) + ',';
         }
-        aText += aPk.columns[aPk.columns.length - 1] + ');';
+        aText += globalFunction.quotedString(aPk.columns[aPk.columns.length - 1]) + ');';
     }
     return aText;
 }
@@ -518,17 +518,17 @@ function indexesToSql(aTableName, aIdx, aSchema) {
             for (let i = 0; i < aIdx[j].index.columns.length - 1; i++) {
                 //diferencia entre typeof e instanceof https://stackoverflow.com/questions/14839656/differences-between-typeof-and-instanceof-in-javascript                
                 if (typeof aIdx[j].index.columns[i] === 'string') {
-                    aText += aIdx[j].index.columns[i] + globalFunction.ifThen(aDescending, ' DESC ', ' ASC ') + ',';
+                    aText += globalFunction.quotedString(aIdx[j].index.columns[i]) + globalFunction.ifThen(aDescending, ' DESC ', ' ASC ') + ',';
                 }
                 else {
-                    aText += aIdx[j].index.columns[i].name + ' ' + aIdx[j].index.columns[i].order + ' ,';
+                    aText += globalFunction.quotedString(aIdx[j].index.columns[i].name) + ' ' + aIdx[j].index.columns[i].order + ' ,';
                 }
             }
             if (typeof aIdx[j].index.columns[aIdx[j].index.columns.length - 1] === 'string') {
-                aText += aIdx[j].index.columns[aIdx[j].index.columns.length - 1] + globalFunction.ifThen(aDescending, ' DESC ', ' ASC') + ')';
+                aText += globalFunction.quotedString(aIdx[j].index.columns[aIdx[j].index.columns.length - 1]) + globalFunction.ifThen(aDescending, ' DESC ', ' ASC') + ')';
             }
             else {
-                aText += aIdx[j].index.columns[aIdx[j].index.columns.length - 1].name + ' ' + aIdx[j].index.columns[aIdx[j].index.columns.length - 1].order + ')';
+                aText += globalFunction.quotedString(aIdx[j].index.columns[aIdx[j].index.columns.length - 1].name) + ' ' + aIdx[j].index.columns[aIdx[j].index.columns.length - 1].order + ')';
             }
         }
         aRet.push(aText + ';');

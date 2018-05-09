@@ -179,8 +179,11 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
 }
 export function quotedString(aValue: string): string {
     let x: boolean = false;
+    x=/[^A-Z_0-9]/.test(aValue);
+    x=/[^A-Z_^a-z_0-9]/.test(aValue);
+    
 
-    if (/[^A-Z_0-9]/.test(aValue))
+    if (/[^A-Z_^a-z_0-9]/.test(aValue))
         return '"' + aValue + '"'
     else
         return aValue
