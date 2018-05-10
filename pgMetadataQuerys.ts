@@ -192,8 +192,11 @@ export const queryTableIndexesField: string =
                 i.relname 																	AS "indexName",
                 ix.indisunique 																AS "isUnique",
                 ix.indisprimary																AS "isPrimaryKey",
-                ix.indoption[(SELECT MIN(CASE WHEN ix.indkey[i] = a.attnum THEN i ELSE NULL END)::int
-                    FROM generate_series(ARRAY_LOWER(ix.indkey, 1), ARRAY_UPPER(ix.indkey, 1)) i)] as "option",
+                CASE WHEN (ix.indoption[(SELECT MIN(CASE WHEN ix.indkey[i] = a.attnum THEN i ELSE NULL END)::int
+                    FROM generate_series(ARRAY_LOWER(ix.indkey, 1), ARRAY_UPPER(ix.indkey, 1)) i)]) & 1 = 1 THEN 'DESC' ELSE 'ASC' END AS "descasc",
+					
+				CASE WHEN (ix.indoption[(SELECT MIN(CASE WHEN ix.indkey[i] = a.attnum THEN i ELSE NULL END)::int
+                    FROM generate_series(ARRAY_LOWER(ix.indkey, 1), ARRAY_UPPER(ix.indkey, 1)) i)])	& 2 = 2 THEN 'NULLS FIRST' ELSE 'NULLS LAST' END  as "nulls",
                 (SELECT MIN(CASE WHEN ix.indkey[i] = a.attnum THEN i ELSE NULL END)::int
                     FROM generate_series(ARRAY_LOWER(ix.indkey, 1), ARRAY_UPPER(ix.indkey, 1)) i) AS "position"
             
@@ -203,7 +206,7 @@ export const queryTableIndexesField: string =
             INNER JOIN pg_attribute a ON (a.attrelid = t.oid AND a.attnum = ANY(ix.indkey))
             INNER JOIN pg_namespace ns ON (ns.oid = t.relnamespace)
             WHERE ns.nspname = {FILTER_SCHEMA}
-            ORDER BY t.relname,i.relname, 11, 13) CC
+            ORDER BY t.relname,i.relname, 11, 14) CC
     {FILTER_OBJECT}`;
 
 export const queryTableCheckConstraint: string =

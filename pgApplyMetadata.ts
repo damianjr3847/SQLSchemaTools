@@ -184,7 +184,7 @@ export class pgApplyMetadata {
             }
         }
         catch (err) {
-            throw new Error('Error aplicando generador ' + genName + '. '+ err.message);
+            throw new Error('Error aplicando generador ' + genName + '. ' + err.message);
         }
     }
 
@@ -197,6 +197,8 @@ export class pgApplyMetadata {
         let tableScript: Array<string> = [];
         let j: number = 0;
         let fileYaml: any;
+        let arrayAux: Array<any> = [];
+        let iDB: number = 0;
 
         try {
             await this.pgDb.query('BEGIN');
@@ -215,6 +217,8 @@ export class pgApplyMetadata {
                 fileYaml = this.sources.tablesArrayYaml[i];
 
                 tableName = fileYaml.table.name;
+                if (tableName === 'art_grup')
+                    tableName = tableName;
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
 
                     j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase() === tableName.toLowerCase()));
@@ -224,7 +228,6 @@ export class pgApplyMetadata {
                         tableScript = this.newTableYamltoString(fileYaml.table);
                     }
                     else {
-
                         tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
                         tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint, this.schema));
                         tableScript = tableScript.concat(this.getTableDescriptionDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
@@ -232,6 +235,54 @@ export class pgApplyMetadata {
                         tableScript = tableScript.concat(this.getTableIndexesDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
                     }
 
+                    if (tableScript.length > 0)
+                        await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
+                }
+            }
+
+            // solamente para los constraint van a lo ultimo por los foreinkey
+            for (let i in this.sources.tablesArrayYaml) {
+                fileYaml = this.sources.tablesArrayYaml[i];
+
+                tableName = fileYaml.table.name.toLowerCase().trim();
+
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
+
+                    j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase().trim() === tableName));
+                    tableScript = [];
+
+                    if (j === -1) {
+                        if ('constraint' in fileYaml.table) {
+                            if ('foreignkeys' in fileYaml.table.constraint)
+                                tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), fileYaml.table.constraint.foreignkeys, this.schema));
+                        }
+                    }
+                    else {
+                        //tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint));
+                        if ('foreignkeys' in fileYaml.table.constraint) {
+                            if ('foreignkeys' in dbYaml[j].table.constraint)
+                                arrayAux = dbYaml[j].table.constraint.foreignkeys;
+                            else
+                                arrayAux = [];
+
+                            for (let z = 0; z < fileYaml.table.constraint.foreignkeys.length; z++) {
+                                iDB = arrayAux.findIndex(aItem => (aItem.foreignkey.name.toLowerCase().trim() === fileYaml.table.constraint.foreignkeys[z].foreignkey.name.toLowerCase().trim()));
+                                if (iDB === -1)
+                                    tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z]), this.schema));
+                                else { /* || or && and*/
+                                    if (String(fileYaml.table.constraint.foreignkeys[z].foreignkey.onColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.onColumn).trim().toUpperCase() ||
+                                        String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toTable).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toTable).trim().toUpperCase() ||
+                                        String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase() ||
+                                        String(fileYaml.table.constraint.foreignkeys[z].foreignkey.updateRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.updateRole).trim().toUpperCase() ||
+                                        String(fileYaml.table.constraint.foreignkeys[z].foreignkey.deleteRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.deleteRole).trim().toUpperCase()) {
+
+                                        tableScript.push('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DROP CONSTRAINT ' + globalFunction.quotedString(fileYaml.table.constraint.foreignkeys[z].foreignkey.name) + ';');
+                                        tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z]), this.schema));
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (tableScript.length > 0)
                         await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                 }
@@ -247,6 +298,7 @@ export class pgApplyMetadata {
         let aTable: string = '';
         let aText: string = '';
         let aRet: Array<string> = [];
+        let aNameTable: string = globalFunction.quotedString(aYaml.name);
 
         aTable = 'CREATE TABLE ' + this.schema + '.' + globalFunction.quotedString(aYaml.name) + ' (' + GlobalTypes.CR;
         for (let j = 0; j < aYaml.columns.length - 1; j++) {
@@ -257,29 +309,29 @@ export class pgApplyMetadata {
 
         aRet.push(aTable);
 
-        aRet.push('ALTER TABLE ' + this.schema + '.' + globalFunction.quotedString(aYaml.name) + ' OWNER TO ' + this.dbRole + ';');
+        aRet.push('ALTER TABLE ' + this.schema + '.' + aNameTable + ' OWNER TO ' + this.dbRole + ';');
 
         if ('constraint' in aYaml) {
-            if ('foreignkeys' in aYaml.constraint)
-                aRet = aRet.concat(foreignkeysToSql(aYaml.name, aYaml.constraint.foreignkeys, this.schema));
+            /*if ('foreignkeys' in aYaml.constraint)
+                aRet = aRet.concat(foreignkeysToSql(aYaml.name, aYaml.constraint.foreignkeys, this.schema));*/
             if ('checks' in aYaml.constraint)
-                aRet = aRet.concat(checkToSql(aYaml.name, aYaml.constraint.checks, this.schema));
+                aRet = aRet.concat(checkToSql(aNameTable, aYaml.constraint.checks, this.schema));
             if ('primaryKey' in aYaml.constraint)
-                aRet.push(primaryKeyToSql(aYaml.name, aYaml.constraint.primaryKey, this.schema));
+                aRet.push(primaryKeyToSql(aNameTable, aYaml.constraint.primaryKey, this.schema));
         }
 
         if ('indexes' in aYaml) {
-            aRet = aRet.concat(indexesToSql(aYaml.name, aYaml.indexes, this.schema));
+            aRet = aRet.concat(indexesToSql(aNameTable, aYaml.indexes, this.schema));
         }
 
         if ('description' in aYaml) {
-            aTable = "COMMENT ON TABLE " + this.schema + '.' + aYaml.name + " IS '" + aYaml.description + "';";
+            aTable = "COMMENT ON TABLE " + this.schema + '.' + aNameTable + " IS '" + aYaml.description + "';";
             aRet.push(aTable);
         }
 
         for (let j = 0; j < aYaml.columns.length; j++) {
             if ('description' in aYaml.columns[j].column && aYaml.columns[j].column.description !== '') {
-                aTable = "COMMENT ON COLUMN " + this.schema + '.' + aYaml.name + "." + aYaml.columns[j].column.name + " IS '" + aYaml.columns[j].column.description + "';";
+                aTable = "COMMENT ON COLUMN " + this.schema + '.' + aNameTable + "." + aYaml.columns[j].column.name + " IS '" + aYaml.columns[j].column.description + "';";
                 aRet.push(aTable);
             }
         }
@@ -304,7 +356,7 @@ export class pgApplyMetadata {
                 }
                 else { //existe campo 
                     if (!("computed" in aFileColumnsYaml[j].column)) {
-                        if (GlobalTypes.convertDataType(aFileColumnsYaml[j].column.type).toUpperCase() !== GlobalTypes.convertDataType(aDbColumnsYaml[i].column.type).toUpperCase()) {
+                        if (GlobalTypes.convertDataTypeToPG(aFileColumnsYaml[j].column.type).toUpperCase() !== GlobalTypes.convertDataTypeToPG(aDbColumnsYaml[i].column.type).toUpperCase()) {
                             retArray.push('ALTER TABLE ' + aSchema + '.' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' TYPE ' + aFileColumnsYaml[j].column.type + ';');
                         }
                     }
@@ -353,31 +405,15 @@ export class pgApplyMetadata {
         let pkFY: string = '';
         let arrayAux: Array<any> = [];
 
-
-        if ('foreignkeys' in aFileConstraintYaml) {
-            arrayAux = aDbConstraintYaml.foreignkeys;
-            for (let j = 0; j < aFileConstraintYaml.foreignkeys.length; j++) {
-                iDB = arrayAux.findIndex(aItem => (aItem.foreignkey.name.toLowerCase() === aFileConstraintYaml.foreignkeys[j].foreignkey.name.toLowerCase()));
-                if (iDB === -1)
-                    retArray = retArray.concat(foreignkeysToSql(aTableName, Array(aFileConstraintYaml.foreignkeys[j]), aSchema));
-                else { /* || or && and*/
-                    if (String(aFileConstraintYaml.foreignkeys[j].foreignkey.onColumn).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.onColumn).trim().toUpperCase() ||
-                        String(aFileConstraintYaml.foreignkeys[j].foreignkey.toTable).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.toTable).trim().toUpperCase() ||
-                        String(aFileConstraintYaml.foreignkeys[j].foreignkey.toColumn).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase() ||
-                        String(aFileConstraintYaml.foreignkeys[j].foreignkey.updateRole).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.updateRole).trim().toUpperCase() ||
-                        String(aFileConstraintYaml.foreignkeys[j].foreignkey.deleteRole).trim().toUpperCase() !== String(aDbConstraintYaml.foreignkeys[iDB].foreignkey.deleteRole).trim().toUpperCase()) {
-
-                        retArray.push('ALTER TABLE ' + aSchema + '.' + aTableName + ' DROP CONSTRAINT ' + globalFunction.quotedString(aFileConstraintYaml.foreignkeys[j].foreignkey.name) + ';');
-                        retArray = retArray.concat(foreignkeysToSql(aTableName, Array(aFileConstraintYaml.foreignkeys[j]), aSchema));
-                    }
-                }
-            }
-        }
+        aTableName = globalFunction.quotedString(aTableName);
 
         if ('checks' in aFileConstraintYaml) {
-            arrayAux = aDbConstraintYaml.checks;
+            if ('checks' in aDbConstraintYaml)
+                arrayAux = aDbConstraintYaml.checks;
+            else
+                arrayAux = [];
             for (let j = 0; j < aFileConstraintYaml.checks.length; j++) {
-                iDB = arrayAux.findIndex(aItem => (aItem.check.name.toLowerCase() === aFileConstraintYaml.checks[j].check.name.toLowerCase()));
+                iDB = arrayAux.findIndex(aItem => (aItem.check.name.toLowerCase().trim() === aFileConstraintYaml.checks[j].check.name.toLowerCase().trim()));
                 if (iDB === -1)
                     retArray = retArray.concat(checkToSql(aTableName, Array(aFileConstraintYaml.checks[j]), aSchema));
                 else { /* || or && and*/
@@ -413,9 +449,13 @@ export class pgApplyMetadata {
         aTableName = globalFunction.quotedString(aTableName);
 
         if ('indexes' in aFileIdxYaml) {
-            arrayAux = aDbIdxYaml.indexes;
+            if ('indexes' in aDbIdxYaml)
+                arrayAux = aDbIdxYaml.indexes;
+            else
+                arrayAux = [];
+
             for (let j = 0; j < aFileIdxYaml.indexes.length; j++) {
-                iDB = arrayAux.findIndex(aItem => (aItem.index.name.toLowerCase() === aFileIdxYaml.indexes[j].index.name.toLowerCase()));
+                iDB = arrayAux.findIndex(aItem => (aItem.index.name.toLowerCase().trim() === aFileIdxYaml.indexes[j].index.name.toLowerCase().trim()));
                 //el index del array que devuelve el siguiente proc es 0 porque me devuelve la linea de creacion
                 //en el primer elemento del array.
                 idxYL = indexesToSql(aTableName, Array(aFileIdxYaml.indexes[j]), aSchema)[0];
@@ -500,10 +540,10 @@ export class pgApplyMetadata {
                     await this.applyTables();
                 if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[4])
                     await this.applyViews();
-                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[1])
-                    await this.applyTriggers();
                 if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[0])
                     await this.applyProcedures();
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[1])
+                    await this.applyTriggers();
 
             }
             finally {
@@ -562,12 +602,12 @@ function foreignkeysToSql(aTableName: string, aForeinKey: any, aSchema: string):
     for (let j = 0; j < aForeinKey.length; j++) {
         aText = 'ALTER TABLE ' + aSchema + '.' + aTableName + ' ADD CONSTRAINT ' + globalFunction.quotedString(aForeinKey[j].foreignkey.name) + ' FOREIGN KEY (' + aForeinKey[j].foreignkey.onColumn + ') REFERENCES ' + aForeinKey[j].foreignkey.toTable + ' (' + aForeinKey[j].foreignkey.toColumn + ')';
         if ('updateRole' in aForeinKey[j].foreignkey) {
-            aText += ' ON UPDATE ' + aForeinKey[j].foreignkey.updateRole + ';'
+            aText += ' ON UPDATE ' + aForeinKey[j].foreignkey.updateRole;
         }
         if ('deleteRole' in aForeinKey[j].foreignkey) {
-            aText += ' ON DELETE ' + aForeinKey[j].foreignkey.deleteRole + ';'
+            aText += ' ON DELETE ' + aForeinKey[j].foreignkey.deleteRole
         }
-        aRet.push(aText);
+        aRet.push(aText + ';');
         if ('description' in aForeinKey[j].foreignkey)
             aRet.push('COMMENT ON CONSTRAINT ' + aSchema + '.' + aTableName + " IS '" + aForeinKey[j].foreignkey.description + "';");
     }
@@ -599,9 +639,7 @@ function checkToSql(aTableName: string, aCheck: any, aSchema: string): Array<str
 
 function primaryKeyToSql(aTableName: string, aPk: any, aSchema: string): string {
     //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_PK PRIMARY KEY (FCODINT);    
-    let aText: string = '';
-
-    aTableName = globalFunction.quotedString(aTableName);
+    let aText: string = '';    
 
     if (aPk.name !== undefined && aPk.name !== '' && aPk.columns.length > 0) {
         aText += 'ALTER TABLE ' + aSchema + '.' + aTableName + ' ADD CONSTRAINT ' + globalFunction.quotedString(aPk.name) + ' PRIMARY KEY (';
@@ -629,24 +667,51 @@ function indexesToSql(aTableName: string, aIdx: any, aSchema: string): Array<str
             aText = ' UNIQUE ';
         if (aIdx[j].index.descending == true)
             aDescending = true;
-        if ('computedBy' in aIdx[j].index)
-            aText = 'CREATE ' + aText + ' INDEX ' + globalFunction.quotedString(aIdx[j].index.name) + ' ON ' + aSchema + '.' + aTableName + ' COMPUTED BY (' + aIdx[j].index.computedBy + ')';
+        if ('computedBy' in aIdx[j].index) {
+            if (String(aIdx[j].index.computedBy).startsWith('('))
+                aText = 'CREATE ' + aText + ' INDEX ' + globalFunction.quotedString(aIdx[j].index.name) + ' ON ' + aSchema + '.' + aTableName + ' ' + aIdx[j].index.computedBy;
+            else
+                aText = 'CREATE ' + aText + ' INDEX ' + globalFunction.quotedString(aIdx[j].index.name) + ' ON ' + aSchema + '.' + aTableName + '(' + aIdx[j].index.computedBy + ')';
+        }
         else {
             aText = 'CREATE ' + aText + ' INDEX ' + globalFunction.quotedString(aIdx[j].index.name) + ' ON ' + aSchema + '.' + aTableName + '(';
             for (let i = 0; i < aIdx[j].index.columns.length - 1; i++) {
                 //diferencia entre typeof e instanceof https://stackoverflow.com/questions/14839656/differences-between-typeof-and-instanceof-in-javascript                
                 if (typeof aIdx[j].index.columns[i] === 'string') {
-                    aText += globalFunction.quotedString(aIdx[j].index.columns[i]) + globalFunction.ifThen(aDescending, ' DESC ', ' ASC ') + ',';
+                    aText += globalFunction.quotedString(aIdx[j].index.columns[i]) + globalFunction.ifThen(aDescending, ' DESC', '') + ',';
                 }
                 else {
-                    aText += globalFunction.quotedString(aIdx[j].index.columns[i].name) + ' ' + aIdx[j].index.columns[i].order + ' ,';
+                    aText += globalFunction.quotedString(aIdx[j].index.columns[i].name);
+                    switch (aIdx[j].index.columns[i].order.toUpperCase().trim()) {
+                        case 'ASC':
+                        case 'ASC NULLS LAST':
+                            aText += ',';
+                            break;
+                        case 'DESC NULLS FIRST':
+                            aText += ' DESC,';
+                            break;    
+                        default:
+                            aText += ' ' + aIdx[j].index.columns[i].order + ',';
+                    }
                 }
             }
+
             if (typeof aIdx[j].index.columns[aIdx[j].index.columns.length - 1] === 'string') {
-                aText += globalFunction.quotedString(aIdx[j].index.columns[aIdx[j].index.columns.length - 1]) + globalFunction.ifThen(aDescending, ' DESC ', ' ASC') + ')'
+                aText += globalFunction.quotedString(aIdx[j].index.columns[aIdx[j].index.columns.length - 1]) + globalFunction.ifThen(aDescending, ' DESC', '') + ')'
             }
             else {
-                aText += globalFunction.quotedString(aIdx[j].index.columns[aIdx[j].index.columns.length - 1].name) + ' ' + aIdx[j].index.columns[aIdx[j].index.columns.length - 1].order + ')';
+                aText += globalFunction.quotedString(aIdx[j].index.columns[aIdx[j].index.columns.length - 1].name);
+                switch (aIdx[j].index.columns[aIdx[j].index.columns.length - 1].order.toUpperCase().trim()) {
+                    case 'ASC':
+                    case 'ASC NULLS LAST':
+                        aText += ')';
+                        break;
+                    case 'DESC NULLS FIRST':
+                        aText += ' DESC)';
+                        break;    
+                    default:
+                        aText += aIdx[j].index.columns[aIdx[j].index.columns.length - 1].order + ')';
+                }                    
             }
         }
         aRet.push(aText + ';');

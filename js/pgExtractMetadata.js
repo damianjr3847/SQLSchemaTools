@@ -266,14 +266,15 @@ class pgExtractMetadata {
                                     if (rIndexes[j_idx].isPrimaryKey)
                                         outTables.table.constraint.primaryKey.columns.push(rIndexesFld[j_idx_fld].columnName.trim());
                                     else {
-                                        if (rIndexesFld[j_idx_fld].option === 0)
+                                        if (rIndexesFld[j_idx_fld].descasc === 'ASC')
                                             aOrden = 'ASC';
-                                        else if (rIndexesFld[j_idx_fld].option === 1)
+                                        else if (rIndexesFld[j_idx_fld].descasc === 'DESC')
                                             aOrden = 'DESC';
-                                        else if (rIndexesFld[j_idx_fld].option === 2)
-                                            aOrden = 'NULL LAST';
-                                        else if (rIndexesFld[j_idx_fld].option === 3)
-                                            aOrden = 'DESC NULL LAST';
+                                        if (rIndexesFld[j_idx_fld].nulls === 'NULLS LAST')
+                                            aOrden += ' NULLS LAST';
+                                        else if (rIndexesFld[j_idx_fld].nulls === 'NULLS FIRST')
+                                            aOrden += ' NULLS FIRST';
+                                        //aOrden = rIndexesFld[j_idx_fld].descasc + ' ' + rIndexesFld[j_idx_fld].nulls;
                                         outIndexes[outIndexes.length - 1].index.columns.push({ name: rIndexesFld[j_idx_fld].columnName.trim(), order: aOrden });
                                     }
                                     j_idx_fld++;

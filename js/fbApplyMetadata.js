@@ -39,29 +39,6 @@ class fbApplyMetadata {
             await this.fb.commit();
         }
     }
-    /*private outFileScript(aType: string, aScript: Array<any> | string) {
-        switch (aType) {
-            case GlobalTypes.ArrayobjectType[2]:
-                if (aScript.length > 0) {
-                    fs.appendFileSync(this.pathFileScript, GlobalTypes.CR, 'utf8');
-                    for (let i = 0; i < aScript.length; i++) {
-                        fs.appendFileSync(this.pathFileScript, aScript[i] + GlobalTypes.CR, 'utf8');
-                    }
-                }
-                break;
-            case GlobalTypes.ArrayobjectType[0]:
-            case GlobalTypes.ArrayobjectType[1]:
-            case GlobalTypes.ArrayobjectType[4]:
-                fs.appendFileSync(this.pathFileScript, GlobalTypes.CR + 'SET TERM ^;' + GlobalTypes.CR, 'utf8');
-                fs.appendFileSync(this.pathFileScript, aScript, 'utf8');
-                fs.appendFileSync(this.pathFileScript, GlobalTypes.CR + 'SET TERM ;^' + GlobalTypes.CR, 'utf8');
-                break;
-            case GlobalTypes.ArrayobjectType[3]:
-                fs.appendFileSync(this.pathFileScript, GlobalTypes.CR, 'utf8');
-                fs.appendFileSync(this.pathFileScript, aScript, 'utf8');
-                break;
-        }
-    }*/
     async applyChange(aObjectType, aObjectName, aAlterScript) {
         let query = '';
         try {
@@ -69,12 +46,16 @@ class fbApplyMetadata {
                 for (var i in aAlterScript) {
                     //console.log(i.toString()+'--'+aAlterScript[i]);    
                     query = aAlterScript[i];
-                    await this.fb.startTransaction(false);
-                    await this.fb.execute(aAlterScript[i], []);
-                    if (this.saveToLog !== '') {
-                        await this.fb.execute(saveQueryLog.replace(new RegExp('{TABLE}', 'g'), this.saveToLog), [aObjectType, aObjectName, aAlterScript[i]]);
+                    if (query !== '') {
+                        if (aObjectName === 'lis_hojadecarga_faltante')
+                            aObjectName = aObjectName;
+                        await this.fb.startTransaction(false);
+                        await this.fb.execute(aAlterScript[i], []);
+                        if (this.saveToLog !== '') {
+                            await this.fb.execute(saveQueryLog.replace(new RegExp('{TABLE}', 'g'), this.saveToLog), [aObjectType, aObjectName, aAlterScript[i]]);
+                        }
+                        await this.fb.commit();
                     }
-                    await this.fb.commit();
                 }
                 console.log(('Aplicando ' + aObjectType + ' ' + aObjectName).padEnd(70, '.') + 'OK');
             }
@@ -92,14 +73,14 @@ class fbApplyMetadata {
     //        P R O C E D U R E S
     //******************************************************************* */
     async applyProcedures() {
-        let procedureYamltoString = (aYaml) => {
+        let procedureYamltoString = (aYaml, aWithBody) => {
             let paramString = (param, aExtra) => {
                 let aText = '';
                 if (param.length > 0) {
                     for (let j = 0; j < param.length - 1; j++) {
-                        aText += globalFunction.quotedString(param[j].param.name) + ' ' + param[j].param.type + ',' + GlobalTypes.CR;
+                        aText += globalFunction.quotedString(param[j].param.name) + ' ' + GlobalTypes.convertDataTypeToFB(param[j].param.type) + ',' + GlobalTypes.CR;
                     }
-                    aText += globalFunction.quotedString(param[param.length - 1].param.name) + ' ' + param[param.length - 1].param.type;
+                    aText += globalFunction.quotedString(param[param.length - 1].param.name) + ' ' + GlobalTypes.convertDataTypeToFB(param[param.length - 1].param.type);
                     aText = aExtra + '(' + GlobalTypes.CR + aText + ')';
                 }
                 ;
@@ -110,9 +91,37 @@ class fbApplyMetadata {
             if ('inputs' in aYaml.procedure)
                 aProc += paramString(aYaml.procedure.inputs, '');
             if ('outputs' in aYaml.procedure)
-                aProc += paramString(aYaml.procedure.outputs, 'RETURNS');
-            aProc += GlobalTypes.CR + 'AS' + GlobalTypes.CR + aYaml.procedure.body;
+                aProc += paramString(aYaml.procedure.outputs, ' RETURNS ');
+            if (aWithBody)
+                aProc += GlobalTypes.CR + 'AS' + GlobalTypes.CR + aYaml.procedure.body;
+            else {
+                if ('outputs' in aYaml.procedure)
+                    aProc += GlobalTypes.CR + 'AS' + GlobalTypes.CR + " begin exception e_custom_err 'Cambiando procedimiento aguerde un momento por favor'; suspend; end";
+                else
+                    aProc += GlobalTypes.CR + 'AS' + GlobalTypes.CR + " begin exception e_custom_err 'Cambiando procedimiento aguerde un momento por favor'; end";
+            }
             return aProc;
+        };
+        let readProcedures = async (aYaml, aWithBody) => {
+            let cambios = false;
+            for (let i in this.sources.proceduresArrayYaml) {
+                fileYaml = this.sources.proceduresArrayYaml[i];
+                procedureName = fileYaml.procedure.name.toLowerCase().trim();
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
+                    j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
+                    procedureBody = procedureYamltoString(fileYaml, true);
+                    if (j !== -1) {
+                        procedureInDB = procedureYamltoString(dbYaml[j], true);
+                    }
+                    if (procedureInDB !== procedureBody) {
+                        cambios = true;
+                        await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, Array(procedureYamltoString(fileYaml, aWithBody)));
+                    }
+                    procedureBody = '';
+                    procedureInDB = '';
+                }
+            }
+            return cambios;
         };
         let procedureName = '';
         let fileYaml;
@@ -125,19 +134,8 @@ class fbApplyMetadata {
             await this.fb.startTransaction(true);
             dbYaml = await this.fbExMe.extractMetadataProcedures('', true, false);
             await this.fb.commit();
-            for (let i in this.sources.proceduresArrayYaml) {
-                fileYaml = this.sources.proceduresArrayYaml[i];
-                procedureName = fileYaml.procedure.name.toLowerCase().trim();
-                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
-                    j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
-                    procedureBody = procedureYamltoString(fileYaml);
-                    if (j !== -1) {
-                        procedureInDB = procedureYamltoString(dbYaml[j]);
-                    }
-                    if (procedureInDB !== procedureBody)
-                        await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, Array(procedureBody));
-                    procedureBody = '';
-                }
+            if (await readProcedures(fileYaml, false)) {
+                await readProcedures(fileYaml, true);
             }
             //console.log(Date.now());               
         }
@@ -324,8 +322,6 @@ class fbApplyMetadata {
             for (let i in this.sources.tablesArrayYaml) {
                 fileYaml = this.sources.tablesArrayYaml[i];
                 tableName = fileYaml.table.name.toLowerCase().trim();
-                if (tableName === 'art_arch')
-                    tableName = tableName;
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
                     j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase().trim() === tableName));
                     tableScript = [];
@@ -381,10 +377,10 @@ class fbApplyMetadata {
         aRet.push(aTable);
         if ('constraint' in aYaml) {
             if ('checks' in aYaml.constraint) {
-                aRet = aRet.concat(checkToSql(globalFunction.quotedString(aTable), aYaml.constraint.checks));
+                aRet = aRet.concat(checkToSql(aNameTable, aYaml.constraint.checks));
             }
             if ('primaryKey' in aYaml.constraint) {
-                aRet = aRet.concat(primaryKeyToSql(globalFunction.quotedString(aTable), aYaml.constraint.primaryKey));
+                aRet = aRet.concat(primaryKeyToSql(aNameTable, aYaml.constraint.primaryKey));
             }
         }
         if ('indexes' in aYaml) {

@@ -145,10 +145,8 @@ function convertDataType(aName) {
             break;
         //numericos con decimales
         case 'numeric':
-            ft = 'numeric';
-            break;
         case 'decimal':
-            ft = 'decimal';
+            ft = 'numeric';
             break;
         case 'float':
         case 'double precision':
@@ -254,6 +252,140 @@ function convertDataType(aName) {
     return ft;
 }
 exports.convertDataType = convertDataType;
+function convertDataTypeToPG(aName) {
+    let ft = '';
+    let aLen = '';
+    if (aName.indexOf('(') > 0) {
+        aLen = aName.substr(aName.indexOf('('));
+        aName = aName.substr(0, aName.indexOf('('));
+    }
+    switch (aName.toLowerCase()) {
+        case 'bit':
+        case 'bit varying':
+            ft = 'bit';
+            break;
+        //tipo de datos string
+        case 'character':
+        case 'char':
+            ft = 'char';
+            break;
+        case 'character varying':
+        case 'varchar':
+            ft = 'varchar';
+            break;
+        case 'blob sub_type 1':
+        case 'text':
+            ft = 'blob text';
+            break;
+        //numericos con decimales
+        case 'numeric':
+        case 'decimal':
+            ft = 'numeric';
+            break;
+        case 'float':
+        case 'double precision':
+        case 'float8':
+            ft = 'double precision';
+            break;
+        case 'real':
+        case 'float4':
+            ft = 'real';
+            break;
+        //monetarios
+        case 'money':
+            ft = 'money';
+            break;
+        //enteros
+        case 'bigint':
+        case 'int8':
+            ft = 'bigint';
+            break;
+        case 'bigserial':
+        case 'serial8':
+            ft = 'bigserial';
+            break;
+        case 'integer':
+        case 'int':
+        case 'int4':
+            ft = 'integer';
+            break;
+        case 'smallint':
+        case 'int2':
+            ft = 'smallint';
+            break;
+        case 'smallserial':
+        case 'serial2':
+            ft = 'smallserial';
+            break;
+        case 'serial':
+        case 'serial4':
+            ft = 'serial';
+            break;
+        //network
+        case 'inet': //direcciones ip v4 y v6
+        case 'cidr': //hostname
+        case 'macaddr':
+        case 'macaddr8':
+            ft = aName;
+            break;
+        //fecha y hora
+        case 'timestamp':
+        case 'timestamp without time zone':
+            ft = 'timestamp';
+            break;
+        case 'timestamp with time zone':
+        case 'timestamptz':
+            ft = aName;
+            break;
+        case 'date':
+            ft = 'date';
+            break;
+        case 'time':
+        case 'time without time zone':
+            ft = 'time';
+            break;
+        case 'time with time zone':
+        case 'timetz':
+            ft = aName;
+            break;
+        case 'interval':
+            ft = 'interval';
+            break;
+        //binarios 
+        case 'blob sub_type 0':
+        case 'bytea':
+            ft = 'blob binary';
+            break;
+        //booleanos     
+        case 'boolean':
+        case 'bool':
+            ft = 'boolean';
+            break;
+        //geometricos
+        case 'box':
+        case 'circle':
+        case 'polygon':
+        case 'line':
+        case 'lseg':
+        case 'point':
+        case 'path':
+            ft = aName;
+            break;
+        //otros    	 	    	
+        case 'tsquery':
+        case 'tsvector':
+        case 'txid_snapshot':
+        case 'uuid':
+        case 'json':
+        case 'xml':
+            ft = aName;
+            break;
+        default:
+            ft = aName; //throw new Error('tipo de dato desconocido ' + aName)
+    }
+    return ft + aLen;
+}
+exports.convertDataTypeToPG = convertDataTypeToPG;
 function convertDataTypeToFB(aName) {
     let ft = '';
     let aLen = '';

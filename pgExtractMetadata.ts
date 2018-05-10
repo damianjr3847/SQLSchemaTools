@@ -317,14 +317,15 @@ export class pgExtractMetadata {
                                     if (rIndexes[j_idx].isPrimaryKey)
                                         outTables.table.constraint.primaryKey.columns.push(rIndexesFld[j_idx_fld].columnName.trim());
                                     else {
-                                        if (rIndexesFld[j_idx_fld].option === 0)  //0 =  ningun ordenamiento 
+                                        if (rIndexesFld[j_idx_fld].descasc === 'ASC')  //0 =  ningun ordenamiento 
                                             aOrden = 'ASC';
-                                        else if (rIndexesFld[j_idx_fld].option === 1) //desending
+                                        else if (rIndexesFld[j_idx_fld].descasc === 'DESC') //desending
                                             aOrden = 'DESC';
-                                        else if (rIndexesFld[j_idx_fld].option === 2) //null last
-                                            aOrden = 'NULL LAST';
-                                        else if (rIndexesFld[j_idx_fld].option === 3) //desending con null last
-                                            aOrden = 'DESC NULL LAST';
+                                        if (rIndexesFld[j_idx_fld].nulls === 'NULLS LAST') //null last
+                                            aOrden += ' NULLS LAST';
+                                        else if (rIndexesFld[j_idx_fld].nulls === 'NULLS FIRST') //desending con null last
+                                            aOrden += ' NULLS FIRST';                                                                             
+                                        //aOrden = rIndexesFld[j_idx_fld].descasc + ' ' + rIndexesFld[j_idx_fld].nulls;
                                         outIndexes[outIndexes.length - 1].index.columns.push({ name: rIndexesFld[j_idx_fld].columnName.trim(), order: aOrden });
                                     }
                                     j_idx_fld++;
@@ -594,7 +595,7 @@ export class pgExtractMetadata {
         let j: number = 0;
 
         try {
-            if (openTr) 
+            if (openTr)
                 await this.pgDb.query('BEGIN');
 
             rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryGenerator, objectName, GlobalTypes.ArrayobjectType[2]), []);
@@ -614,16 +615,16 @@ export class pgExtractMetadata {
 
                     if (aRetYaml)
                         outGenYalm.push(outGenerator);
-                    else  {
+                    else {
                         this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
                         console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
-                    }    
+                    }
                     outGenerator = { generator: { name: '' } };
                 }
             }
-            if (openTr) 
+            if (openTr)
                 await this.pgDb.query('COMMIT');
-            if (aRetYaml) 
+            if (aRetYaml)
                 return outGenYalm;
         }
         catch (err) {
@@ -667,7 +668,7 @@ export class pgExtractMetadata {
                 if (objectType === GlobalTypes.ArrayobjectType[2] || objectType === '') {
                     await this.extractMetadataTables(objectName);
                 }
-                if (objectType === GlobalTypes.ArrayobjectType[1] || objectType === '') {                    
+                if (objectType === GlobalTypes.ArrayobjectType[1] || objectType === '') {
                     await this.extractMetadataTriggers(objectName);
                 }
                 if (objectType === GlobalTypes.ArrayobjectType[3] || objectType === '') {

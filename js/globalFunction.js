@@ -175,9 +175,9 @@ function varToJSON(aValue, AType, ASubType) {
 exports.varToJSON = varToJSON;
 function quotedString(aValue) {
     let x = false;
-    x = /[^A-Z_0-9]/.test(aValue);
-    x = /[^A-Z_^a-z_0-9]/.test(aValue);
-    if (/[^A-Z_^a-z_0-9]/.test(aValue))
+    // x=/[^A-Z_0-9]/.test(aValue);
+    // x=/[^A-Z_^a-z_0-9]/.test(aValue);
+    if (/[^A-Z_^a-z_0-9]/.test(aValue[0]))
         return '"' + aValue + '"';
     else
         return aValue;
