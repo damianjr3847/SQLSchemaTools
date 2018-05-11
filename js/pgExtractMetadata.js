@@ -15,6 +15,7 @@ class pgExtractMetadata {
         //        D E C L A R A C I O N E S    P R I V A D A S
         //******************************************************************* */
         this.connectionString = {};
+        this.schema = defaultSchema;
         //****************************************************************** */
         //        D E C L A R A C I O N E S    P U B L I C A S
         //******************************************************************* */
@@ -39,7 +40,7 @@ class pgExtractMetadata {
         let namesArray = [];
         let aux = '';
         //va con RegExp porque el replace cambia solo la primer ocurrencia.        
-        aRet = aRet.replace(new RegExp('{FILTER_SCHEMA}', 'g'), "'" + defaultSchema + "'");
+        aRet = aRet.replace(new RegExp('{FILTER_SCHEMA}', 'g'), "'" + this.schema + "'");
         if (aObjectName !== '')
             aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(cc.objectName)) = '" + aObjectName.toUpperCase() + "'");
         else {

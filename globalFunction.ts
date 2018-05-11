@@ -40,7 +40,7 @@ export function arrayToString(aArray: Array<any>, aSeparated: string = '', aSubV
     return aText;
 }
 
-export function readRecursiveDirectory(dir: string): Array<any> {
+export function readRecursiveDirectory(dir: string, aPathUnido: boolean = true): Array<any> {
     var retArrayFile: Array<any> = [];
     var files: any;
     var fStat: any;
@@ -52,8 +52,13 @@ export function readRecursiveDirectory(dir: string): Array<any> {
         fStat = fs.statSync(dir + files[i]);
         if (fStat && fStat.isDirectory())
             retArrayFile = retArrayFile.concat(readRecursiveDirectory(dir + files[i]));
-        else
-            retArrayFile.push(dir + files[i]);
+        else {
+            if (aPathUnido)
+                retArrayFile.push(dir + files[i]);
+            else
+                retArrayFile.push({path:dir, file: files[i]});
+                
+        }    
     }
     return retArrayFile;
 };
@@ -179,9 +184,9 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
 }
 export function quotedString(aValue: string): string {
     let x: boolean = false;
-   // x=/[^A-Z_0-9]/.test(aValue);
-   // x=/[^A-Z_^a-z_0-9]/.test(aValue);
-    
+    // x=/[^A-Z_0-9]/.test(aValue);
+    // x=/[^A-Z_^a-z_0-9]/.test(aValue);
+
 
     if (/[^A-Z_^a-z_0-9]/.test(aValue[0]))
         return '"' + aValue + '"'
@@ -200,7 +205,7 @@ export function outFileScript(aType: string, aScript: Array<any> | string, pathF
     switch (aType) {
         case GlobalTypes.ArrayobjectType[2]:
             if (aScript.length > 0) {
-                fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');                
+                fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
                 for (let i = 0; i < aScript.length; i++) {
                     fs.appendFileSync(pathFileScript, aScript[i] + GlobalTypes.CR, 'utf8');
                 }
@@ -220,10 +225,10 @@ export function outFileScript(aType: string, aScript: Array<any> | string, pathF
                 fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
             }
             else {
-                for(let i=0; i<aScript.length; i++) {
+                for (let i = 0; i < aScript.length; i++) {
                     fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
                     fs.appendFileSync(pathFileScript, aScript[i], 'utf8');
-                    fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');    
+                    fs.appendFileSync(pathFileScript, GlobalTypes.CR, 'utf8');
                 }
             }
             break;

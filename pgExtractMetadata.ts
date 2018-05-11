@@ -28,7 +28,7 @@ export class pgExtractMetadata {
     //******************************************************************* */
     private connectionString: pg.ClientConfig = {};
     public pgDb: pg.Client | any;
-
+    public schema: string = defaultSchema;
     public sources: sources.tSource | any;
 
     private saveToFile(aYalm: any, aObjectType: string, aObjectName: string) {
@@ -49,7 +49,7 @@ export class pgExtractMetadata {
         let aux: string = '';
 
         //va con RegExp porque el replace cambia solo la primer ocurrencia.        
-        aRet = aRet.replace(new RegExp('{FILTER_SCHEMA}', 'g'), "'" + defaultSchema + "'");
+        aRet = aRet.replace(new RegExp('{FILTER_SCHEMA}', 'g'), "'" + this.schema + "'");
 
         if (aObjectName !== '')
             aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(cc.objectName)) = '" + aObjectName.toUpperCase() + "'")

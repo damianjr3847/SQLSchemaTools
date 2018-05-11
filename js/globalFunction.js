@@ -39,7 +39,7 @@ function arrayToString(aArray, aSeparated = '', aSubValue = '') {
     return aText;
 }
 exports.arrayToString = arrayToString;
-function readRecursiveDirectory(dir) {
+function readRecursiveDirectory(dir, aPathUnido = true) {
     var retArrayFile = [];
     var files;
     var fStat;
@@ -50,8 +50,12 @@ function readRecursiveDirectory(dir) {
         fStat = fs.statSync(dir + files[i]);
         if (fStat && fStat.isDirectory())
             retArrayFile = retArrayFile.concat(readRecursiveDirectory(dir + files[i]));
-        else
-            retArrayFile.push(dir + files[i]);
+        else {
+            if (aPathUnido)
+                retArrayFile.push(dir + files[i]);
+            else
+                retArrayFile.push({ path: dir, file: files[i] });
+        }
     }
     return retArrayFile;
 }

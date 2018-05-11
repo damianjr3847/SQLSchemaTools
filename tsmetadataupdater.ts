@@ -27,6 +27,7 @@ import * as GlobalTypes from './globalTypes';
 import * as fbExtractLoadData from './fbExtractLoadData';
 import * as pgApplyMetadata from './pgApplyMetadata';
 import * as pgExtractMetadata from './pgExtractMetadata';
+import * as pgExtractLoadData from './pgExtractLoadData';
 
 let operation: string = '';
 let source1: string = '';
@@ -393,6 +394,7 @@ console.log('p '+params.outscript)
 
     let pgam: pgApplyMetadata.pgApplyMetadata;
     let pgem: pgExtractMetadata.pgExtractMetadata;
+    let pgdata: pgExtractLoadData.pgExtractLoadData;
 
     beginTime = new Date();
 
@@ -463,7 +465,16 @@ console.log('p '+params.outscript)
         }
         else if (operation === 'extractdata') {
 
+
         }
+        else if (operation === 'importdata') {
+            pgdata = new pgExtractLoadData.pgExtractLoadData;
+            pgdata.filesPath = source1;
+            pgdata.excludeObject = excludeObject;
+
+            await pgdata.loadData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName, dbRole);
+        }
+
 
     }
     endTime = new Date();

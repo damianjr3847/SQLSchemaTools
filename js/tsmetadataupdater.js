@@ -9,6 +9,7 @@ const GlobalTypes = require("./globalTypes");
 const fbExtractLoadData = require("./fbExtractLoadData");
 const pgApplyMetadata = require("./pgApplyMetadata");
 const pgExtractMetadata = require("./pgExtractMetadata");
+const pgExtractLoadData = require("./pgExtractLoadData");
 let operation = '';
 let source1 = '';
 let source2 = '';
@@ -314,6 +315,7 @@ console.log('p '+params.outscript)
     let fbdata;
     let pgam;
     let pgem;
+    let pgdata;
     beginTime = new Date();
     if (!(pathSave.endsWith('/')))
         pathSave += '/';
@@ -375,6 +377,12 @@ console.log('p '+params.outscript)
             await pgam.applyYalm(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);
         }
         else if (operation === 'extractdata') {
+        }
+        else if (operation === 'importdata') {
+            pgdata = new pgExtractLoadData.pgExtractLoadData;
+            pgdata.filesPath = source1;
+            pgdata.excludeObject = excludeObject;
+            await pgdata.loadData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName, dbRole);
         }
     }
     endTime = new Date();
