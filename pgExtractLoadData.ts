@@ -72,18 +72,74 @@ export class pgExtractLoadData {
         let rQuery: any;
         let rTables: Array<any> = [];
         let rFields: Array<any> = [];
-        let rData: Array<any> = [];
         let qFields: Array<pgExtractMetadata.iFieldType> = [];
         let query: string = '';
-        let queryValues: string = '';
-        let xCont: number = 0;
-        let xContGral: number = 0;
+        //let queryValues: string = '';
+        //let xCont: number = 0;
+        //let xContGral: number = 0;
         let contline: number = 0;
         let j: number = 0;
         let rs: fs.ReadStream;
         let filelines: any;
-        let jsonline: any;
+        let jsonline: any;        
 
+        let processLine = async (line: any) => {
+            let aValues: Array<any> = [];
+
+            if (contline === 0) {
+                jsonline = JSON.parse(line);
+                qFields = [];
+                query = 'INSERT INTO ' + globalFunction.quotedString(tableName) + '( ';
+                for (let z = 0; z < jsonline.length; z++) {
+                    j = rFields.findIndex(aItem => (aItem.tableName.toLowerCase().trim() === tableName.toLowerCase().trim() && aItem.columnName.toUpperCase().trim() === jsonline[z].toUpperCase().trim()));
+                    if (j !== -1) {
+                        qFields.push({ AName: rFields[j].columnName, AType: rFields[j].type });
+                        query += rFields[j].columnName + ',';
+                    }
+                    else
+                        throw new Error('El campo ' + jsonline[z] + ' de la tabla ' + tableName + ', no existe');
+                }
+                query = query.substr(0, query.length - 1) + ') VALUES(';
+
+                for (let z = 1; z < jsonline.length; z++) {
+                    query += '$' + z.toString() + ',';
+                }
+                query += '$' + jsonline.length.toString() + ')';
+            }
+            else {
+                if (line !== '') {                    
+                    try {
+                        jsonline = JSON.parse(line);
+                        for (let z = 0; z < jsonline.length; z++) {
+                            if (jsonline[z] === null) 
+                                aValues.push(null);    
+                            else if (typeof jsonline[z] === 'object') {
+                                for (let jname in jsonline[z]) {
+                                    if (jname === '$numberlong' || jname === '$numberint') {
+                                        aValues.push(jsonline[z][jname]);
+                                    }
+                                    else if (jname === '$binary') {
+                                        aValues.push(Buffer.from(jsonline[z][jname], 'base64'));
+                                    }
+                                    else if (jname === '$date') {
+                                        aValues.push(jsonline[z][jname]);
+                                    }
+                                    else 
+                                        throw new Error(jname + ', tipo de dato no soportado');
+                                }
+                            }
+                            else 
+                                aValues.push(jsonline[z]);
+                        }
+                        await this.pgDb.query(query, aValues);
+                    }
+                    catch (err) {
+                        throw new Error('linea '+contline.toString() + '. ' +err.message);
+                    }
+                }
+            }
+            contline += 1;
+        }
 
         this.connectionString.host = ahostName;
         this.connectionString.database = adatabase;
@@ -125,70 +181,33 @@ export class pgExtractLoadData {
                         filelines = fs.readFileSync(filesDirSource1[i].path + filesDirSource1[i].file);
 
                         console.log(filesDirSource1[i].path + filesDirSource1[i].file);
-                        contline = 0;
-                        rData = [];
+                        contline = 0;                        
 
-                        //for (let line in filelines.toString().split(String.fromCharCode(10))) {                        
-                        filelines.toString().split(/\r?\n/).forEach(function (line:any) {    
-                            if (contline === 0) {
-                                jsonline = JSON.parse(line);
-                                qFields = [];
-                                query = 'INSERT INTO ' + globalFunction.quotedString(tableName) + '( ';
-                                for (let z = 0; z < jsonline.length; z++) {
-                                    j = rFields.findIndex(aItem => (aItem.tableName.toLowerCase().trim() === tableName.toLowerCase().trim() && aItem.columnName.toUpperCase().trim() === jsonline[z].toUpperCase().trim()));
-                                    if (j !== -1) {
-                                        qFields.push({ AName: rFields[j].columnName, AType: rFields[j].type });
-                                        query += rFields[j].columnName + ',';
-                                    }
-                                    else
-                                        throw new Error('El campo ' + jsonline[z] + ' de la tabla ' + tableName + ', no existe');
-                                }
-                                query = query.substr(0, query.length - 1) + ') VALUES(';
-                            }
-                            else {
-                                queryValues = '';    
-                                jsonline = JSON.parse(line);                                
-                                for (let z = 0; z < jsonline.length; z++) {
-                                    if (jsonline[z] === null) 
-                                        queryValues += 'NULL,';
-                                    else if (typeof jsonline[z] === 'string') 
-                                        queryValues += "'"+jsonline[z]+"',";
-                                    else if (typeof jsonline[z] === 'object') {
-                                        for(let jname in jsonline[z]) {
-                                            if (jname === '$numberlong' || jname === '$numberint') {
-                                                queryValues += jsonline[z][jname]+',';       
-                                            }
-                                            else if (jname === '$binary') {
-
-                                            }
-                                            else if (jname === '$date') {
-                                                queryValues += "'"+jsonline[z][jname]+"',";    
-                                            }
-                                        }                                           
-                                    }  
-                                }
-                                rData.push(query+queryValues.substr(0, queryValues.length - 1) + ')');
-                            }
-                            contline += 1;
-                        });
-                        await this.pgDb.query('BEGIN');
-                        for(let p = 0; p < rData.length; p++) { 
-                            await this.pgDb.query(rData[p]);
-                        }    
-                        await this.pgDb.query('COMMIT');                                                    
+                        //for (let line in filelines.toString().split(String.fromCharCode(10))) {
+                        try {     
+                            await this.pgDb.query('BEGIN');
+                            await filelines.toString().split(/\r?\n/).forEach(async function (line: any) {
+                                await processLine(line);
+                            });
+                            await this.pgDb.query('COMMIT');
+                        }
+                        catch (err){                            
+                            console.error('linea ' + contline + ' ' + err.message);
+                            throw new Error(err.message);   
+                        }                            
                     }
 
                 }
-            }    
-            finally {
-                    await this.pgDb.end();
-                }
             }
-            catch (err) {
-                console.error(err.message);
-                process.exit(1);
+            finally {
+                await this.pgDb.end();
             }
         }
+        catch (err) {
+            console.error(err.message);
+            process.exit(1);
+        }
+    }
 }
 
 

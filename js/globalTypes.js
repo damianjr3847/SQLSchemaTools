@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArrayDbDriver = ['pg', 'fb'];
 exports.ArrayobjectType = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields'];
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
+exports.ArrayPgFunctionLenguage = ['plpython3u', 'c', 'sql', 'plpgsql'];
 exports.saveToLog_Table = 'ZLG_META_UPD';
 exports.yamlExportOptions = {
     indent: 2,
@@ -252,7 +253,7 @@ function convertDataType(aName) {
     return ft;
 }
 exports.convertDataType = convertDataType;
-function convertDataTypeToPG(aName) {
+function convertDataTypeToPG(aName, isProc = false) {
     let ft = '';
     let aLen = '';
     if (aName.indexOf('(') > 0) {
@@ -275,7 +276,8 @@ function convertDataTypeToPG(aName) {
             break;
         case 'blob sub_type 1':
         case 'text':
-            ft = 'blob text';
+        case 'blob text':
+            ft = 'text';
             break;
         //numericos con decimales
         case 'numeric':
@@ -354,7 +356,8 @@ function convertDataTypeToPG(aName) {
         //binarios 
         case 'blob sub_type 0':
         case 'bytea':
-            ft = 'blob binary';
+        case 'blob binary':
+            ft = 'bytea';
             break;
         //booleanos     
         case 'boolean':
@@ -383,7 +386,10 @@ function convertDataTypeToPG(aName) {
         default:
             ft = aName; //throw new Error('tipo de dato desconocido ' + aName)
     }
-    return ft + aLen;
+    if (isProc)
+        return ft;
+    else
+        return ft + aLen;
 }
 exports.convertDataTypeToPG = convertDataTypeToPG;
 function convertDataTypeToFB(aName) {

@@ -6,6 +6,7 @@ import * as sources from './loadsource';
 import * as pg from 'pg';
 import * as pgMetadataQuerys from './pgMetadataQuerys';
 import * as pgExtractMetadata from './pgExtractMetadata';
+import { globalAgent } from 'https';
 
 const defaultSchema = 'public';
 
@@ -123,7 +124,156 @@ export class pgApplyMetadata {
     //        P R O C E D U R E S
     //******************************************************************* */
     private async applyProcedures() {
+        let procedureName: string = '';
+        let fileYaml: any;
+        let dbYaml: Array<any> = [];
+        let procedureBody: string = '';
+        let procedureParams: string = '';
+        let procedureInDB: any;
+        let j: number = 0;
+        let rQuery: Array<string> = [];
+        let withOutputs: boolean = false;
 
+        let procedureYamltoString = (aYaml: any, aWithBody: boolean) => {
+            let paramString = (param: any, aExtra: string) => {
+                let aText: string = '';
+
+                if (param.length > 0) {
+                    withOutputs = true;
+                    for (let j = 0; j < param.length - 1; j++) {
+                        aText += globalFunction.quotedString(param[j].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(param[j].param.type, true) + ',' + GlobalTypes.CR;
+                    }
+                    aText += globalFunction.quotedString(param[param.length - 1].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(param[param.length - 1].param.type, true);
+                    aText = aExtra + '(' + GlobalTypes.CR + aText + ')';
+                }
+                else {
+                    aText = ' RETURNS void ';
+                    withOutputs = false;
+                }    
+
+                return aText;
+            };
+
+            let aProc: string = '';
+
+            aProc = 'CREATE OR REPLACE FUNCTION ' + this.schema + '.' + globalFunction.quotedString(aYaml.procedure.name);
+
+            if ('inputs' in aYaml.procedure)
+                aProc += paramString(aYaml.procedure.inputs, '');
+            else
+                aProc += '() ';
+
+            if (aYaml.procedure.pg.resultType.toUpperCase().trim() === 'TABLE') {
+                if ('outputs' in aYaml.procedure)
+                    aProc += paramString(aYaml.procedure.outputs, ' RETURNS TABLE') + GlobalTypes.CR;
+                else {
+                    aProc += ' RETURNS void ' + GlobalTypes.CR;
+                    withOutputs = false;
+                }    
+            }
+            else {
+                aProc += ' RETURNS ' + aYaml.procedure.pg.resultType + GlobalTypes.CR;
+                withOutputs = true;
+            }    
+
+            if ('language' in aYaml.procedure.pg) {
+                if (GlobalTypes.ArrayPgFunctionLenguage.indexOf(aYaml.procedure.pg.language) > -1) {
+                    aProc += 'LANGUAGE ' + aYaml.procedure.pg.language + GlobalTypes.CR;
+                }
+                else
+                    throw new Error('lenguaje no soportado ' + aYaml.procedure.pg.language + '. ' + aYaml.procedure.name);
+            }
+            else
+                throw new Error('falta lenguaje en ' + aYaml.procedure.name);
+
+            if ('executionCost' in aYaml.procedure.pg) {
+                aProc += 'COST ' + aYaml.procedure.pg.executionCost + GlobalTypes.CR;
+            }
+            else
+                aProc += 'COST 100' + GlobalTypes.CR;
+
+            if ('type' in aYaml.procedure.pg.options.optimization) {
+                aProc += aYaml.procedure.pg.options.optimization.type + GlobalTypes.CR;
+            }
+            else
+                aProc += 'VOLATILE' + GlobalTypes.CR;
+
+            if ('returnNullonNullInput' in aYaml.procedure.pg.options.optimization) {
+                if (aYaml.procedure.pg.options.optimization.returnNullonNullInput)
+                    aProc += 'RETURNS NULL ON NULL INPUT ' + GlobalTypes.CR;
+            }
+
+            if (withOutputs) {
+                if ('resultRows' in aYaml.procedure.pg)
+                    aProc += 'ROWS ' + aYaml.procedure.pg.resultRows + GlobalTypes.CR;
+                else
+                    aProc += 'ROWS 1000 ' + GlobalTypes.CR;
+            }   
+
+            if (aWithBody)
+                aProc += GlobalTypes.CR + 'AS $BODY$' + GlobalTypes.CR + aYaml.procedure.body + GlobalTypes.CR + '$BODY$';
+            else {
+                if ('outputs' in aYaml.procedure)
+                    aProc += GlobalTypes.CR + 'AS $BODY$' + GlobalTypes.CR + " begin RAISE EXCEPTION  USING MESSAGE = 'Cambiando procedimiento aguerde un momento por favor'; end" + GlobalTypes.CR + '$BODY$';
+                else
+                    aProc += GlobalTypes.CR + 'AS $BODY$' + GlobalTypes.CR + " begin RAISE EXCEPTION  USING MESSAGE = 'Cambiando procedimiento aguerde un momento por favor'; end" + GlobalTypes.CR + '$BODY$';
+            }
+            return aProc;
+        }
+
+        let readProcedures = async (aYaml: any, aWithBody: boolean) => {
+            let cambios: boolean = false;
+
+            for (let i in this.sources.proceduresArrayYaml) {
+
+                fileYaml = this.sources.proceduresArrayYaml[i];
+
+                procedureName = fileYaml.procedure.name.toLowerCase().trim();
+
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
+
+                    j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
+
+                    procedureBody = procedureYamltoString(fileYaml, true);
+                    if (j !== -1) {
+                        procedureInDB = procedureYamltoString(dbYaml[j], true);
+                    }
+
+                    if (procedureInDB !== procedureBody) {
+                        cambios = true;
+                        rQuery = [];
+                        rQuery.push(procedureYamltoString(fileYaml, aWithBody));
+                        if (j === -1)
+                            rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + ' OWNER TO ' + this.dbRole + ';');
+
+                        await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, rQuery);
+                    }
+
+                    procedureBody = '';
+                    procedureInDB = '';
+                }
+            }
+            return cambios;
+        }
+
+
+        try {
+            await this.pgDb.query('BEGIN');
+            try {
+                dbYaml = await this.pgExMe.extractMetadataProcedures('', true, false);
+            }
+            finally {
+                await this.pgDb.query('COMMIT');
+            }
+
+            if (await readProcedures(fileYaml, false)) {
+                await readProcedures(fileYaml, true);
+            }
+            //console.log(Date.now());               
+        }
+        catch (err) {
+            throw new Error('Error aplicando procedimiento ' + procedureName + '. ' + err.message + GlobalTypes.CR + procedureBody);
+        }
     }
 
     //****************************************************************** */
@@ -138,7 +288,67 @@ export class pgApplyMetadata {
     //        V I E W S
     //******************************************************************* */
     private async applyViews() {
+        let viewYamltoString = (aYaml: any) => {
+            let aView: string = '';
 
+            aView = 'CREATE OR REPLACE VIEW ' + globalFunction.quotedString(aYaml.view.name) + '(' + GlobalTypes.CR;
+
+            for (let j = 0; j < aYaml.view.columns.length - 1; j++) {
+                aView += globalFunction.quotedString(aYaml.view.columns[j]) + ',' + GlobalTypes.CR;
+            };
+            aView += globalFunction.quotedString(aYaml.view.columns[aYaml.view.columns.length - 1]) + ')' + GlobalTypes.CR;
+
+            aView += 'AS' + GlobalTypes.CR + aYaml.view.body;
+
+            return aView;
+        };
+
+        let dbYaml: Array<any> = [];
+        let viewName: string = '';
+        let viewInDb: string = '';
+        let j: number = 0;
+        let fileYaml: any;
+        let viewBody: string = '';
+        let rQuerys: Array<string> = [];
+
+        try {
+            await this.pgDb.query('BEGIN')
+            try {
+                dbYaml = await this.pgExMe.extractMetadataViews('', true, false);
+            }
+            finally {
+                await this.pgDb.query('COMMIT');
+            }
+
+            for (let i in this.sources.viewsArrayYaml) {
+                fileYaml = this.sources.viewsArrayYaml[i];
+
+                viewName = fileYaml.view.name.toLowerCase().trim();
+
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[4], viewName)) {
+                    j = dbYaml.findIndex(aItem => (aItem.view.name.toLowerCase().trim() === viewName));
+
+                    viewBody = viewYamltoString(fileYaml);
+                    if (j !== -1) {
+                        viewInDb = viewYamltoString(dbYaml[j]);
+                    }
+
+                    if (viewBody !== viewInDb) {
+                        rQuerys = [];
+                        rQuerys.push(viewBody);
+                        if (j === -1)
+                            rQuerys.push('ALTER TABLE ' + this.schema + '.' + viewName + ' OWNER TO ' + this.dbRole + ';');
+
+                        await this.applyChange(GlobalTypes.ArrayobjectType[4], viewName, rQuerys);
+                    }
+                    viewBody = '';
+                    viewInDb = '';
+                }
+            }
+
+        } catch (err) {
+            throw new Error('Error aplicando view ' + viewName + '. ' + err.message);
+        }
     }
 
     //****************************************************************** */
@@ -226,6 +436,7 @@ export class pgApplyMetadata {
 
                     if (j === -1) { //NO EXISTE TABLA
                         tableScript = this.newTableYamltoString(fileYaml.table);
+                        tableScript.push('ALTER TABLE ' + this.schema + '.' + tableName + ' OWNER TO ' + this.dbRole + ';');
                     }
                     else {
                         tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
@@ -289,7 +500,7 @@ export class pgApplyMetadata {
             }
 
         } catch (err) {
-            console.error('Error aplicando tabla ' + tableName + '.', err.message);
+            throw new Error('Error aplicando tabla ' + tableName + '.' + err.message);
         }
 
     }
@@ -639,7 +850,7 @@ function checkToSql(aTableName: string, aCheck: any, aSchema: string): Array<str
 
 function primaryKeyToSql(aTableName: string, aPk: any, aSchema: string): string {
     //ALTER TABLE ART_ARCH ADD CONSTRAINT ART_ARCH_PK PRIMARY KEY (FCODINT);    
-    let aText: string = '';    
+    let aText: string = '';
 
     if (aPk.name !== undefined && aPk.name !== '' && aPk.columns.length > 0) {
         aText += 'ALTER TABLE ' + aSchema + '.' + aTableName + ' ADD CONSTRAINT ' + globalFunction.quotedString(aPk.name) + ' PRIMARY KEY (';
@@ -689,7 +900,7 @@ function indexesToSql(aTableName: string, aIdx: any, aSchema: string): Array<str
                             break;
                         case 'DESC NULLS FIRST':
                             aText += ' DESC,';
-                            break;    
+                            break;
                         default:
                             aText += ' ' + aIdx[j].index.columns[i].order + ',';
                     }
@@ -708,10 +919,10 @@ function indexesToSql(aTableName: string, aIdx: any, aSchema: string): Array<str
                         break;
                     case 'DESC NULLS FIRST':
                         aText += ' DESC)';
-                        break;    
+                        break;
                     default:
                         aText += aIdx[j].index.columns[aIdx[j].index.columns.length - 1].order + ')';
-                }                    
+                }
             }
         }
         aRet.push(aText + ';');

@@ -5,6 +5,8 @@ export const ArrayobjectType: string[] = ['procedures', 'triggers', 'tables', 'g
 
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 
+export const ArrayPgFunctionLenguage: string[] = ['plpython3u', 'c', 'sql', 'plpgsql'];
+
 export const saveToLog_Table = 'ZLG_META_UPD';
 
 export const yamlExportOptions = {
@@ -49,7 +51,7 @@ export interface iTriggerYamlType {
 		ensure?: string, //present: crea si no esta pero no actualisa, absent: si es lo borra, latest: que este la ultima version 
 		triggers: Array<iTriggerTable>,
 		function: {
-			language?: string,			
+			language?: string,
 			options: {
 				optimization: {
 					type?: string,
@@ -287,7 +289,7 @@ export function emptyViewYamlType() {
 
 export function convertDataType(aName: string): string {
 	let ft: string = '';
-	
+
 	switch (aName.toLowerCase()) {
 		case 'bit':
 		case 'bit varying':
@@ -302,7 +304,7 @@ export function convertDataType(aName: string): string {
 		case 'varchar':
 			ft = 'varchar';
 			break;
-		case 'blob sub_type 1':	
+		case 'blob sub_type 1':
 		case 'text':
 			ft = 'blob text';
 			break;
@@ -311,7 +313,7 @@ export function convertDataType(aName: string): string {
 		case 'decimal':
 			ft = 'numeric';
 			break;
-		case 'float':	
+		case 'float':
 		case 'double precision':
 		case 'float8':
 			ft = 'double precision';
@@ -359,22 +361,22 @@ export function convertDataType(aName: string): string {
 			break;
 		//fecha y hora
 		case 'timestamp':
-		case 'timestamp without time zone':            
+		case 'timestamp without time zone':
 			ft = 'timestamp';
 			break;
 		case 'timestamp with time zone':
-		case 'timestamptz':            
+		case 'timestamptz':
 			ft = aName;
 			break;
 		case 'date':
 			ft = 'date';
 			break;
 		case 'time':
-		case 'time without time zone':            
+		case 'time without time zone':
 			ft = 'time';
 			break;
 		case 'time with time zone':
-		case 'timetz':            
+		case 'timetz':
 			ft = aName;
 			break;
 		case 'interval':
@@ -415,13 +417,13 @@ export function convertDataType(aName: string): string {
 	return ft;
 }
 
-export function convertDataTypeToPG(aName: string): string {
+export function convertDataTypeToPG(aName: string, isProc: boolean = false): string {
 	let ft: string = '';
 	let aLen: string = '';
 
-	if (aName.indexOf('(') >0)  {
-		aLen=aName.substr(aName.indexOf('('));
-		aName=aName.substr(0,aName.indexOf('('));
+	if (aName.indexOf('(') > 0) {
+		aLen = aName.substr(aName.indexOf('('));
+		aName = aName.substr(0, aName.indexOf('('));
 	}
 
 	switch (aName.toLowerCase()) {
@@ -438,16 +440,17 @@ export function convertDataTypeToPG(aName: string): string {
 		case 'varchar':
 			ft = 'varchar';
 			break;
-		case 'blob sub_type 1':	
+		case 'blob sub_type 1':
 		case 'text':
-			ft = 'blob text';
+		case 'blob text':
+			ft = 'text';
 			break;
 		//numericos con decimales
 		case 'numeric':
 		case 'decimal':
 			ft = 'numeric';
 			break;
-		case 'float':	
+		case 'float':
 		case 'double precision':
 		case 'float8':
 			ft = 'double precision';
@@ -495,22 +498,22 @@ export function convertDataTypeToPG(aName: string): string {
 			break;
 		//fecha y hora
 		case 'timestamp':
-		case 'timestamp without time zone':            
+		case 'timestamp without time zone':
 			ft = 'timestamp';
 			break;
 		case 'timestamp with time zone':
-		case 'timestamptz':            
+		case 'timestamptz':
 			ft = aName;
 			break;
 		case 'date':
 			ft = 'date';
 			break;
 		case 'time':
-		case 'time without time zone':            
+		case 'time without time zone':
 			ft = 'time';
 			break;
 		case 'time with time zone':
-		case 'timetz':            
+		case 'timetz':
 			ft = aName;
 			break;
 		case 'interval':
@@ -519,7 +522,8 @@ export function convertDataTypeToPG(aName: string): string {
 		//binarios 
 		case 'blob sub_type 0':
 		case 'bytea':
-			ft = 'blob binary';
+		case 'blob binary':
+			ft = 'bytea';
 			break;
 		//booleanos     
 		case 'boolean':
@@ -548,20 +552,23 @@ export function convertDataTypeToPG(aName: string): string {
 		default:
 			ft = aName; //throw new Error('tipo de dato desconocido ' + aName)
 	}
-	return ft+aLen;
+	if (isProc)
+		return ft;
+	else
+		return ft + aLen;
 }
 
 export function convertDataTypeToFB(aName: string): string {
 	let ft: string = '';
 	let aLen: string = '';
 
-	if (aName.indexOf('(') >0)  {
-		aLen=aName.substr(aName.indexOf('('));
-		aName=aName.substr(0,aName.indexOf('('));
+	if (aName.indexOf('(') > 0) {
+		aLen = aName.substr(aName.indexOf('('));
+		aName = aName.substr(0, aName.indexOf('('));
 	}
 
-	switch (aName.toLowerCase()) {		
-			//tipo de datos string
+	switch (aName.toLowerCase()) {
+		//tipo de datos string
 		case 'character':
 		case 'char':
 			ft = 'char';
@@ -571,7 +578,7 @@ export function convertDataTypeToFB(aName: string): string {
 			ft = 'varchar';
 			break;
 		case 'blob text':
-		case 'blob sub_type 1':	
+		case 'blob sub_type 1':
 		case 'text':
 			ft = 'blob sub_type 1';
 			break;
@@ -584,7 +591,7 @@ export function convertDataTypeToFB(aName: string): string {
 			break;
 		case 'float':
 			ft = 'float';
-			break;	
+			break;
 		case 'double precision':
 		case 'float8':
 		case 'real':
@@ -605,21 +612,21 @@ export function convertDataTypeToFB(aName: string): string {
 		case 'smallint':
 		case 'int2':
 			ft = 'smallint';
-			break;	
+			break;
 		//fecha y hora
 		case 'timestamp':
 		case 'timestamp without time zone':
 		case 'timestamp with time zone':
-		case 'timestamptz':            
+		case 'timestamptz':
 			ft = 'timestamp';
-			break;		        
+			break;
 		case 'date':
 			ft = 'date';
 			break;
 		case 'time':
-		case 'time without time zone': 
+		case 'time without time zone':
 		case 'time with time zone':
-		case 'timetz':                       
+		case 'timetz':
 			ft = 'time';
 			break;
 		//binarios 
@@ -662,9 +669,9 @@ export function convertDataTypeToFB(aName: string): string {
 		case 'serial8':
 		case 'bit':
 		case 'bit varying':
-			throw new Error('tipo de dato desconocido ' + aName);			
+			throw new Error('tipo de dato desconocido ' + aName);
 		default:
 			ft = aName; //throw new Error('tipo de dato desconocido ' + aName)
 	}
-	return ft+aLen;
+	return ft + aLen;
 }

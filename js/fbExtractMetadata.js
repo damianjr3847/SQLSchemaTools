@@ -243,7 +243,7 @@ class fbExtractMetadata {
                                     }
                                     if (rFields[j_fld].DEFSOURCE !== null) {
                                         txtAux = await fbClass.getBlob(rFields[j_fld].DEFSOURCE, 'text');
-                                        outFields[outFields.length - 1].column.default = txtAux.replace('DEFAULT', '').toLowerCase().trim();
+                                        outFields[outFields.length - 1].column.default = txtAux.replace('DEFAULT', '').trim();
                                     }
                                     outFields[outFields.length - 1].column.type = FieldType(ft);
                                 }
@@ -304,7 +304,7 @@ class fbExtractMetadata {
                                 outcheck.push({ check: { name: '', expresion: '' } });
                                 outcheck[outcheck.length - 1].check.name = rCheckConst[j_const].CONST_NAME.toLowerCase().trim();
                                 outcheck[outcheck.length - 1].check.expresion = await fbClass.getBlob(rCheckConst[j_const].CHECK_SOURCE, 'text');
-                                outcheck[outcheck.length - 1].check.expresion = String(outcheck[outcheck.length - 1].check.expresion).toLowerCase().trim();
+                                outcheck[outcheck.length - 1].check.expresion = String(outcheck[outcheck.length - 1].check.expresion).trim();
                                 if (rCheckConst[j_const].DESCRIPTION !== null)
                                     outcheck[outcheck.length - 1].check.description = await fbClass.getBlob(rCheckConst[j_const].DESCRIPTION, 'text');
                             }
