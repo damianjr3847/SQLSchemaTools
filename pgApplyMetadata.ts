@@ -123,59 +123,62 @@ export class pgApplyMetadata {
     //****************************************************************** */
     //        P R O C E D U R E S
     //******************************************************************* */
-    private async applyProcedures() {
-        let procedureName: string = '';
-        let fileYaml: any;
-        let dbYaml: Array<any> = [];
-        let procedureBody: string = '';
-        let procedureParams: string = '';
-        let procedureInDB: any;
-        let j: number = 0;
-        let rQuery: Array<string> = [];
-        let withOutputs: boolean = false;
-
-        let procedureYamltoString = (aYaml: any, aWithBody: boolean) => {
-            let paramString = (param: any, aExtra: string) => {
-                let aText: string = '';
-
-                if (param.length > 0) {
+    
+    private async readProcedures (aWithBody: boolean, dbYaml: Array<any>, aType:string) {
+        let paramString = (aParam: any, aExtra: string, aInOut: string, aOnlyType: boolean = false) => {
+            let aText: string = '';
+    
+            if (aParam.length > 0) {
+                if (aInOut === 'O')
                     withOutputs = true;
-                    for (let j = 0; j < param.length - 1; j++) {
-                        aText += globalFunction.quotedString(param[j].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(param[j].param.type, true) + ',' + GlobalTypes.CR;
-                    }
-                    aText += globalFunction.quotedString(param[param.length - 1].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(param[param.length - 1].param.type, true);
-                    aText = aExtra + '(' + GlobalTypes.CR + aText + ')';
+                for (let j = 0; j < aParam.length - 1; j++) {
+                    if (aOnlyType)
+                        aText += GlobalTypes.convertDataTypeToPG(aParam[j].param.type, true) + ',';
+                    else
+                        aText += globalFunction.quotedString(aParam[j].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(aParam[j].param.type, true) + ',';
+                }
+                if (aOnlyType)
+                    aText += GlobalTypes.convertDataTypeToPG(aParam[aParam.length - 1].param.type, true);
+                else
+                    aText += globalFunction.quotedString(aParam[aParam.length - 1].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(aParam[aParam.length - 1].param.type, true);
+                aText = aExtra + '(' + GlobalTypes.CR + aText + ')';
+            } else {
+                if (aInOut === 'I') {
+                    aText = aExtra + '()';
                 }
                 else {
-                    aText = ' RETURNS void ';
+                    aText += ' RETURNS void ';
                     withOutputs = false;
-                }    
-
-                return aText;
-            };
-
+                }
+            }
+            return aText;
+        };
+    
+        let procedureYamltoString = (aYaml: any, aWithBody: boolean) => {
+    
             let aProc: string = '';
-
+    
             aProc = 'CREATE OR REPLACE FUNCTION ' + this.schema + '.' + globalFunction.quotedString(aYaml.procedure.name);
-
+    
             if ('inputs' in aYaml.procedure)
-                aProc += paramString(aYaml.procedure.inputs, '');
+                aProc += paramString(aYaml.procedure.inputs, '', 'I');
             else
                 aProc += '() ';
-
+    
             if (aYaml.procedure.pg.resultType.toUpperCase().trim() === 'TABLE') {
-                if ('outputs' in aYaml.procedure)
-                    aProc += paramString(aYaml.procedure.outputs, ' RETURNS TABLE') + GlobalTypes.CR;
+                if ('outputs' in aYaml.procedure) {
+                    aProc += paramString(aYaml.procedure.outputs, ' RETURNS TABLE', 'O') + GlobalTypes.CR;
+                }
                 else {
                     aProc += ' RETURNS void ' + GlobalTypes.CR;
                     withOutputs = false;
-                }    
+                }
             }
             else {
                 aProc += ' RETURNS ' + aYaml.procedure.pg.resultType + GlobalTypes.CR;
                 withOutputs = true;
-            }    
-
+            }
+    
             if ('language' in aYaml.procedure.pg) {
                 if (GlobalTypes.ArrayPgFunctionLenguage.indexOf(aYaml.procedure.pg.language) > -1) {
                     aProc += 'LANGUAGE ' + aYaml.procedure.pg.language + GlobalTypes.CR;
@@ -185,45 +188,50 @@ export class pgApplyMetadata {
             }
             else
                 throw new Error('falta lenguaje en ' + aYaml.procedure.name);
-
+    
             if ('executionCost' in aYaml.procedure.pg) {
                 aProc += 'COST ' + aYaml.procedure.pg.executionCost + GlobalTypes.CR;
             }
             else
                 aProc += 'COST 100' + GlobalTypes.CR;
-
+    
             if ('type' in aYaml.procedure.pg.options.optimization) {
                 aProc += aYaml.procedure.pg.options.optimization.type + GlobalTypes.CR;
             }
             else
                 aProc += 'VOLATILE' + GlobalTypes.CR;
-
+    
             if ('returnNullonNullInput' in aYaml.procedure.pg.options.optimization) {
                 if (aYaml.procedure.pg.options.optimization.returnNullonNullInput)
                     aProc += 'RETURNS NULL ON NULL INPUT ' + GlobalTypes.CR;
             }
-
+    
             if (withOutputs) {
                 if ('resultRows' in aYaml.procedure.pg)
                     aProc += 'ROWS ' + aYaml.procedure.pg.resultRows + GlobalTypes.CR;
                 else
                     aProc += 'ROWS 1000 ' + GlobalTypes.CR;
-            }   
-
+            }
+    
             if (aWithBody)
                 aProc += GlobalTypes.CR + 'AS $BODY$' + GlobalTypes.CR + aYaml.procedure.body + GlobalTypes.CR + '$BODY$';
             else {
-                if ('outputs' in aYaml.procedure)
-                    aProc += GlobalTypes.CR + 'AS $BODY$' + GlobalTypes.CR + " begin RAISE EXCEPTION  USING MESSAGE = 'Cambiando procedimiento aguerde un momento por favor'; end" + GlobalTypes.CR + '$BODY$';
-                else
-                    aProc += GlobalTypes.CR + 'AS $BODY$' + GlobalTypes.CR + " begin RAISE EXCEPTION  USING MESSAGE = 'Cambiando procedimiento aguerde un momento por favor'; end" + GlobalTypes.CR + '$BODY$';
+                aProc += GlobalTypes.CR + 'AS $BODY$' + GlobalTypes.CR + " begin RAISE EXCEPTION  USING MESSAGE = 'Cambiando procedimiento aguerde un momento por favor'; end" + GlobalTypes.CR + '$BODY$';
             }
             return aProc;
         }
 
-        let readProcedures = async (aYaml: any, aWithBody: boolean) => {
-            let cambios: boolean = false;
+        let procedureName: string = '';
+        let cambios: boolean = false;
+        let fileYaml: any;
+        let procedureBody: string = '';
+        let procedureParams: string = '';
+        let procedureInDB: any;
+        let j: number = 0;
+        let rQuery: Array<string> = [];
+        let withOutputs: boolean = false;      
 
+        try {
             for (let i in this.sources.proceduresArrayYaml) {
 
                 fileYaml = this.sources.proceduresArrayYaml[i];
@@ -242,10 +250,16 @@ export class pgApplyMetadata {
                     if (procedureInDB !== procedureBody) {
                         cambios = true;
                         rQuery = [];
-                        rQuery.push(procedureYamltoString(fileYaml, aWithBody));
-                        if (j === -1)
-                            rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + ' OWNER TO ' + this.dbRole + ';');
+                        if (j !== -1)
+                            rQuery.push('DROP FUNCTION ' + this.schema + '.' + procedureName);
 
+                        rQuery.push(procedureYamltoString(fileYaml, aWithBody));
+                        if (j === -1) {
+                            if (aType === 'function' || 'inputs' in fileYaml.procedure)
+                                rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + paramString(fileYaml.procedure.inputs, '', 'I', true) + ' OWNER TO ' + this.dbRole + ';');
+                            else 
+                                rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + '() OWNER TO ' + this.dbRole + ';');
+                        }
                         await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, rQuery);
                     }
 
@@ -255,7 +269,13 @@ export class pgApplyMetadata {
             }
             return cambios;
         }
-
+        catch (err) {
+            throw new Error('Error aplicando procedimiento ' + procedureName + '. ' + err.message + GlobalTypes.CR + procedureBody);
+        }    
+    }
+    
+    private async applyProcedures() {        
+        let dbYaml: Array<any> = []; 
 
         try {
             await this.pgDb.query('BEGIN');
@@ -266,13 +286,13 @@ export class pgApplyMetadata {
                 await this.pgDb.query('COMMIT');
             }
 
-            if (await readProcedures(fileYaml, false)) {
-                await readProcedures(fileYaml, true);
+            if (await this.readProcedures(false, dbYaml, 'function')) {
+                await this.readProcedures(true, dbYaml, 'function');
             }
             //console.log(Date.now());               
         }
         catch (err) {
-            throw new Error('Error aplicando procedimiento ' + procedureName + '. ' + err.message + GlobalTypes.CR + procedureBody);
+            throw new Error(err.message);    
         }
     }
 
@@ -281,7 +301,79 @@ export class pgApplyMetadata {
     //******************************************************************* */
 
     private async applyTriggers() {
+        /*
+        CREATE FUNCTION public.prueba()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    VOLATILE NOT LEAKPROOF */
 
+        let triggerYamltoString = (aYaml: any) => {
+            let aProc: string = '';
+
+            aProc = 'CREATE OR ALTER TRIGGER ' + globalFunction.quotedString(aYaml.triggerFunction.name) + ' FOR ';
+
+            aProc += aYaml.triggerFunction.triggers[0].trigger.table;
+            if (aYaml.triggerFunction.triggers[0].trigger.active) {
+                aProc += ' ACTIVE ';
+            }
+            else {
+                aProc += ' INACTIVE ';
+            }
+
+            aProc += aYaml.triggerFunction.triggers[0].trigger.fires + ' ';
+            aProc += aYaml.triggerFunction.triggers[0].trigger.events[0];
+            for (let j = 1; j < aYaml.triggerFunction.triggers[0].trigger.events.length; j++) {
+                aProc += ' OR ' + aYaml.triggerFunction.triggers[0].trigger.events[j];
+            };
+            aProc += ' POSITION ' + aYaml.triggerFunction.triggers[0].trigger.position;
+
+            aProc += GlobalTypes.CR + aYaml.triggerFunction.function.body;
+            return aProc;
+        };
+
+        let triggerName: string = '';
+        let dbYaml: Array<any> = [];
+        let fileYaml: any;
+        let triggerBody: string = '';
+        let triggerInDb: string = '';
+        let j: number = 0;
+
+        try {
+            
+            await this.pgDb.query('BEGIN');
+            try {
+                dbYaml = await this.pgExMe.extractMetadataTriggers('', true, false);
+            }
+            finally {
+                await this.pgDb.query('COMMIT');
+            }    
+
+            for (let i in this.sources.triggersArrayYaml) {
+
+                fileYaml = this.sources.triggersArrayYaml[i];
+
+                triggerName = fileYaml.triggerFunction.name.toLowerCase().trim();
+
+                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[1], triggerName)) {
+                    j = dbYaml.findIndex(aItem => (aItem.triggerFunction.name.toLowerCase().trim() === triggerName));
+
+                    triggerBody = triggerYamltoString(fileYaml);
+                    if (j !== -1) {
+                        triggerInDb = triggerYamltoString(dbYaml[j]);
+                    }
+
+                    if (triggerBody !== triggerInDb) {
+                        await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, Array(triggerBody));
+                    }
+
+                    triggerBody = '';
+                    triggerInDb = '';
+                }
+            }
+        }
+        catch (err) {
+            throw new Error('Error aplicando trigger ' + triggerName + '. ' + err.message);
+        }
     }
 
     //****************************************************************** */

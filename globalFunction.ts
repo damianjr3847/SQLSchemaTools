@@ -120,7 +120,7 @@ export function varToSql(aValue: any, AType: number, ASubType: number) {
 
 export function varToJSON(aValue: any, AType: number, ASubType: number) {
     let ft: any;
-    let aDate: string = '';
+    let aDate: string = '';    
 
     if (aValue === null)
         ft = null;
@@ -149,14 +149,14 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
                 if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
                     ft = '';
                 else
-                    ft = aValue.toString();
+                    ft = aValue.toString('binary');                
                 break;
             case 261: //blob
                 if (ASubType === 1) {
                     if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
                         ft = ''
                     else {
-                        ft = aValue.toString();
+                        ft = aValue.toString('binary');
                     }
                 }
                 else {
@@ -180,6 +180,8 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
                 throw new Error(AType + ' tipo de dato no reconocido');
         }
     }
+    if (ft !== null || String(ft).indexOf('ACEITE') !== -1)     
+        aValue=aValue;
     return ft;
 }
 export function quotedString(aValue: string): string {

@@ -136,7 +136,7 @@ export class fbApplyMetadata {
             return aProc;
         }
 
-        let readProcedures = async (aYaml: any, aWithBody: boolean) => {
+        let readProcedures = async (aWithBody: boolean) => {
             let cambios: boolean = false;
 
             for (let i in this.sources.proceduresArrayYaml) {
@@ -181,8 +181,8 @@ export class fbApplyMetadata {
 
             await this.fb.commit();
 
-            if (await readProcedures(fileYaml, false)) {
-                await readProcedures(fileYaml, true);
+            if (await readProcedures(false)) {
+                await readProcedures(true);
             }
             //console.log(Date.now());               
         }

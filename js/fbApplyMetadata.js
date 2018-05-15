@@ -102,7 +102,7 @@ class fbApplyMetadata {
             }
             return aProc;
         };
-        let readProcedures = async (aYaml, aWithBody) => {
+        let readProcedures = async (aWithBody) => {
             let cambios = false;
             for (let i in this.sources.proceduresArrayYaml) {
                 fileYaml = this.sources.proceduresArrayYaml[i];
@@ -134,8 +134,8 @@ class fbApplyMetadata {
             await this.fb.startTransaction(true);
             dbYaml = await this.fbExMe.extractMetadataProcedures('', true, false);
             await this.fb.commit();
-            if (await readProcedures(fileYaml, false)) {
-                await readProcedures(fileYaml, true);
+            if (await readProcedures(false)) {
+                await readProcedures(true);
             }
             //console.log(Date.now());               
         }

@@ -143,7 +143,9 @@ function varToJSON(aValue, AType, ASubType) {
                 if (aValue === undefined)
                     ft = '';
                 else
-                    ft = aValue.toString();
+                    ft = aValue.toString('binary');
+                //ft = decodeURIComponent(escape(aValue));
+                ft = unescape(encodeURIComponent(aValue));
                 break;
             case 261://blob
                 if (ASubType === 1) {
@@ -174,6 +176,8 @@ function varToJSON(aValue, AType, ASubType) {
                 throw new Error(AType + ' tipo de dato no reconocido');
         }
     }
+    if (ft !== null || String(ft).indexOf('ACEITE') !== -1)
+        aValue = aValue;
     return ft;
 }
 exports.varToJSON = varToJSON;

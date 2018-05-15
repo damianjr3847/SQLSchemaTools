@@ -100,6 +100,7 @@ class fbExtractLoadData {
                             }
                             await this.fb.startTransaction(true);
                             query = 'SELECT ' + globalFunction.arrayToString(qFields, ',', 'AName') + ' FROM ' + globalFunction.quotedString(tableName);
+                            query += ' where fcodint=605';
                             rData = [];
                             xCont = 0;
                             xContGral = 0;
