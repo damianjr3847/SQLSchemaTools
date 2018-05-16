@@ -105,7 +105,7 @@ class fbApplyMetadata {
         let readProcedures = async (aWithBody) => {
             let cambios = false;
             for (let i in this.sources.proceduresArrayYaml) {
-                fileYaml = this.sources.proceduresArrayYaml[i];
+                fileYaml = this.sources.proceduresArrayYaml[i].contentFile;
                 procedureName = fileYaml.procedure.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
                     j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
@@ -178,7 +178,7 @@ class fbApplyMetadata {
             dbYaml = await this.fbExMe.extractMetadataTriggers('', true, false);
             await this.fb.commit();
             for (let i in this.sources.triggersArrayYaml) {
-                fileYaml = this.sources.triggersArrayYaml[i];
+                fileYaml = this.sources.triggersArrayYaml[i].contentFile;
                 triggerName = fileYaml.triggerFunction.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[1], triggerName)) {
                     j = dbYaml.findIndex(aItem => (aItem.triggerFunction.name.toLowerCase().trim() === triggerName));
@@ -224,7 +224,7 @@ class fbApplyMetadata {
             dbYaml = await this.fbExMe.extractMetadataViews('', true, false);
             await this.fb.commit();
             for (let i in this.sources.viewsArrayYaml) {
-                fileYaml = this.sources.viewsArrayYaml[i];
+                fileYaml = this.sources.viewsArrayYaml[i].contentFile;
                 viewName = fileYaml.view.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[4], viewName)) {
                     j = dbYaml.findIndex(aItem => (aItem.view.name.toLowerCase().trim() === viewName));
@@ -263,7 +263,7 @@ class fbApplyMetadata {
                 this.fb.commit();
             }
             for (let i in this.sources.generatorsArrayYaml) {
-                fileYaml = this.sources.generatorsArrayYaml[i];
+                fileYaml = this.sources.generatorsArrayYaml[i].contentFile;
                 genBody = [];
                 genName = fileYaml.generator.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
@@ -300,7 +300,7 @@ class fbApplyMetadata {
             }
             await this.fb.commit();
             for (let i in this.sources.tablesArrayYaml) {
-                fileYaml = this.sources.tablesArrayYaml[i];
+                fileYaml = this.sources.tablesArrayYaml[i].contentFile;
                 tableName = fileYaml.table.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
                     j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase().trim() === tableName));
@@ -320,7 +320,7 @@ class fbApplyMetadata {
             }
             // solamente para los constraint van a lo ultimo por los foreinkey
             for (let i in this.sources.tablesArrayYaml) {
-                fileYaml = this.sources.tablesArrayYaml[i];
+                fileYaml = this.sources.tablesArrayYaml[i].contentFile;
                 tableName = fileYaml.table.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
                     j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase().trim() === tableName));

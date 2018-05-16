@@ -51,23 +51,23 @@ class pgExtractMetadata {
                 switch (aObjectType) {
                     case GlobalTypes.ArrayobjectType[2]:
                         for (let i in this.sources.tablesArrayYaml)
-                            namesArray.push("'" + this.sources.tablesArrayYaml[i].table.name + "'");
+                            namesArray.push("'" + this.sources.tablesArrayYaml[i].contentFile.table.name + "'");
                         break;
                     case GlobalTypes.ArrayobjectType[0]:
                         for (let i in this.sources.proceduresArrayYaml)
-                            namesArray.push("'" + this.sources.proceduresArrayYaml[i].procedure.name + "'");
+                            namesArray.push("'" + this.sources.proceduresArrayYaml[i].contentFile.procedure.name + "'");
                         break;
                     case GlobalTypes.ArrayobjectType[1]:
                         for (let i in this.sources.triggersArrayYaml)
-                            namesArray.push("'" + this.sources.triggersArrayYaml[i].triggerFunction.name + "'");
+                            namesArray.push("'" + this.sources.triggersArrayYaml[i].contentFile.triggerFunction.name + "'");
                         break;
                     case GlobalTypes.ArrayobjectType[4]:
                         for (let i in this.sources.viewsArrayYaml)
-                            namesArray.push("'" + this.sources.viewsArrayYaml[i].view.name + "'");
+                            namesArray.push("'" + this.sources.viewsArrayYaml[i].contentFile.view.name + "'");
                         break;
                     case GlobalTypes.ArrayobjectType[3]:
                         for (let i in this.sources.generatorsArrayYaml)
-                            namesArray.push("'" + this.sources.generatorsArrayYaml[i].generator.name + "'");
+                            namesArray.push("'" + this.sources.generatorsArrayYaml[i].contentFile.generator.name + "'");
                         break;
                 }
                 if (namesArray.length > 0) {
@@ -395,7 +395,7 @@ class pgExtractMetadata {
                             if (String(rTrigger[j].triggerEvent).indexOf('DELETE') !== -1) {
                                 outTriggerTables[outTriggerTables.length - 1].trigger.events.push('DELETE');
                             }
-                            if (rTrigger[i].description !== null) {
+                            if (rTrigger[j].description !== null) {
                                 outTriggerTables[outTriggerTables.length - 1].trigger.description = rTrigger[j].description;
                             }
                             //outTriggerTables[outTriggerTables.length - 1].trigger.position = rTrigger[i].SEQUENCE;
@@ -408,9 +408,9 @@ class pgExtractMetadata {
                         outTrigger.triggerFunction.function.description = rTriggerFunction[i].description;
                     outTrigger.triggerFunction.function.executionCost = rTriggerFunction[i].cost;
                     outTrigger.triggerFunction.function.language = rTriggerFunction[i].languageName;
-                    outTrigger.triggerFunction.function.resultRows = rTriggerFunction[i].rows;
+                    //outTrigger.triggerFunction.function.resultRows = rTriggerFunction[i].rows;
                     outTrigger.triggerFunction.function.options.optimization.type = rTriggerFunction[i].volatility;
-                    outTrigger.triggerFunction.function.options.optimization.returnNullonNullInput = rTriggerFunction[i].isStrict;
+                    //outTrigger.triggerFunction.function.options.optimization.returnNullonNullInput = rTriggerFunction[i].isStrict;
                     outTrigger.triggerFunction.triggers = outTriggerTables;
                     if (aRetYaml) {
                         outReturnYaml.push(outTrigger);

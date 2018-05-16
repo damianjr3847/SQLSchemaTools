@@ -58,23 +58,23 @@ export class fbExtractMetadata {
                 switch (aObjectType) {
                     case GlobalTypes.ArrayobjectType[2]:
                         for (let i in this.sources.tablesArrayYaml)
-                            namesArray.push("'" + this.sources.tablesArrayYaml[i].table.name + "'")
+                            namesArray.push("'" + this.sources.tablesArrayYaml[i].contentFile.table.name + "'")
                         break;
                     case GlobalTypes.ArrayobjectType[0]:
                         for (let i in this.sources.proceduresArrayYaml)
-                            namesArray.push("'" + this.sources.proceduresArrayYaml[i].procedure.name + "'")
+                            namesArray.push("'" + this.sources.proceduresArrayYaml[i].contentFile.procedure.name + "'")
                         break;
                     case GlobalTypes.ArrayobjectType[1]:
                         for (let i in this.sources.triggersArrayYaml)
-                            namesArray.push("'" + this.sources.triggersArrayYaml[i].triggerFunction.name + "'")
+                            namesArray.push("'" + this.sources.triggersArrayYaml[i].contentFile.triggerFunction.name + "'")
                         break;
                     case GlobalTypes.ArrayobjectType[4]:
                         for (let i in this.sources.viewsArrayYaml)
-                            namesArray.push("'" + this.sources.viewsArrayYaml[i].view.name + "'")
+                            namesArray.push("'" + this.sources.viewsArrayYaml[i].contentFile.view.name + "'")
                         break;
                     case GlobalTypes.ArrayobjectType[3]:
                         for (let i in this.sources.generatorsArrayYaml)
-                            namesArray.push("'" + this.sources.generatorsArrayYaml[i].generator.name + "'")
+                            namesArray.push("'" + this.sources.generatorsArrayYaml[i].contentFile.generator.name + "'")
                         break;
                 }
                 if (namesArray.length > 0) {

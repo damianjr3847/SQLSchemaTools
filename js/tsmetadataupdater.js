@@ -37,6 +37,7 @@ let beginTime;
 let endTime;
 let textTime = '';
 let dbRole = '';
+let saveafterapply = '';
 /**********para pruebas */
 /*let actionYalm:string       = 'write';
 let source1:string          = './export/';
@@ -79,6 +80,7 @@ params.option('-e, --exclude <excludeobject>', 'opcional, filtros de objetos a e
 params.option('--excludefrom <pathexclude>', 'opcional, generar matadata exluyendo objetos de dicho path');
 params.option('-l, --savetolog <tabla>', 'seguido de la tabla, guarda en la db el log de los querys ejecutados');
 params.option('--conf <archivoconf>', 'archivo de configuracion');
+params.option('--saveafterapply <pathsave>', 'Path del directorio donde se guardaran los archivos despues de aplicar cambios en el metadata solo PG');
 params.parse(process.argv);
 // validacion de parametros
 if (params.conf) {
@@ -144,6 +146,9 @@ if (params.conf) {
                 break;
             case 'savetolog':
                 saveToLog = aValue;
+                break;
+            case 'saveafterapply':
+                saveafterapply = aValue;
                 break;
         }
     });
@@ -293,6 +298,14 @@ if (excludefrom !== '') {
         process.exit(1);
     }
 }
+if (saveafterapply !== '') {
+    if (!(saveafterapply.endsWith('/')))
+        saveafterapply += '/';
+    if (!fs.existsSync(saveafterapply)) {
+        console.log('el path saveafterapply %j no existe', saveafterapply);
+        process.exit(1);
+    }
+}
 if (params.nofolders)
     nofolders = true;
 /*console.log('actionYalm: %j',actionYalm);
@@ -368,6 +381,7 @@ console.log('p '+params.outscript)
             pgam.sources.pathSource1 = source1;
             pgam.sources.pathSource2 = source2;
             pgam.pathFileScript = pathfilescript;
+            pgam.saveafterapply = saveafterapply;
             pgam.excludeObject = excludeObject;
             pgam.saveToLog = saveToLog.toLowerCase();
             if (pathfilescript !== '')

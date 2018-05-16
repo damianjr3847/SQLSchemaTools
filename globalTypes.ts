@@ -54,12 +54,10 @@ export interface iTriggerYamlType {
 			language?: string,
 			options: {
 				optimization: {
-					type?: string,
-					returnNullonNullInput?: boolean
+					type?: string
 				}
 			},
 			executionCost?: number,
-			resultRows?: number,
 			description?: string, //solo se llena en postgre si la hay
 			body?: string
 		}
@@ -76,12 +74,10 @@ export function emptyTriggerYamlType() {
 				language: 'plpgsql',
 				options: {
 					optimization: {
-						type: 'STABLE',
-						returnNullonNullInput: false
+						type: 'STABLE'						
 					}
 				},
-				executionCost: 100,
-				resultRows: 1000,
+				executionCost: 100,				
 				body: ''
 			}
 		}

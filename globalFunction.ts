@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as fbClass from './classFirebird';
 import * as GlobalTypes from './globalTypes';
+import * as loadsource from './loadsource';
 
 //esta funcion devuelve falso si el valor de aName esta dentro de los objetos a excluir
 //devuelve true si se puede aplicar el cambio
@@ -40,7 +41,7 @@ export function arrayToString(aArray: Array<any>, aSeparated: string = '', aSubV
     return aText;
 }
 
-export function readRecursiveDirectory(dir: string, aPathUnido: boolean = true): Array<any> {
+export function readRecursiveDirectory(dir: string): Array<any> {
     var retArrayFile: Array<any> = [];
     var files: any;
     var fStat: any;
@@ -52,13 +53,8 @@ export function readRecursiveDirectory(dir: string, aPathUnido: boolean = true):
         fStat = fs.statSync(dir + files[i]);
         if (fStat && fStat.isDirectory())
             retArrayFile = retArrayFile.concat(readRecursiveDirectory(dir + files[i]));
-        else {
-            if (aPathUnido)
-                retArrayFile.push(dir + files[i]);
-            else
-                retArrayFile.push({path:dir, file: files[i]});
-                
-        }    
+        else
+            retArrayFile.push({ path: dir, file: files[i], ctime: fStat.ctime, atime: fStat.atime, mtime: fStat.mtime, ctimeMs: fStat.ctimeMs, atimeMs: fStat.atimeMs, mtimeMs: fStat.mtimeMs });
     }
     return retArrayFile;
 };
@@ -120,7 +116,7 @@ export function varToSql(aValue: any, AType: number, ASubType: number) {
 
 export function varToJSON(aValue: any, AType: number, ASubType: number) {
     let ft: any;
-    let aDate: string = '';    
+    let aDate: string = '';
 
     if (aValue === null)
         ft = null;
@@ -149,7 +145,7 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
                 if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
                     ft = '';
                 else
-                    ft = aValue.toString('binary');                
+                    ft = aValue.toString('binary');
                 break;
             case 261: //blob
                 if (ASubType === 1) {
@@ -180,8 +176,8 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
                 throw new Error(AType + ' tipo de dato no reconocido');
         }
     }
-    if (ft !== null || String(ft).indexOf('ACEITE') !== -1)     
-        aValue=aValue;
+    if (ft !== null || String(ft).indexOf('ACEITE') !== -1)
+        aValue = aValue;
     return ft;
 }
 export function quotedString(aValue: string): string {
@@ -235,4 +231,40 @@ export function outFileScript(aType: string, aScript: Array<any> | string, pathF
             }
             break;
     }
+}
+
+export function isChange(aFileToApply: loadsource.ifile, aOriginalMetadata: Array<any>, aType: string) {
+    let j: number = 0;
+    let ret: boolean = false;
+
+    if (aOriginalMetadata.length === 0)
+        ret = true;
+    else {
+        j = -1;
+        switch (aType) {
+            case GlobalTypes.ArrayobjectType[0]: //procedures
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.procedure.name.toLowerCase().trim() === aFileToApply.contentFile.procedure.name.toLowerCase().trim()));
+                break;
+            case GlobalTypes.ArrayobjectType[1]: //trigger
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.triggerFunction.name.toLowerCase().trim() === aFileToApply.contentFile.triggerFunction.name.toLowerCase().trim()));
+                break;
+            case GlobalTypes.ArrayobjectType[2]: //tables
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.table.name.toLowerCase().trim() === aFileToApply.contentFile.table.name.toLowerCase().trim()));
+                break;
+            case GlobalTypes.ArrayobjectType[3]: //generator
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.generator.name.toLowerCase().trim() === aFileToApply.contentFile.generator.name.toLowerCase().trim()));
+                break;
+            case GlobalTypes.ArrayobjectType[4]: //views
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.view.name.toLowerCase().trim() === aFileToApply.contentFile.view.name.toLowerCase().trim()));
+                break;
+        }
+        if (j === -1)
+            ret = true;
+        else {  
+            if (aFileToApply.ctime > aOriginalMetadata[j].ctime)
+                ret = true;
+        }
+    }
+
+    return ret;
 }

@@ -39,7 +39,7 @@ function arrayToString(aArray, aSeparated = '', aSubValue = '') {
     return aText;
 }
 exports.arrayToString = arrayToString;
-function readRecursiveDirectory(dir, aPathUnido = true) {
+function readRecursiveDirectory(dir) {
     var retArrayFile = [];
     var files;
     var fStat;
@@ -50,12 +50,8 @@ function readRecursiveDirectory(dir, aPathUnido = true) {
         fStat = fs.statSync(dir + files[i]);
         if (fStat && fStat.isDirectory())
             retArrayFile = retArrayFile.concat(readRecursiveDirectory(dir + files[i]));
-        else {
-            if (aPathUnido)
-                retArrayFile.push(dir + files[i]);
-            else
-                retArrayFile.push({ path: dir, file: files[i] });
-        }
+        else
+            retArrayFile.push({ path: dir, file: files[i], ctime: fStat.ctime, atime: fStat.atime, mtime: fStat.mtime, ctimeMs: fStat.ctimeMs, atimeMs: fStat.atimeMs, mtimeMs: fStat.mtimeMs });
     }
     return retArrayFile;
 }
@@ -144,15 +140,13 @@ function varToJSON(aValue, AType, ASubType) {
                     ft = '';
                 else
                     ft = aValue.toString('binary');
-                //ft = decodeURIComponent(escape(aValue));
-                ft = unescape(encodeURIComponent(aValue));
                 break;
             case 261://blob
                 if (ASubType === 1) {
                     if (aValue === undefined)
                         ft = '';
                     else {
-                        ft = aValue.toString();
+                        ft = aValue.toString('binary');
                     }
                 }
                 else {
@@ -232,4 +226,38 @@ function outFileScript(aType, aScript, pathFileScript) {
     }
 }
 exports.outFileScript = outFileScript;
+function isChange(aFileToApply, aOriginalMetadata, aType) {
+    let j = 0;
+    let ret = false;
+    if (aOriginalMetadata.length === 0)
+        ret = true;
+    else {
+        j = -1;
+        switch (aType) {
+            case GlobalTypes.ArrayobjectType[0]://procedures
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.procedure.name.toLowerCase().trim() === aFileToApply.contentFile.procedure.name.toLowerCase().trim()));
+                break;
+            case GlobalTypes.ArrayobjectType[1]://trigger
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.triggerFunction.name.toLowerCase().trim() === aFileToApply.contentFile.triggerFunction.name.toLowerCase().trim()));
+                break;
+            case GlobalTypes.ArrayobjectType[2]://tables
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.table.name.toLowerCase().trim() === aFileToApply.contentFile.table.name.toLowerCase().trim()));
+                break;
+            case GlobalTypes.ArrayobjectType[3]://generator
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.generator.name.toLowerCase().trim() === aFileToApply.contentFile.generator.name.toLowerCase().trim()));
+                break;
+            case GlobalTypes.ArrayobjectType[4]://views
+                j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.view.name.toLowerCase().trim() === aFileToApply.contentFile.view.name.toLowerCase().trim()));
+                break;
+        }
+        if (j === -1)
+            ret = true;
+        else {
+            if (aFileToApply.ctime > aOriginalMetadata[j].ctime)
+                ret = true;
+        }
+    }
+    return ret;
+}
+exports.isChange = isChange;
 //# sourceMappingURL=globalFunction.js.map

@@ -168,7 +168,7 @@ export class pgExtractLoadData {
 
                 await this.pgDb.query('COMMIT');
 
-                filesDirSource1 = globalFunction.readRecursiveDirectory(this.filesPath, false);
+                filesDirSource1 = globalFunction.readRecursiveDirectory(this.filesPath);
 
 
                 for (let i = 0; i < filesDirSource1.length; i++) {

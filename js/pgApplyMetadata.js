@@ -26,8 +26,10 @@ class pgApplyMetadata {
         this.saveToLog = '';
         this.schema = defaultSchema;
         this.dbRole = '';
+        this.saveafterapply = '';
         this.sources = new sources.tSource;
         this.pgExMe = new pgExtractMetadata.pgExtractMetadata;
+        this.originalMetadata = new sources.tSource;
     }
     async validate(aQuery, aParam) {
         let rResult;
@@ -86,16 +88,7 @@ class pgApplyMetadata {
     //****************************************************************** */
     //        P R O C E D U R E S
     //******************************************************************* */
-    async applyProcedures() {
-        let procedureName = '';
-        let fileYaml;
-        let dbYaml = [];
-        let procedureBody = '';
-        let procedureParams = '';
-        let procedureInDB;
-        let j = 0;
-        let rQuery = [];
-        let withOutputs = false;
+    async readProcedures(aWithBody, dbYaml) {
         let paramString = (aParam, aExtra, aInOut, aOnlyType = false) => {
             let aText = '';
             if (aParam.length > 0) {
@@ -180,10 +173,18 @@ class pgApplyMetadata {
             }
             return aProc;
         };
-        let readProcedures = async (aWithBody) => {
-            let cambios = false;
+        let procedureName = '';
+        let cambios = false;
+        let fileYaml;
+        let procedureBody = '';
+        let procedureParams = '';
+        let procedureInDB;
+        let j = 0;
+        let rQuery = [];
+        let withOutputs = false;
+        try {
             for (let i in this.sources.proceduresArrayYaml) {
-                fileYaml = this.sources.proceduresArrayYaml[i];
+                fileYaml = this.sources.proceduresArrayYaml[i].contentFile;
                 procedureName = fileYaml.procedure.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
                     j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
@@ -210,7 +211,13 @@ class pgApplyMetadata {
                 }
             }
             return cambios;
-        };
+        }
+        catch (err) {
+            throw new Error('Error aplicando procedimiento ' + procedureName + '. ' + err.message + GlobalTypes.CR + procedureBody);
+        }
+    }
+    async applyProcedures() {
+        let dbYaml = [];
         try {
             await this.pgDb.query('BEGIN');
             try {
@@ -219,37 +226,95 @@ class pgApplyMetadata {
             finally {
                 await this.pgDb.query('COMMIT');
             }
-            if (await readProcedures(false)) {
-                await readProcedures(true);
+            if (await this.readProcedures(false, dbYaml)) {
+                await this.readProcedures(true, dbYaml);
             }
             //console.log(Date.now());               
         }
         catch (err) {
-            throw new Error('Error aplicando procedimiento ' + procedureName + '. ' + err.message + GlobalTypes.CR + procedureBody);
+            throw new Error(err.message);
         }
     }
     //****************************************************************** */
     //        T R I G G E R S
     //******************************************************************* */
     async applyTriggers() {
-        let triggerYamltoString = (aYaml) => {
+        /*
+        CREATE FUNCTION public.prueba()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    VOLATILE NOT LEAKPROOF
+
+    CREATE TRIGGER t_art_arch_ean
+    BEFORE INSERT OR DELETE OR UPDATE
+    ON public.art_arch
+    FOR EACH ROW
+    EXECUTE PROCEDURE public."T_ART_ARCH_EAN"();*/
+        let triggerYamltoString = (aYaml, aDbYaml) => {
             let aProc = '';
-            aProc = 'CREATE OR ALTER TRIGGER ' + globalFunction.quotedString(aYaml.triggerFunction.name) + ' FOR ';
-            aProc += aYaml.triggerFunction.triggers[0].trigger.table;
-            if (aYaml.triggerFunction.triggers[0].trigger.active) {
-                aProc += ' ACTIVE ';
+            let rTrigger = [];
+            let x = 0;
+            let aAux = [];
+            for (let i = 0; i < aYaml.triggerFunction.triggers.length; i++) {
+                //si existe borro el trigger
+                if (aDbYaml !== undefined) {
+                    aAux = aDbYaml.triggerFunction.triggers;
+                    if (aAux.length > 0) {
+                        x = aAux.findIndex(aItem => (aItem.trigger.name.toLowerCase().trim() === aYaml.triggerFunction.triggers[i].trigger.name.toLowerCase().trim()));
+                        if (x !== -1)
+                            rTrigger.push('DROP TRIGGER ' + aYaml.triggerFunction.triggers[i].trigger.name + ' ON ' + this.schema + '.' + globalFunction.quotedString(aYaml.triggerFunction.triggers[i].trigger.table));
+                    }
+                }
+                aProc = 'CREATE TRIGGER ' + globalFunction.quotedString(aYaml.triggerFunction.triggers[i].trigger.name) + GlobalTypes.CR;
+                aProc += aYaml.triggerFunction.triggers[i].trigger.fires + ' ';
+                aProc += aYaml.triggerFunction.triggers[i].trigger.events[0];
+                for (let j = 1; j < aYaml.triggerFunction.triggers[i].trigger.events.length; j++) {
+                    aProc += ' OR ' + aYaml.triggerFunction.triggers[i].trigger.events[j];
+                }
+                ;
+                aProc += GlobalTypes.CR;
+                aProc += 'ON ' + this.schema + '.' + globalFunction.quotedString(aYaml.triggerFunction.triggers[i].trigger.table) + GlobalTypes.CR;
+                aProc += 'FOR EACH ROW' + GlobalTypes.CR;
+                aProc += 'EXECUTE PROCEDURE ' + this.schema + '.' + globalFunction.quotedString(aYaml.triggerFunction.name) + '()';
+                rTrigger.push(aProc);
+                if ('active' in aYaml.triggerFunction.triggers[i].trigger)
+                    if (aYaml.triggerFunction.triggers[i].trigger.active === false)
+                        rTrigger.push('ALTER TABLE ' + this.schema + '.' + globalFunction.quotedString(aYaml.triggerFunction.triggers[i].trigger.table) + ' DISABLE TRIGGER ' + globalFunction.quotedString(aYaml.triggerFunction.triggers[i].trigger.name));
+                if ('description' in aYaml.triggerFunction.triggers[i].trigger)
+                    rTrigger.push('COMMENT ON TRIGGER  ON ' + this.schema + '.' + globalFunction.quotedString(aYaml.triggerFunction.triggers[i].trigger.table) + ' IS ' + "'" + aYaml.triggerFunction.triggers[i].trigger.description + "'");
             }
-            else {
-                aProc += ' INACTIVE ';
+            return rTrigger;
+        };
+        let triggerFunctionYamltoString = (aYaml) => {
+            let aProc = '';
+            aProc = 'CREATE OR REPLACE FUNCTION ' + this.schema + '.' + globalFunction.quotedString(aYaml.triggerFunction.name) + '() ' + GlobalTypes.CR;
+            aProc += 'RETURNS TRIGGER' + GlobalTypes.CR;
+            if ('language' in aYaml.triggerFunction.function) {
+                if (GlobalTypes.ArrayPgFunctionLenguage.indexOf(aYaml.triggerFunction.function.language) > -1) {
+                    aProc += 'LANGUAGE ' + aYaml.triggerFunction.function.language + GlobalTypes.CR;
+                }
+                else
+                    throw new Error('lenguaje no soportado ' + aYaml.triggerFunction.function + '. ' + aYaml.triggerFunction.name);
             }
-            aProc += aYaml.triggerFunction.triggers[0].trigger.fires + ' ';
-            aProc += aYaml.triggerFunction.triggers[0].trigger.events[0];
-            for (let j = 1; j < aYaml.triggerFunction.triggers[0].trigger.events.length; j++) {
-                aProc += ' OR ' + aYaml.triggerFunction.triggers[0].trigger.events[j];
+            else
+                throw new Error('falta lenguaje en ' + aYaml.triggerFunction.name);
+            if ('executionCost' in aYaml.triggerFunction.function) {
+                aProc += 'COST ' + aYaml.triggerFunction.function.executionCost + GlobalTypes.CR;
             }
-            ;
-            aProc += ' POSITION ' + aYaml.triggerFunction.triggers[0].trigger.position;
-            aProc += GlobalTypes.CR + aYaml.triggerFunction.function.body;
+            else
+                aProc += 'COST 100' + GlobalTypes.CR;
+            if ('type' in aYaml.triggerFunction.function.options.optimization) {
+                aProc += aYaml.triggerFunction.function.options.optimization.type + GlobalTypes.CR;
+            }
+            else
+                aProc += 'VOLATILE' + GlobalTypes.CR;
+            //esta puesto por separado el AS y as porque no puedo pasar al body del trigger a upper o lower por si tiene literales
+            if (aYaml.triggerFunction.function.body.startsWith('AS'))
+                aProc += GlobalTypes.CR + aYaml.triggerFunction.function.body.replace('AS', 'AS $BODY$') + ' $BODY$' + GlobalTypes.CR;
+            else if (aYaml.triggerFunction.function.body.startsWith('as'))
+                aProc += GlobalTypes.CR + aYaml.triggerFunction.function.body.replace('as', 'as $BODY$') + ' $BODY$' + GlobalTypes.CR;
+            else
+                aProc += 'AS' + GlobalTypes.CR + '$BODY$' + aYaml.triggerFunction.function.body + GlobalTypes.CR + ' $BODY$';
             return aProc;
         };
         let triggerName = '';
@@ -258,6 +323,7 @@ class pgApplyMetadata {
         let triggerBody = '';
         let triggerInDb = '';
         let j = 0;
+        let rQuery = [];
         try {
             await this.pgDb.query('BEGIN');
             try {
@@ -267,17 +333,25 @@ class pgApplyMetadata {
                 await this.pgDb.query('COMMIT');
             }
             for (let i in this.sources.triggersArrayYaml) {
-                fileYaml = this.sources.triggersArrayYaml[i];
+                fileYaml = this.sources.triggersArrayYaml[i].contentFile;
                 triggerName = fileYaml.triggerFunction.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[1], triggerName)) {
                     j = dbYaml.findIndex(aItem => (aItem.triggerFunction.name.toLowerCase().trim() === triggerName));
-                    triggerBody = triggerYamltoString(fileYaml);
+                    triggerBody = triggerFunctionYamltoString(fileYaml);
                     if (j !== -1) {
-                        triggerInDb = triggerYamltoString(dbYaml[j]);
+                        triggerInDb = triggerFunctionYamltoString(dbYaml[j]);
                     }
+                    rQuery = [];
                     if (triggerBody !== triggerInDb) {
-                        await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, Array(triggerBody));
+                        if (j !== -1)
+                            rQuery.push('DROP FUNCTION ' + this.schema + '.' + triggerName + '()');
+                        rQuery.push(triggerBody);
+                        if (j === -1) {
+                            rQuery.push('ALTER FUNCTION ' + this.schema + '.' + triggerName + '() OWNER TO ' + this.dbRole + ';');
+                        }
+                        await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, rQuery);
                     }
+                    await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, triggerYamltoString(fileYaml, dbYaml[j]));
                     triggerBody = '';
                     triggerInDb = '';
                 }
@@ -318,7 +392,7 @@ class pgApplyMetadata {
                 await this.pgDb.query('COMMIT');
             }
             for (let i in this.sources.viewsArrayYaml) {
-                fileYaml = this.sources.viewsArrayYaml[i];
+                fileYaml = this.sources.viewsArrayYaml[i].contentFile;
                 viewName = fileYaml.view.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[4], viewName)) {
                     j = dbYaml.findIndex(aItem => (aItem.view.name.toLowerCase().trim() === viewName));
@@ -361,18 +435,20 @@ class pgApplyMetadata {
                 this.pgDb.query('COMMIT');
             }
             for (let i in this.sources.generatorsArrayYaml) {
-                fileYaml = this.sources.generatorsArrayYaml[i];
-                genBody = [];
-                genName = fileYaml.generator.name;
-                if (!genName.toUpperCase().startsWith('G_'))
-                    genName = 'G_' + genName;
-                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
-                    genBody.push('CREATE SEQUENCE ' + this.schema + '.' + genName + ' INCREMENT ' + fileYaml.generator.increment.toString() + ';');
-                    genBody.push('ALTER SEQUENCE ' + this.schema + '.' + genName + ' OWNER TO ' + this.dbRole + ';');
-                    if ('description' in fileYaml.generator)
-                        genBody.push('COMMENT ON SEQUENCE ' + this.schema + '.' + genName + " IS '" + fileYaml.generator.description + "';");
-                    if (dbYaml.findIndex(aItem => (aItem.generator.name.toLowerCase() === genName.toLowerCase())) === -1) {
-                        await this.applyChange(GlobalTypes.ArrayobjectType[3], genName, genBody);
+                if (globalFunction.isChange(this.sources.generatorsArrayYaml[i], this.originalMetadata.generatorsArrayYaml, GlobalTypes.ArrayobjectType[3])) {
+                    fileYaml = this.sources.generatorsArrayYaml[i].contentFile;
+                    genBody = [];
+                    genName = fileYaml.generator.name;
+                    if (!genName.toUpperCase().startsWith('G_'))
+                        genName = 'G_' + genName;
+                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
+                        genBody.push('CREATE SEQUENCE ' + this.schema + '.' + genName + ' INCREMENT ' + fileYaml.generator.increment.toString() + ';');
+                        genBody.push('ALTER SEQUENCE ' + this.schema + '.' + genName + ' OWNER TO ' + this.dbRole + ';');
+                        if ('description' in fileYaml.generator)
+                            genBody.push('COMMENT ON SEQUENCE ' + this.schema + '.' + genName + " IS '" + fileYaml.generator.description + "';");
+                        if (dbYaml.findIndex(aItem => (aItem.generator.name.toLowerCase() === genName.toLowerCase())) === -1) {
+                            await this.applyChange(GlobalTypes.ArrayobjectType[3], genName, genBody);
+                        }
                     }
                 }
             }
@@ -404,67 +480,71 @@ class pgApplyMetadata {
                 await this.pgDb.query('COMMIT');
             }
             for (let i in this.sources.tablesArrayYaml) {
-                fileYaml = this.sources.tablesArrayYaml[i];
-                tableName = fileYaml.table.name;
-                if (tableName === 'art_grup')
-                    tableName = tableName;
-                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
-                    j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase() === tableName.toLowerCase()));
-                    tableScript = [];
-                    if (j === -1) {
-                        tableScript = this.newTableYamltoString(fileYaml.table);
-                        tableScript.push('ALTER TABLE ' + this.schema + '.' + tableName + ' OWNER TO ' + this.dbRole + ';');
+                if (globalFunction.isChange(this.sources.tablesArrayYaml[i], this.originalMetadata.tablesArrayYaml, GlobalTypes.ArrayobjectType[2])) {
+                    fileYaml = this.sources.tablesArrayYaml[i].contentFile;
+                    tableName = fileYaml.table.name;
+                    if (tableName === 'art_grup')
+                        tableName = tableName;
+                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
+                        j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase() === tableName.toLowerCase()));
+                        tableScript = [];
+                        if (j === -1) {
+                            tableScript = this.newTableYamltoString(fileYaml.table);
+                            tableScript.push('ALTER TABLE ' + this.schema + '.' + tableName + ' OWNER TO ' + this.dbRole + ';');
+                        }
+                        else {
+                            tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
+                            tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint, this.schema));
+                            tableScript = tableScript.concat(this.getTableDescriptionDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
+                            // ver indices se cambio el formato de los campos que lo componen
+                            tableScript = tableScript.concat(this.getTableIndexesDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
+                        }
+                        if (tableScript.length > 0)
+                            await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                     }
-                    else {
-                        tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
-                        tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint, this.schema));
-                        tableScript = tableScript.concat(this.getTableDescriptionDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
-                        // ver indices se cambio el formato de los campos que lo componen
-                        tableScript = tableScript.concat(this.getTableIndexesDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
-                    }
-                    if (tableScript.length > 0)
-                        await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                 }
             }
             // solamente para los constraint van a lo ultimo por los foreinkey
             for (let i in this.sources.tablesArrayYaml) {
-                fileYaml = this.sources.tablesArrayYaml[i];
-                tableName = fileYaml.table.name.toLowerCase().trim();
-                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
-                    j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase().trim() === tableName));
-                    tableScript = [];
-                    if (j === -1) {
-                        if ('constraint' in fileYaml.table) {
-                            if ('foreignkeys' in fileYaml.table.constraint)
-                                tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), fileYaml.table.constraint.foreignkeys, this.schema));
+                if (globalFunction.isChange(this.sources.tablesArrayYaml[i], this.originalMetadata.tablesArrayYaml, GlobalTypes.ArrayobjectType[2])) {
+                    fileYaml = this.sources.tablesArrayYaml[i].contentFile;
+                    tableName = fileYaml.table.name.toLowerCase().trim();
+                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
+                        j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase().trim() === tableName));
+                        tableScript = [];
+                        if (j === -1) {
+                            if ('constraint' in fileYaml.table) {
+                                if ('foreignkeys' in fileYaml.table.constraint)
+                                    tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), fileYaml.table.constraint.foreignkeys, this.schema));
+                            }
                         }
-                    }
-                    else {
-                        //tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint));
-                        if ('foreignkeys' in fileYaml.table.constraint) {
-                            if ('foreignkeys' in dbYaml[j].table.constraint)
-                                arrayAux = dbYaml[j].table.constraint.foreignkeys;
-                            else
-                                arrayAux = [];
-                            for (let z = 0; z < fileYaml.table.constraint.foreignkeys.length; z++) {
-                                iDB = arrayAux.findIndex(aItem => (aItem.foreignkey.name.toLowerCase().trim() === fileYaml.table.constraint.foreignkeys[z].foreignkey.name.toLowerCase().trim()));
-                                if (iDB === -1)
-                                    tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z]), this.schema));
-                                else {
-                                    if (String(fileYaml.table.constraint.foreignkeys[z].foreignkey.onColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.onColumn).trim().toUpperCase() ||
-                                        String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toTable).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toTable).trim().toUpperCase() ||
-                                        String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase() ||
-                                        String(fileYaml.table.constraint.foreignkeys[z].foreignkey.updateRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.updateRole).trim().toUpperCase() ||
-                                        String(fileYaml.table.constraint.foreignkeys[z].foreignkey.deleteRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.deleteRole).trim().toUpperCase()) {
-                                        tableScript.push('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DROP CONSTRAINT ' + globalFunction.quotedString(fileYaml.table.constraint.foreignkeys[z].foreignkey.name) + ';');
+                        else {
+                            //tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint));
+                            if ('foreignkeys' in fileYaml.table.constraint) {
+                                if ('foreignkeys' in dbYaml[j].table.constraint)
+                                    arrayAux = dbYaml[j].table.constraint.foreignkeys;
+                                else
+                                    arrayAux = [];
+                                for (let z = 0; z < fileYaml.table.constraint.foreignkeys.length; z++) {
+                                    iDB = arrayAux.findIndex(aItem => (aItem.foreignkey.name.toLowerCase().trim() === fileYaml.table.constraint.foreignkeys[z].foreignkey.name.toLowerCase().trim()));
+                                    if (iDB === -1)
                                         tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z]), this.schema));
+                                    else {
+                                        if (String(fileYaml.table.constraint.foreignkeys[z].foreignkey.onColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.onColumn).trim().toUpperCase() ||
+                                            String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toTable).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toTable).trim().toUpperCase() ||
+                                            String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase() ||
+                                            String(fileYaml.table.constraint.foreignkeys[z].foreignkey.updateRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.updateRole).trim().toUpperCase() ||
+                                            String(fileYaml.table.constraint.foreignkeys[z].foreignkey.deleteRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.deleteRole).trim().toUpperCase()) {
+                                            tableScript.push('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DROP CONSTRAINT ' + globalFunction.quotedString(fileYaml.table.constraint.foreignkeys[z].foreignkey.name) + ';');
+                                            tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z]), this.schema));
+                                        }
                                     }
                                 }
                             }
                         }
+                        if (tableScript.length > 0)
+                            await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                     }
-                    if (tableScript.length > 0)
-                        await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                 }
             }
         }
@@ -672,17 +752,39 @@ class pgApplyMetadata {
             if (this.saveToLog)
                 await this.checkMetadataLog();
             try {
+                if (this.saveafterapply !== '') {
+                    this.pgExMe.excludeObject = this.excludeObject;
+                    this.pgExMe.schema = this.schema;
+                    this.pgExMe.filesPath = this.saveafterapply;
+                    this.originalMetadata.pathSource1 = this.saveafterapply;
+                    this.originalMetadata.readSource(objectType, objectName);
+                }
                 this.sources.readSource(objectType, objectName);
-                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[3])
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[3]) {
                     await this.applyGenerators();
-                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[2])
+                    if (this.saveafterapply !== '')
+                        await this.pgExMe.extractMetadataGenerators(objectName, false, false);
+                }
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[2]) {
                     await this.applyTables();
-                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[4])
+                    if (this.saveafterapply !== '')
+                        await this.pgExMe.extractMetadataTables(objectName, false, false);
+                }
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[4]) {
                     await this.applyViews();
-                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[0])
+                    if (this.saveafterapply !== '')
+                        await this.pgExMe.extractMetadataViews(objectName, false, false);
+                }
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[0]) {
                     await this.applyProcedures();
-                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[1])
+                    if (this.saveafterapply !== '')
+                        await this.pgExMe.extractMetadataProcedures(objectName, false, false);
+                }
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[1]) {
                     await this.applyTriggers();
+                    if (this.saveafterapply !== '')
+                        await this.pgExMe.extractMetadataTriggers(objectName, false, false);
+                }
             }
             finally {
                 await this.pgDb.end();

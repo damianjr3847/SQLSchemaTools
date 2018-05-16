@@ -34,12 +34,10 @@ function emptyTriggerYamlType() {
                 language: 'plpgsql',
                 options: {
                     optimization: {
-                        type: 'STABLE',
-                        returnNullonNullInput: false
+                        type: 'STABLE'
                     }
                 },
                 executionCost: 100,
-                resultRows: 1000,
                 body: ''
             }
         }

@@ -137,7 +137,7 @@ class pgExtractLoadData {
                 rQuery = await this.pgDb.query(this.analyzeQuery(metadataQuerys.queryTablesViewFields, objectName, GlobalTypes.ArrayobjectType[5]), []);
                 rFields = rQuery.rows;
                 await this.pgDb.query('COMMIT');
-                filesDirSource1 = globalFunction.readRecursiveDirectory(this.filesPath, false);
+                filesDirSource1 = globalFunction.readRecursiveDirectory(this.filesPath);
                 for (let i = 0; i < filesDirSource1.length; i++) {
                     tableName = filesDirSource1[i].file;
                     tableName = tableName.substring(0, tableName.length - 4); //quito extension
