@@ -41,7 +41,7 @@ class pgExtractLoadData {
         let aRet = aQuery;
         aRet = aRet.replace(new RegExp('{FILTER_SCHEMA}', 'g'), "'" + this.schema + "'");
         if (aObjectName !== '')
-            aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(cc.objectName)) = '" + aObjectName.toUpperCase() + "'");
+            aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(cc." + '"objectName")) = ' + "'" + aObjectName.toUpperCase().trim() + "'");
         else
             aRet = aRet.replace('{FILTER_OBJECT}', '');
         aRet = aRet.replace('{RELTYPE}', " AND relkind IN ('r','t','f') ");
@@ -167,6 +167,46 @@ class pgExtractLoadData {
         catch (err) {
             console.error(err.message);
             process.exit(1);
+        }
+    }
+    async loadDataStream(ahostName, aportNumber, adatabase, adbUser, adbPassword, objectName, adbRole) {
+        let execute = (aStream, afileStream) => {
+            return new Promise((resolve, reject) => {
+                afileStream.pipe(aStream).on('finish', function () {
+                    resolve();
+                }).on('error', function (err) {
+                    reject(err);
+                });
+            });
+        };
+        let tableName = '';
+        let filesDirSource1 = [];
+        let copyFrom = require('pg-copy-streams').from;
+        filesDirSource1 = globalFunction.readRecursiveDirectory(this.filesPath);
+        this.connectionString.host = ahostName;
+        this.connectionString.database = adatabase;
+        this.connectionString.password = adbPassword;
+        this.connectionString.user = adbUser;
+        this.connectionString.port = aportNumber;
+        this.pgDb = new pg.Client(this.connectionString);
+        //await this.pgDb.query('SET ROLE ' + adbRole);
+        try {
+            await this.pgDb.connect();
+            try {
+                for (let i = 0; i < filesDirSource1.length; i++) {
+                    tableName = filesDirSource1[i].file;
+                    tableName = tableName.substring(0, tableName.length - 4); //quito extension
+                    let stream = this.pgDb.query(copyFrom('COPY ' + tableName + ' FROM STDIN WITH CSV HEADER'));
+                    let fileStream = fs.createReadStream(filesDirSource1[i].path + filesDirSource1[i].file);
+                    await execute(stream, fileStream);
+                }
+            }
+            finally {
+                await this.pgDb.end();
+            }
+        }
+        catch (err) {
+            console.log(err.message);
         }
     }
 }

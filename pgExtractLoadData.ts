@@ -56,7 +56,7 @@ export class pgExtractLoadData {
         aRet = aRet.replace(new RegExp('{FILTER_SCHEMA}', 'g'), "'" + this.schema + "'");
 
         if (aObjectName !== '')
-            aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(cc.objectName)) = '" + aObjectName.toUpperCase() + "'")
+            aRet = aRet.replace('{FILTER_OBJECT}', "WHERE UPPER(TRIM(cc." + '"objectName")) = ' + "'" + aObjectName.toUpperCase().trim() + "'")
         else
             aRet = aRet.replace('{FILTER_OBJECT}', '');
 
@@ -81,7 +81,7 @@ export class pgExtractLoadData {
         let j: number = 0;
         let rs: fs.ReadStream;
         let filelines: any;
-        let jsonline: any;        
+        let jsonline: any;
 
         let processLine = async (line: any) => {
             let aValues: Array<any> = [];
@@ -107,12 +107,12 @@ export class pgExtractLoadData {
                 query += '$' + jsonline.length.toString() + ')';
             }
             else {
-                if (line !== '') {                    
+                if (line !== '') {
                     try {
                         jsonline = JSON.parse(line);
                         for (let z = 0; z < jsonline.length; z++) {
-                            if (jsonline[z] === null) 
-                                aValues.push(null);    
+                            if (jsonline[z] === null)
+                                aValues.push(null);
                             else if (typeof jsonline[z] === 'object') {
                                 for (let jname in jsonline[z]) {
                                     if (jname === '$numberlong' || jname === '$numberint') {
@@ -124,17 +124,17 @@ export class pgExtractLoadData {
                                     else if (jname === '$date') {
                                         aValues.push(jsonline[z][jname]);
                                     }
-                                    else 
+                                    else
                                         throw new Error(jname + ', tipo de dato no soportado');
                                 }
                             }
-                            else 
+                            else
                                 aValues.push(jsonline[z]);
                         }
                         await this.pgDb.query(query, aValues);
                     }
                     catch (err) {
-                        throw new Error('linea '+contline.toString() + '. ' +err.message);
+                        throw new Error('linea ' + contline.toString() + '. ' + err.message);
                     }
                 }
             }
@@ -181,20 +181,20 @@ export class pgExtractLoadData {
                         filelines = fs.readFileSync(filesDirSource1[i].path + filesDirSource1[i].file);
 
                         console.log(filesDirSource1[i].path + filesDirSource1[i].file);
-                        contline = 0;                        
+                        contline = 0;
 
                         //for (let line in filelines.toString().split(String.fromCharCode(10))) {
-                        try {     
+                        try {
                             await this.pgDb.query('BEGIN');
                             await filelines.toString().split(/\r?\n/).forEach(async function (line: any) {
                                 await processLine(line);
                             });
                             await this.pgDb.query('COMMIT');
                         }
-                        catch (err){                            
+                        catch (err) {
                             console.error('linea ' + contline + ' ' + err.message);
-                            throw new Error(err.message);   
-                        }                            
+                            throw new Error(err.message);
+                        }
                     }
 
                 }
@@ -207,6 +207,58 @@ export class pgExtractLoadData {
             console.error(err.message);
             process.exit(1);
         }
+    }
+
+    public async loadDataStream(ahostName: string, aportNumber: number, adatabase: string, adbUser: string, adbPassword: string, objectName: string, adbRole: string) {
+        let execute = (aStream: any, afileStream: any) => {
+            return new Promise<any>((resolve, reject) => {
+                afileStream.pipe(aStream).on('finish', function () {
+                    resolve();                
+                }).on('error', function (err: any) {
+                    reject(err)
+                });
+            });
+        }
+    
+        let tableName: string = '';
+        let filesDirSource1: Array<any> = [];
+        let copyFrom = require('pg-copy-streams').from;
+
+        filesDirSource1 = globalFunction.readRecursiveDirectory(this.filesPath);
+
+        this.connectionString.host = ahostName;
+        this.connectionString.database = adatabase;
+        this.connectionString.password = adbPassword;
+        this.connectionString.user = adbUser;
+        this.connectionString.port = aportNumber;
+
+        this.pgDb = new pg.Client(this.connectionString);
+
+        //await this.pgDb.query('SET ROLE ' + adbRole);
+
+        try {
+
+            await this.pgDb.connect();
+            try {
+                for (let i = 0; i < filesDirSource1.length; i++) {
+                    tableName = filesDirSource1[i].file;
+                    tableName = tableName.substring(0, tableName.length - 4); //quito extension
+
+                    console.log('Importando '+tableName);
+                    
+                    let stream = this.pgDb.query(copyFrom('COPY ' + tableName + ' FROM STDIN WITH CSV HEADER'));
+                    let fileStream = fs.createReadStream(filesDirSource1[i].path+filesDirSource1[i].file)
+                    await execute(stream,fileStream);
+                }
+            }
+            finally {
+                await this.pgDb.end();            
+            }
+        }
+        catch (err) {
+            console.log(err.message);
+        }
+        
     }
 }
 

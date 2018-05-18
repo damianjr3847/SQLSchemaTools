@@ -23,6 +23,7 @@
     "js-yaml": "^3.10.0",
     "node-firebird": "git+https://github.com/kattunga/node-firebird.git",
     "pg": "^7.4.1",
+    "pg-copy-streams": "^1.2.0",
     "pg-structure": "^4.1.0",
     "typescript": "^2.7.2"
   },

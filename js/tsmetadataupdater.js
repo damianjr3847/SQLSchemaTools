@@ -219,10 +219,10 @@ if (dbUser === '') {
 }
 if (params.dbpass)
     dbPass = params.dbpass;
-if (dbPass === '') {
+/*if (dbPass === '') {
     console.log('falta dbpass');
     process.exit(1);
-}
+}*/
 if (params.dbhost)
     dbHost = params.dbhost;
 if (dbHost === '') {
@@ -361,6 +361,7 @@ console.log('p '+params.outscript)
             fbdata = new fbExtractLoadData.fbExtractLoadData;
             fbdata.filesPath = pathSave;
             fbdata.excludeObject = excludeObject;
+            fbdata.formatExport = 'csv';
             await fbdata.extractData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName);
         }
     }
@@ -396,7 +397,7 @@ console.log('p '+params.outscript)
             pgdata = new pgExtractLoadData.pgExtractLoadData;
             pgdata.filesPath = source1;
             pgdata.excludeObject = excludeObject;
-            await pgdata.loadData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName, dbRole);
+            await pgdata.loadDataStream(dbHost, dbPort, dbPath, dbUser, dbPass, objectName, dbRole);
         }
     }
     endTime = new Date();

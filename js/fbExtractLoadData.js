@@ -5,32 +5,42 @@ const fbClass = require("./classFirebird");
 const GlobalTypes = require("./globalTypes");
 const globalFunction = require("./globalFunction");
 const metadataQuerys = require("./fbMetadataQuerys");
-function outFileScript(aFields, aData, aTable, filesPath) {
+function outFileScript(aFields, aData, aTable, filesPath, aFormat) {
     const saveTo = 10000;
     let insertQuery = '';
     let contSaveTo = 0;
-    let qQuery = [];
-    let y = 0;
+    let qSQL = [];
     for (let i = 0; i < aData.length; i++) {
-        qQuery = [];
-        y = aData[i].length;
-        for (let j = 0; j < aFields.length; j++)
-            qQuery.push(globalFunction.varToJSON(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType));
-        insertQuery += JSON.stringify(qQuery) + GlobalTypes.CR;
+        qSQL = [];
+        for (let j = 0; j < aFields.length; j++) {
+            if (aFormat === 'sql')
+                qSQL.push(globalFunction.varToJSON(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType));
+            else {
+                if (j < (aFields.length - 1))
+                    insertQuery += globalFunction.varToCSV(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType) + ',';
+                else
+                    insertQuery += globalFunction.varToCSV(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType);
+            }
+        }
+        if (aFormat === 'sql')
+            insertQuery += JSON.stringify(qSQL) + GlobalTypes.CR;
+        else
+            insertQuery += GlobalTypes.CR;
         if (contSaveTo < saveTo)
             contSaveTo++;
         else {
-            fs.appendFileSync(filesPath + aTable + '.sql', insertQuery, 'utf8');
+            fs.appendFileSync(filesPath + aTable + '.' + aFormat, insertQuery, 'utf8');
             contSaveTo = 0;
             insertQuery = '';
         }
     }
-    fs.appendFileSync(filesPath + aTable + '.sql', insertQuery, 'utf8');
+    fs.appendFileSync(filesPath + aTable + '.' + aFormat, insertQuery, 'utf8');
     contSaveTo = 0;
     insertQuery = '';
 }
 class fbExtractLoadData {
     constructor() {
+        this.formatExport = '';
         this.filesPath = '';
         this.fb = new fbClass.fbConnection;
     }
@@ -42,14 +52,15 @@ class fbExtractLoadData {
             aRet = aRet.replace('{FILTER_OBJECT}', '');
         if (aObjectType === GlobalTypes.ArrayobjectType[5]) {
             aRet = aRet.replace('SELECT *', 'SELECT OBJECT_NAME, FIELDNAME, FTYPE, SUBTYPE ');
-            aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL) AND FLD.RDB$COMPUTED_SOURCE IS NULL');
+            aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL) /*AND FLD.RDB$COMPUTED_SOURCE IS NULL*/');
         }
         else
             aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE NOT IN (1,5,4) OR REL.RDB$RELATION_TYPE IS NULL)');
         return aRet;
     }
     async extractData(ahostName, aportNumber, adatabase, adbUser, adbPassword, objectName) {
-        let filepath = this.filesPath; //para poder llamarlo en el callback        
+        let filepath = this.filesPath; //para poder llamarlo en el callback
+        let formatExport = this.formatExport; //para poder llamarlo en el callback          
         let tableName = '';
         let filesDirSource1 = [];
         let rTables = [];
@@ -82,8 +93,8 @@ class fbExtractLoadData {
                         j = rFields.findIndex(aItem => (aItem.OBJECT_NAME.trim() === tableName));
                         qFields = [];
                         qBlobFields = [];
-                        if (fs.existsSync(this.filesPath + tableName + '.sql')) {
-                            fs.unlinkSync(this.filesPath + tableName + '.sql');
+                        if (fs.existsSync(this.filesPath + tableName + '.' + formatExport)) {
+                            fs.unlinkSync(this.filesPath + tableName + '.' + formatExport);
                         }
                         if (j !== -1) {
                             while ((j < rFields.length) && (rFields[j].OBJECT_NAME.trim() === tableName)) {
@@ -100,18 +111,27 @@ class fbExtractLoadData {
                             }
                             await this.fb.startTransaction(true);
                             query = 'SELECT ' + globalFunction.arrayToString(qFields, ',', 'AName') + ' FROM ' + globalFunction.quotedString(tableName);
+                            //query += ' where fcodint=33771';
                             rData = [];
                             xCont = 0;
                             xContGral = 0;
                             console.log(i.toString() + '/' + rTables.length.toString() + ' - extract ' + tableName);
-                            fs.appendFileSync(this.filesPath + tableName + '.sql', '["' + globalFunction.arrayToString(qFields, '","', 'AName') + '"]' + GlobalTypes.CR, 'utf8');
+                            if (formatExport.toLowerCase() === 'sql')
+                                fs.appendFileSync(this.filesPath + tableName + '.sql', '["' + globalFunction.arrayToString(qFields, '","', 'AName') + '"]' + GlobalTypes.CR, 'utf8');
+                            else if (formatExport.toLowerCase() === 'csv')
+                                fs.appendFileSync(this.filesPath + tableName + '.csv', globalFunction.arrayToString(qFields, ',', 'AName') + GlobalTypes.CR, 'utf8');
                             await this.fb.dbSequentially(query, [], async function (row, index) {
                                 let value;
                                 if (qBlobFields.length > 0) {
                                     for (let i in qBlobFields) {
                                         if (row[qBlobFields[i].AName] !== null || row[qBlobFields[i].AName] instanceof Function) {
-                                            if (qBlobFields[i].ASubType === 0)
-                                                value = new Buffer(row[qBlobFields[i].AName]).toString('base64');
+                                            if (qBlobFields[i].ASubType === 0) {
+                                                if (formatExport.toLowerCase() === 'sql')
+                                                    value = new Buffer(row[qBlobFields[i].AName]).toString('base64');
+                                                else
+                                                    (formatExport.toLowerCase() === 'csv');
+                                                value = new Buffer(row[qBlobFields[i].AName]).toString('hex');
+                                            }
                                             row[qBlobFields[i].AName] = value;
                                         }
                                     }
@@ -120,7 +140,7 @@ class fbExtractLoadData {
                                 xCont++;
                                 //console.log(xCont.toString());
                                 if (xCont >= 20000) {
-                                    outFileScript(qFields, rData, tableName, filepath);
+                                    outFileScript(qFields, rData, tableName, filepath, formatExport);
                                     //fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
                                     xContGral += xCont;
                                     console.log('   Registros: ' + xContGral.toString());
@@ -131,7 +151,7 @@ class fbExtractLoadData {
                             if (rData.length > 0) {
                                 xContGral += xCont;
                                 console.log('   Registros: ' + xContGral.toString());
-                                outFileScript(qFields, rData, tableName, filepath);
+                                outFileScript(qFields, rData, tableName, filepath, formatExport);
                                 //fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
                             }
                             await this.fb.commit();

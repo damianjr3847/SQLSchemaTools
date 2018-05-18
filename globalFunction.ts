@@ -180,6 +180,96 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
         aValue = aValue;
     return ft;
 }
+
+function quotedCSV(aValue:string) : string {
+    let ft: string = '';
+    
+    //va con RegExp porque el replace cambia solo la primer ocurrencia.        
+    aValue = aValue.replace(new RegExp('"', 'g'), '""');
+    //aValue = aValue.replace(new RegExp(String.fromCharCode(13), 'g'), '\\r');
+    //aValue = aValue.replace(new RegExp(String.fromCharCode(10), 'g'), '\\n');
+    //aValue = aValue.replace(new RegExp(String.fromCharCode(9), 'g'), '\\t');
+
+
+    if (aValue.indexOf(',') !== -1 || 
+        aValue.indexOf('"') !== -1 || 
+        aValue.indexOf(String.fromCharCode(13)) !== -1 || 
+        aValue.indexOf(String.fromCharCode(10)) !== -1 ||
+        aValue.indexOf(String.fromCharCode(9)) !== -1) 
+        ft = '"'+aValue+'"';
+    else 
+        ft = aValue;
+        
+    return ft;
+}
+
+export function varToCSV(aValue: any, AType: number, ASubType: number) {
+    let ft: string;
+    let aDate: string = '';
+
+    if (aValue === null)
+        ft = '';
+    else {
+        switch (AType) {
+            case 7:
+            case 8:
+            case 16:
+                if (ASubType == 1) //numeric
+                    ft = aValue;
+                else if (ASubType == 2) //decimal
+                    ft = String(aValue).replace(',','.');
+                else if (ASubType == 7) //small
+                    ft = String(aValue).replace(',','.');
+                else if (ASubType == 8) //int
+                    ft = String(aValue).replace(',','.');
+                else
+                    ft = String(aValue).replace(',','.');
+                break;
+            case 10: //float
+            case 27: //double precision
+                ft = String(aValue).replace(',','.');
+                break;
+            case 37:
+            case 14: //varchar-char
+                if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+                    ft = '';
+                else
+                    ft = quotedCSV(aValue.toString('binary')); //por la Ñ
+                break;
+            case 261: //blob
+                if (ASubType === 1) { //type text
+                    if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+                        ft = ''
+                    else {
+                        ft = quotedCSV(aValue.toString('binary')); //por la Ñ
+                    }
+                }
+                else { //type binary
+                    ft = '\\x'+aValue.toString();
+                }
+                break;
+            case 12: //date
+                aDate = new Date(aValue).toLocaleDateString();
+                ft = aDate;
+                break;
+            case 13: //time 
+                aDate = new Date(aValue).toLocaleString();
+                ft = aDate.substr(aDate.indexOf(' ') + 1);
+                break;
+            /*case 12: //date 
+            case 13: //time    */
+            case 35: //timestamp 
+                ft = new Date(aValue).toJSON();
+                break;
+            default:
+                throw new Error(AType + ' tipo de dato no reconocido');
+        }
+    }
+    if (ft !== null || String(ft).indexOf('ACEITE') !== -1)
+        aValue = aValue;
+    return ft;
+}
+
 export function quotedString(aValue: string): string {
     let x: boolean = false;
     // x=/[^A-Z_0-9]/.test(aValue);

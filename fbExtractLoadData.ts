@@ -8,41 +8,58 @@ import * as metadataQuerys from './fbMetadataQuerys';
 import * as nfb from 'node-firebird';
 import { clearTimeout } from 'timers';
 
-function outFileScript(aFields: Array<fbExtractMetadata.iFieldType>, aData: Array<any>, aTable: string, filesPath: string) {
+function outFileScript(aFields: Array<fbExtractMetadata.iFieldType>, aData: Array<any>, aTable: string, filesPath: string, aFormat: string) {
 
     const saveTo: number = 10000;
 
     let insertQuery: string = '';
 
     let contSaveTo: number = 0;
-    let qQuery: Array<any> = [];
-    let y: number = 0;
+    let qSQL: Array<any> = [];
+
+
 
     for (let i = 0; i < aData.length; i++) {
-        qQuery = [];
-        y = aData[i].length;
-        for (let j = 0; j < aFields.length; j++)
-            qQuery.push(globalFunction.varToJSON(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType));
+        
+        qSQL = [];    
 
-        insertQuery += JSON.stringify(qQuery) + GlobalTypes.CR;
+        for (let j = 0; j < aFields.length; j++) {
+            if (aFormat === 'sql')
+                qSQL.push(globalFunction.varToJSON(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType));
+            else {
+                if (j < (aFields.length-1))    
+                    insertQuery += globalFunction.varToCSV(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType) +',';
+                else     
+                    insertQuery += globalFunction.varToCSV(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType);
+            }    
+        }
+
+        if (aFormat === 'sql')
+            insertQuery += JSON.stringify(qSQL) + GlobalTypes.CR;
+        else
+            insertQuery += GlobalTypes.CR;
+
         if (contSaveTo < saveTo)
             contSaveTo++;
         else {
-            fs.appendFileSync(filesPath + aTable + '.sql', insertQuery, 'utf8');
+            fs.appendFileSync(filesPath + aTable + '.' + aFormat, insertQuery, 'utf8');
             contSaveTo = 0;
             insertQuery = '';
         }
 
     }
-    fs.appendFileSync(filesPath + aTable + '.sql', insertQuery, 'utf8');
+    fs.appendFileSync(filesPath + aTable + '.' + aFormat, insertQuery, 'utf8');
     contSaveTo = 0;
     insertQuery = '';
 
 }
 
+
 export class fbExtractLoadData {
 
     public fb: fbClass.fbConnection;
+    public formatExport: string = '';
+
 
     filesPath: string = '';
     excludeObject: any;
@@ -61,7 +78,7 @@ export class fbExtractLoadData {
 
         if (aObjectType === GlobalTypes.ArrayobjectType[5]) { //field  COMPUTED_SOURCE campos calculados
             aRet = aRet.replace('SELECT *', 'SELECT OBJECT_NAME, FIELDNAME, FTYPE, SUBTYPE ');
-            aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL) AND FLD.RDB$COMPUTED_SOURCE IS NULL');
+            aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE<>1 OR REL.RDB$RELATION_TYPE IS NULL) /*AND FLD.RDB$COMPUTED_SOURCE IS NULL*/');
         }
         else //table RELATION_TYPE teporales 
             aRet = aRet.replace('{RELTYPE}', ' AND (REL.RDB$RELATION_TYPE NOT IN (1,5,4) OR REL.RDB$RELATION_TYPE IS NULL)');
@@ -70,7 +87,8 @@ export class fbExtractLoadData {
     }
 
     public async extractData(ahostName: string, aportNumber: number, adatabase: string, adbUser: string, adbPassword: string, objectName: string) {
-        let filepath: string = this.filesPath; //para poder llamarlo en el callback        
+        let filepath: string = this.filesPath; //para poder llamarlo en el callback
+        let formatExport: string = this.formatExport; //para poder llamarlo en el callback          
 
         let tableName: string = '';
         let filesDirSource1: Array<any> = [];
@@ -115,8 +133,8 @@ export class fbExtractLoadData {
                         qFields = [];
                         qBlobFields = [];
 
-                        if (fs.existsSync(this.filesPath + tableName + '.sql')) {
-                            fs.unlinkSync(this.filesPath + tableName + '.sql');
+                        if (fs.existsSync(this.filesPath + tableName + '.' + formatExport)) {
+                            fs.unlinkSync(this.filesPath + tableName + '.' + formatExport);
                         }
 
                         if (j !== -1) {
@@ -135,14 +153,18 @@ export class fbExtractLoadData {
 
                             await this.fb.startTransaction(true);
 
-                            query = 'SELECT ' + globalFunction.arrayToString(qFields, ',', 'AName') + ' FROM ' + globalFunction.quotedString(tableName);                          
+                            query = 'SELECT ' + globalFunction.arrayToString(qFields, ',', 'AName') + ' FROM ' + globalFunction.quotedString(tableName);
+                            //query += ' where fcodint=33771';
                             rData = [];
                             xCont = 0;
                             xContGral = 0;
                             console.log(i.toString() + '/' + rTables.length.toString() + ' - extract ' + tableName);
 
 
-                            fs.appendFileSync(this.filesPath + tableName + '.sql', '["' + globalFunction.arrayToString(qFields, '","', 'AName') + '"]' + GlobalTypes.CR, 'utf8');
+                            if (formatExport.toLowerCase() === 'sql')
+                                fs.appendFileSync(this.filesPath + tableName + '.sql', '["' + globalFunction.arrayToString(qFields, '","', 'AName') + '"]' + GlobalTypes.CR, 'utf8');
+                            else if (formatExport.toLowerCase() === 'csv')
+                                fs.appendFileSync(this.filesPath + tableName + '.csv', globalFunction.arrayToString(qFields, ',', 'AName') + GlobalTypes.CR, 'utf8');
 
                             await this.fb.dbSequentially(query, [], async function (row: any, index: any) {
                                 let value: any;
@@ -150,8 +172,12 @@ export class fbExtractLoadData {
                                 if (qBlobFields.length > 0) {
                                     for (let i in qBlobFields) {
                                         if (row[qBlobFields[i].AName] !== null || row[qBlobFields[i].AName] instanceof Function) { //me aseguro que es un blob                                            
-                                            if (qBlobFields[i].ASubType === 0) //binario                                            
-                                                value = new Buffer(row[qBlobFields[i].AName]).toString('base64');
+                                            if (qBlobFields[i].ASubType === 0) { //binario                                            
+                                                if (formatExport.toLowerCase() === 'sql')
+                                                    value = new Buffer(row[qBlobFields[i].AName]).toString('base64');
+                                                else (formatExport.toLowerCase() === 'csv')
+                                                value = new Buffer(row[qBlobFields[i].AName]).toString('hex');
+                                            }
 
                                             row[qBlobFields[i].AName] = value;
                                         }
@@ -162,7 +188,8 @@ export class fbExtractLoadData {
                                 xCont++;
                                 //console.log(xCont.toString());
                                 if (xCont >= 20000) {
-                                    outFileScript(qFields, rData, tableName, filepath);
+
+                                    outFileScript(qFields, rData, tableName, filepath, formatExport);
                                     //fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
                                     xContGral += xCont;
                                     console.log('   Registros: ' + xContGral.toString());
@@ -173,7 +200,7 @@ export class fbExtractLoadData {
                             if (rData.length > 0) {
                                 xContGral += xCont;
                                 console.log('   Registros: ' + xContGral.toString());
-                                outFileScript(qFields, rData, tableName, filepath);
+                                outFileScript(qFields, rData, tableName, filepath, formatExport);
                                 //fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
                             }
 
