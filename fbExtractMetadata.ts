@@ -728,10 +728,14 @@ function FieldType(aParam: iFieldType) {
         case 8:
         case 16:
             aParam.AScale = -aParam.AScale;
-            if (aParam.ASubType == 1)
+            /*if (aParam.ASubType == 1 || aParam.AScale !== 0)
                 ft = GlobalTypes.convertDataType('numeric') + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')'
-            else if (aParam.ASubType == 2)
-                ft = GlobalTypes.convertDataType('decimal') + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')'
+            else if (aParam.ASubType == 2 || aParam.AScale !== 0)
+                ft = GlobalTypes.convertDataType('decimal') + '(' + aParam.APrecision.toString() + ',' + aParam.AScale.toString() + ')'*/
+            if (aParam.ASubType == 1 || aParam.AScale !== 0) //se fuerza 18  a pedido de chris
+                ft = GlobalTypes.convertDataType('numeric') + '(18,' + aParam.AScale.toString() + ')'
+            else if (aParam.ASubType == 2 || aParam.AScale !== 0)
+                ft = GlobalTypes.convertDataType('decimal') + '(18,' + aParam.AScale.toString() + ')'                
             else if (aParam.AType == 7)
                 ft = GlobalTypes.convertDataType('smallint')
             else if (aParam.AType == 8)
