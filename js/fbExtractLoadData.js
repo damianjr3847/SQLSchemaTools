@@ -6,7 +6,7 @@ const GlobalTypes = require("./globalTypes");
 const globalFunction = require("./globalFunction");
 const metadataQuerys = require("./fbMetadataQuerys");
 function outFileScript(aFields, aData, aTable, filesPath, aFormat) {
-    const saveTo = 10000;
+    const saveTo = 500;
     let insertQuery = '';
     let contSaveTo = 0;
     let qSQL = [];

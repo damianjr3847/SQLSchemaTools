@@ -10,7 +10,7 @@ import { clearTimeout } from 'timers';
 
 function outFileScript(aFields: Array<fbExtractMetadata.iFieldType>, aData: Array<any>, aTable: string, filesPath: string, aFormat: string) {
 
-    const saveTo: number = 10000;
+    const saveTo: number = 500;
 
     let insertQuery: string = '';
 
