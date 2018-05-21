@@ -688,6 +688,14 @@ export class pgApplyMetadata {
                 }
             }
 
+            //solamente pra rdb$database
+            j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase() === 'rdb$database'));
+
+            if (j === -1) { //NO EXISTE TABLA
+                tableScript.push('CREATE TABLE rdb$database (fcodigo integer)')
+                await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
+            }
+
         } catch (err) {
             throw new Error('Error aplicando tabla ' + tableName + '.' + err.message);
         }
