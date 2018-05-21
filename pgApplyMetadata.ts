@@ -622,7 +622,7 @@ export class pgApplyMetadata {
 
                         if (j === -1) { //NO EXISTE TABLA
                             tableScript = this.newTableYamltoString(fileYaml.table);
-                            tableScript.push('ALTER TABLE ' + this.schema + '.' + tableName + ' OWNER TO ' + this.dbRole + ';');
+                            tableScript.push('ALTER TABLE ' + this.schema + '.' + globalFunction.quotedString(tableName) + ' OWNER TO ' + this.dbRole + ';');
                         }
                         else {
                             tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
