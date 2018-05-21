@@ -482,25 +482,27 @@ class pgApplyMetadata {
             for (let i in this.sources.tablesArrayYaml) {
                 if (globalFunction.isChange(this.sources.tablesArrayYaml[i], this.originalMetadata.tablesArrayYaml, GlobalTypes.ArrayobjectType[2])) {
                     fileYaml = this.sources.tablesArrayYaml[i].contentFile;
-                    tableName = fileYaml.table.name;
-                    if (tableName === 'art_grup')
-                        tableName = tableName;
-                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
-                        j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase() === tableName.toLowerCase()));
-                        tableScript = [];
-                        if (j === -1) {
-                            tableScript = this.newTableYamltoString(fileYaml.table);
-                            //tableScript.push('ALTER TABLE ' + this.schema + '.' + globalFunction.quotedString(tableName) + ' OWNER TO ' + this.dbRole + ';');
+                    if ('temporaryType' in fileYaml && fileYaml.temporaryType !== '') {
+                        tableName = fileYaml.table.name;
+                        if (tableName === 'art_grup')
+                            tableName = tableName;
+                        if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
+                            j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase() === tableName.toLowerCase()));
+                            tableScript = [];
+                            if (j === -1) {
+                                tableScript = this.newTableYamltoString(fileYaml.table);
+                                //tableScript.push('ALTER TABLE ' + this.schema + '.' + globalFunction.quotedString(tableName) + ' OWNER TO ' + this.dbRole + ';');
+                            }
+                            else {
+                                tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
+                                tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint, this.schema));
+                                tableScript = tableScript.concat(this.getTableDescriptionDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
+                                // ver indices se cambio el formato de los campos que lo componen
+                                tableScript = tableScript.concat(this.getTableIndexesDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
+                            }
+                            if (tableScript.length > 0)
+                                await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                         }
-                        else {
-                            tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
-                            tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint, this.schema));
-                            tableScript = tableScript.concat(this.getTableDescriptionDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
-                            // ver indices se cambio el formato de los campos que lo componen
-                            tableScript = tableScript.concat(this.getTableIndexesDiferences(tableName, fileYaml.table, dbYaml[j].table, this.schema));
-                        }
-                        if (tableScript.length > 0)
-                            await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                     }
                 }
             }
@@ -508,42 +510,44 @@ class pgApplyMetadata {
             for (let i in this.sources.tablesArrayYaml) {
                 if (globalFunction.isChange(this.sources.tablesArrayYaml[i], this.originalMetadata.tablesArrayYaml, GlobalTypes.ArrayobjectType[2])) {
                     fileYaml = this.sources.tablesArrayYaml[i].contentFile;
-                    tableName = fileYaml.table.name.toLowerCase().trim();
-                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
-                        j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase().trim() === tableName));
-                        tableScript = [];
-                        if (j === -1) {
-                            if ('constraint' in fileYaml.table) {
-                                if ('foreignkeys' in fileYaml.table.constraint)
-                                    tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), fileYaml.table.constraint.foreignkeys, this.schema));
+                    if ('temporaryType' in fileYaml && fileYaml.temporaryType !== '') {
+                        tableName = fileYaml.table.name.toLowerCase().trim();
+                        if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
+                            j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase().trim() === tableName));
+                            tableScript = [];
+                            if (j === -1) {
+                                if ('constraint' in fileYaml.table) {
+                                    if ('foreignkeys' in fileYaml.table.constraint)
+                                        tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), fileYaml.table.constraint.foreignkeys, this.schema));
+                                }
                             }
-                        }
-                        else {
-                            //tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint));
-                            if ('foreignkeys' in fileYaml.table.constraint) {
-                                if ('foreignkeys' in dbYaml[j].table.constraint)
-                                    arrayAux = dbYaml[j].table.constraint.foreignkeys;
-                                else
-                                    arrayAux = [];
-                                for (let z = 0; z < fileYaml.table.constraint.foreignkeys.length; z++) {
-                                    iDB = arrayAux.findIndex(aItem => (aItem.foreignkey.name.toLowerCase().trim() === fileYaml.table.constraint.foreignkeys[z].foreignkey.name.toLowerCase().trim()));
-                                    if (iDB === -1)
-                                        tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z]), this.schema));
-                                    else {
-                                        if (String(fileYaml.table.constraint.foreignkeys[z].foreignkey.onColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.onColumn).trim().toUpperCase() ||
-                                            String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toTable).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toTable).trim().toUpperCase() ||
-                                            String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase() ||
-                                            String(fileYaml.table.constraint.foreignkeys[z].foreignkey.updateRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.updateRole).trim().toUpperCase() ||
-                                            String(fileYaml.table.constraint.foreignkeys[z].foreignkey.deleteRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.deleteRole).trim().toUpperCase()) {
-                                            tableScript.push('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DROP CONSTRAINT ' + globalFunction.quotedString(fileYaml.table.constraint.foreignkeys[z].foreignkey.name) + ';');
+                            else {
+                                //tableScript = tableScript.concat(this.getTableConstraintDiferences(tableName, fileYaml.table.constraint, dbYaml[j].table.constraint));
+                                if ('foreignkeys' in fileYaml.table.constraint) {
+                                    if ('foreignkeys' in dbYaml[j].table.constraint)
+                                        arrayAux = dbYaml[j].table.constraint.foreignkeys;
+                                    else
+                                        arrayAux = [];
+                                    for (let z = 0; z < fileYaml.table.constraint.foreignkeys.length; z++) {
+                                        iDB = arrayAux.findIndex(aItem => (aItem.foreignkey.name.toLowerCase().trim() === fileYaml.table.constraint.foreignkeys[z].foreignkey.name.toLowerCase().trim()));
+                                        if (iDB === -1)
                                             tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z]), this.schema));
+                                        else {
+                                            if (String(fileYaml.table.constraint.foreignkeys[z].foreignkey.onColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.onColumn).trim().toUpperCase() ||
+                                                String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toTable).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toTable).trim().toUpperCase() ||
+                                                String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase() ||
+                                                String(fileYaml.table.constraint.foreignkeys[z].foreignkey.updateRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.updateRole).trim().toUpperCase() ||
+                                                String(fileYaml.table.constraint.foreignkeys[z].foreignkey.deleteRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.deleteRole).trim().toUpperCase()) {
+                                                tableScript.push('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DROP CONSTRAINT ' + globalFunction.quotedString(fileYaml.table.constraint.foreignkeys[z].foreignkey.name) + ';');
+                                                tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z]), this.schema));
+                                            }
                                         }
                                     }
                                 }
                             }
+                            if (tableScript.length > 0)
+                                await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                         }
-                        if (tableScript.length > 0)
-                            await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                     }
                 }
             }

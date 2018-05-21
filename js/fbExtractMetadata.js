@@ -207,6 +207,8 @@ class fbExtractMetadata {
                 /*FIELDNAME, FTYPE, SUBTYPE, FLENGTH, FPRECISION, SCALE, CHARACTERSET,
                 FCOLLATION, DEFSOURCE, FLAG, VALSOURCE, COMSOURCE, DESCRIPTION*/
                 tableName = rTables[i].OBJECT_NAME.toLowerCase().trim();
+                if (tableName === 'web_fact_neg')
+                    tableName = tableName;
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
                     outTables.table.name = tableName;
                     if (rTables[i].RELTYPE === 5)
