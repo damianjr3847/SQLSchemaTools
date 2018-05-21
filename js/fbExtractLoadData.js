@@ -6,7 +6,7 @@ const GlobalTypes = require("./globalTypes");
 const globalFunction = require("./globalFunction");
 const metadataQuerys = require("./fbMetadataQuerys");
 function outFileScript(aFields, aData, aTable, filesPath, aFormat) {
-    const saveTo = 500;
+    const saveTo = 100;
     let insertQuery = '';
     let contSaveTo = 0;
     let qSQL = [];
@@ -139,7 +139,7 @@ class fbExtractLoadData {
                                 rData.push(row);
                                 xCont++;
                                 //console.log(xCont.toString());
-                                if (xCont >= 20000) {
+                                if (xCont >= 100) {
                                     outFileScript(qFields, rData, tableName, filepath, formatExport);
                                     //fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
                                     xContGral += xCont;

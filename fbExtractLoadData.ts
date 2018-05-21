@@ -10,7 +10,7 @@ import { clearTimeout } from 'timers';
 
 function outFileScript(aFields: Array<fbExtractMetadata.iFieldType>, aData: Array<any>, aTable: string, filesPath: string, aFormat: string) {
 
-    const saveTo: number = 500;
+    const saveTo: number = 100;
 
     let insertQuery: string = '';
 
@@ -187,7 +187,7 @@ export class fbExtractLoadData {
                                 rData.push(row);
                                 xCont++;
                                 //console.log(xCont.toString());
-                                if (xCont >= 20000) {
+                                if (xCont >= 100) {
 
                                     outFileScript(qFields, rData, tableName, filepath, formatExport);
                                     //fs.appendFileSync('/home/damian/temp/db/'+tableName+'.sql', JSON.stringify(rData), 'utf8');
