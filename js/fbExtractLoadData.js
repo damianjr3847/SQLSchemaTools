@@ -131,8 +131,8 @@ class fbExtractLoadData {
                                                 else
                                                     (formatExport.toLowerCase() === 'csv');
                                                 value = new Buffer(row[qBlobFields[i].AName]).toString('hex');
+                                                row[qBlobFields[i].AName] = value.toString(); //piso el valor convertido
                                             }
-                                            row[qBlobFields[i].AName] = value;
                                         }
                                     }
                                 }

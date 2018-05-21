@@ -186,7 +186,8 @@ function quotedCSV(aValue) {
         aValue.indexOf('"') !== -1 ||
         aValue.indexOf(String.fromCharCode(13)) !== -1 ||
         aValue.indexOf(String.fromCharCode(10)) !== -1 ||
-        aValue.indexOf(String.fromCharCode(9)) !== -1)
+        aValue.indexOf(String.fromCharCode(9)) !== -1 ||
+        aValue.trim() === '')
         ft = '"' + aValue + '"';
     else
         ft = aValue;
@@ -195,8 +196,11 @@ function quotedCSV(aValue) {
 function varToCSV(aValue, AType, ASubType) {
     let ft;
     let aDate = '';
+    let aux;
     if (aValue === null)
         ft = '';
+    else if (aValue === undefined)
+        ft = '""';
     else {
         switch (AType) {
             case 7:
@@ -241,8 +245,14 @@ function varToCSV(aValue, AType, ASubType) {
                 ft = aDate;
                 break;
             case 13://time 
-                aDate = new Date(aValue).toLocaleString();
-                ft = aDate.substr(aDate.indexOf(' ') + 1);
+                //aDate = new Date(aValue).toLocaleString();
+                aux = aValue.getHours() + ':';
+                aux += aValue.getMinutes() + ':';
+                aux += aValue.getSeconds() + '.';
+                aux += aValue.getMilliseconds();
+                //aux = new Date(aValue).getTime();
+                //ft = aDate.substr(aDate.indexOf(' ') + 1);
+                ft = aux;
                 break;
             /*case 12: //date
             case 13: //time    */

@@ -181,9 +181,9 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
     return ft;
 }
 
-function quotedCSV(aValue:string) : string {
+function quotedCSV(aValue: string): string {
     let ft: string = '';
-    
+
     //va con RegExp porque el replace cambia solo la primer ocurrencia.        
     aValue = aValue.replace(new RegExp('"', 'g'), '""');
     //aValue = aValue.replace(new RegExp(String.fromCharCode(13), 'g'), '\\r');
@@ -191,24 +191,28 @@ function quotedCSV(aValue:string) : string {
     //aValue = aValue.replace(new RegExp(String.fromCharCode(9), 'g'), '\\t');
 
 
-    if (aValue.indexOf(',') !== -1 || 
-        aValue.indexOf('"') !== -1 || 
-        aValue.indexOf(String.fromCharCode(13)) !== -1 || 
+    if (aValue.indexOf(',') !== -1 ||
+        aValue.indexOf('"') !== -1 ||
+        aValue.indexOf(String.fromCharCode(13)) !== -1 ||
         aValue.indexOf(String.fromCharCode(10)) !== -1 ||
-        aValue.indexOf(String.fromCharCode(9)) !== -1) 
-        ft = '"'+aValue+'"';
-    else 
+        aValue.indexOf(String.fromCharCode(9)) !== -1 ||
+        aValue.trim() === '')
+        ft = '"' + aValue + '"';
+    else
         ft = aValue;
-        
+
     return ft;
 }
 
 export function varToCSV(aValue: any, AType: number, ASubType: number) {
     let ft: string;
     let aDate: string = '';
+    let aux: any;
 
     if (aValue === null)
         ft = '';
+    else if (aValue === undefined)
+        ft = '""';
     else {
         switch (AType) {
             case 7:
@@ -217,17 +221,17 @@ export function varToCSV(aValue: any, AType: number, ASubType: number) {
                 if (ASubType == 1) //numeric
                     ft = aValue;
                 else if (ASubType == 2) //decimal
-                    ft = String(aValue).replace(',','.');
+                    ft = String(aValue).replace(',', '.');
                 else if (ASubType == 7) //small
-                    ft = String(aValue).replace(',','.');
+                    ft = String(aValue).replace(',', '.');
                 else if (ASubType == 8) //int
-                    ft = String(aValue).replace(',','.');
+                    ft = String(aValue).replace(',', '.');
                 else
-                    ft = String(aValue).replace(',','.');
+                    ft = String(aValue).replace(',', '.');
                 break;
             case 10: //float
             case 27: //double precision
-                ft = String(aValue).replace(',','.');
+                ft = String(aValue).replace(',', '.');
                 break;
             case 37:
             case 14: //varchar-char
@@ -245,7 +249,7 @@ export function varToCSV(aValue: any, AType: number, ASubType: number) {
                     }
                 }
                 else { //type binary
-                    ft = '\\x'+aValue.toString();
+                    ft = '\\x' + aValue.toString();
                 }
                 break;
             case 12: //date
@@ -253,8 +257,17 @@ export function varToCSV(aValue: any, AType: number, ASubType: number) {
                 ft = aDate;
                 break;
             case 13: //time 
-                aDate = new Date(aValue).toLocaleString();
-                ft = aDate.substr(aDate.indexOf(' ') + 1);
+
+                //aDate = new Date(aValue).toLocaleString();
+
+                aux = aValue.getHours() + ':';
+                aux += aValue.getMinutes() + ':';
+                aux += aValue.getSeconds() + '.';
+                aux += aValue.getMilliseconds();
+                //aux = new Date(aValue).getTime();
+
+                //ft = aDate.substr(aDate.indexOf(' ') + 1);
+                ft = aux;
                 break;
             /*case 12: //date 
             case 13: //time    */
@@ -350,7 +363,7 @@ export function isChange(aFileToApply: loadsource.ifile, aOriginalMetadata: Arra
         }
         if (j === -1)
             ret = true;
-        else {  
+        else {
             if (aFileToApply.ctime > aOriginalMetadata[j].ctime)
                 ret = true;
         }

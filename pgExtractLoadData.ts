@@ -47,6 +47,7 @@ export class pgExtractLoadData {
     private pgDb: pg.Client | any;
     public dbRole: string = '';
     public schema: string = defaultSchema;
+    public deletedata:boolean = false;
 
     filesPath: string = '';
     excludeObject: any;
@@ -210,19 +211,13 @@ export class pgExtractLoadData {
     }
 
     public async loadDataStream(ahostName: string, aportNumber: number, adatabase: string, adbUser: string, adbPassword: string, objectName: string, adbRole: string) {
-        let execute = (aStream: any, afileStream: any) => {
-            return new Promise<any>((resolve, reject) => {
-                afileStream.pipe(aStream).on('finish', function () {
-                    resolve();                
-                }).on('error', function (err: any) {
-                    reject(err)
-                });
-            });
-        }
-    
+
         let tableName: string = '';
         let filesDirSource1: Array<any> = [];
         let copyFrom = require('pg-copy-streams').from;
+        //let MaxListeners = emitter.getMaxListeners();
+        let stream: any;
+        let fileStream: any;
 
         filesDirSource1 = globalFunction.readRecursiveDirectory(this.filesPath);
 
@@ -235,33 +230,93 @@ export class pgExtractLoadData {
         this.pgDb = new pg.Client(this.connectionString);
 
         //await this.pgDb.query('SET ROLE ' + adbRole);
+        process.setMaxListeners(0);
+        //emitter.setMaxListeners();
 
         try {
-
             await this.pgDb.connect();
-            try {
+            console.log('Deshabilitando triggers');
+
+            //await this.pgDb.query('BEGIN');
+            for (let i = 0; i < filesDirSource1.length; i++) {
+                tableName = filesDirSource1[i].file;
+                tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
+
+                await this.pgDb.query('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DISABLE TRIGGER ALL');
+
+            }
+            //await this.pgDb.query('COMMIT');
+
+            if (this.deletedata) {
+                console.log('Borrando datos');
+
+                //await this.pgDb.query('BEGIN');
                 for (let i = 0; i < filesDirSource1.length; i++) {
                     tableName = filesDirSource1[i].file;
                     tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
 
-                    console.log('Importando '+tableName);
-                    
-                    let stream = this.pgDb.query(copyFrom('COPY ' + globalFunction.quotedString(tableName) + ' FROM STDIN WITH CSV HEADER'));
-                    let fileStream = fs.createReadStream(filesDirSource1[i].path+filesDirSource1[i].file)
-                    await execute(stream,fileStream);
+                    await this.pgDb.query('DELETE FROM ' + globalFunction.quotedString(tableName));
+
                 }
+                //await this.pgDb.query('COMMIT');
             }
-            finally {
-                await this.pgDb.end();            
+
+            for (let i = 0; i < filesDirSource1.length; i++) {
+                tableName = filesDirSource1[i].file;
+                tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
+
+                console.log('Importando ' + tableName);
+
+                //await this.pgDb.query('BEGIN');
+                stream = this.pgDb.query(copyFrom('COPY ' + globalFunction.quotedString(tableName) + ' FROM STDIN WITH CSV HEADER'));
+                fileStream = fs.createReadStream(filesDirSource1[i].path + filesDirSource1[i].file)
+                await execute(stream, fileStream);
+
+                // await this.pgDb.query('COMMIT');
             }
         }
         catch (err) {
             console.log(err.message);
         }
-        
+
+        try {
+            console.log('Habilitando triggers');
+            //await this.pgDb.query('BEGIN');    
+            for (let i = 0; i < filesDirSource1.length; i++) {
+                tableName = filesDirSource1[i].file;
+                tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
+
+                await this.pgDb.query('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' ENABLE TRIGGER ALL');
+            }
+            //await this.pgDb.query('COMMIT');
+        }
+        catch (err) {
+            console.log(err.message);
+        }
+
+        await this.pgDb.end();
+
     }
 }
 
+
+function execute(aStream: any, afileStream: any) {
+    return new Promise<any>((resolve, reject) => {
+        afileStream.on('finish', function () {
+            resolve();
+        });
+        afileStream.on('error', function (err: any) {
+            reject(err)
+        });
+        aStream.on('error', function (err: any) {
+            reject(err)
+        });
+        aStream.on('end', function () {
+            resolve();
+        });
+        afileStream.pipe(aStream);
+    });
+}
 
 
 /*

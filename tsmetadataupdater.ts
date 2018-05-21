@@ -59,6 +59,7 @@ let endTime: any;
 let textTime: string = '';
 let dbRole: string = '';
 let saveafterapply: string = '';
+let deletedata:boolean = false;
 
 /**********para pruebas */
 /*let actionYalm:string       = 'write';
@@ -114,6 +115,8 @@ params.option('-l, --savetolog <tabla>', 'seguido de la tabla, guarda en la db e
 
 params.option('--conf <archivoconf>', 'archivo de configuracion');
 params.option('--saveafterapply <pathsave>', 'Path del directorio donde se guardaran los archivos despues de aplicar cambios en el metadata solo PG');
+
+params.option('--deletedata', 'operacion=importdata. Borra el contenido de las tablas antes de importar');
 
 params.parse(process.argv);
 
@@ -185,6 +188,9 @@ if (params.conf) {
                 break;
             case 'saveafterapply':
                 saveafterapply = aValue;
+                break;
+            case 'deletedata':
+                deletedata=true;
                 break;
         }
     });
@@ -385,6 +391,9 @@ if (saveafterapply !== '') {
 if (params.nofolders)
     nofolders = true;
 
+if (params.deletedata)
+    deletedata = true;
+
 /*console.log('actionYalm: %j',actionYalm);
 console.log('pathYalm: %j',pathSave);
 console.log('source1: %j',source1);
@@ -487,7 +496,7 @@ console.log('p '+params.outscript)
             pgdata = new pgExtractLoadData.pgExtractLoadData;
             pgdata.filesPath = source1;
             pgdata.excludeObject = excludeObject;
-
+            pgdata.deletedata = deletedata;
             await pgdata.loadDataStream(dbHost, dbPort, dbPath, dbUser, dbPass, objectName, dbRole);
         }
 

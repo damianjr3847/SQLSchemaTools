@@ -176,10 +176,10 @@ export class fbExtractLoadData {
                                                 if (formatExport.toLowerCase() === 'sql')
                                                     value = new Buffer(row[qBlobFields[i].AName]).toString('base64');
                                                 else (formatExport.toLowerCase() === 'csv')
-                                                value = new Buffer(row[qBlobFields[i].AName]).toString('hex');
-                                            }
-
-                                            row[qBlobFields[i].AName] = value;
+                                                    value = new Buffer(row[qBlobFields[i].AName]).toString('hex');
+                                                
+                                                row[qBlobFields[i].AName] = value.toString();    //piso el valor convertido
+                                            }                                            
                                         }
                                     }
                                 }
