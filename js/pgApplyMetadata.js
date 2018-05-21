@@ -404,7 +404,7 @@ class pgApplyMetadata {
                         rQuerys = [];
                         rQuerys.push(viewBody);
                         if (j === -1)
-                            rQuerys.push('ALTER TABLE ' + this.schema + '.' + viewName + ' OWNER TO ' + this.dbRole + ';');
+                            rQuerys.push('ALTER TABLE ' + this.schema + '.' + globalFunction.quotedString(viewName) + ' OWNER TO ' + this.dbRole + ';');
                         await this.applyChange(GlobalTypes.ArrayobjectType[4], viewName, rQuerys);
                     }
                     viewBody = '';
@@ -490,7 +490,7 @@ class pgApplyMetadata {
                         tableScript = [];
                         if (j === -1) {
                             tableScript = this.newTableYamltoString(fileYaml.table);
-                            tableScript.push('ALTER TABLE ' + this.schema + '.' + globalFunction.quotedString(tableName) + ' OWNER TO ' + this.dbRole + ';');
+                            //tableScript.push('ALTER TABLE ' + this.schema + '.' + globalFunction.quotedString(tableName) + ' OWNER TO ' + this.dbRole + ';');
                         }
                         else {
                             tableScript = tableScript.concat(this.getTableColumnDiferences(tableName, fileYaml.table.columns, dbYaml[j].table.columns, this.schema));
