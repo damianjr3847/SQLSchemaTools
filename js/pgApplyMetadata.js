@@ -482,7 +482,7 @@ class pgApplyMetadata {
             for (let i in this.sources.tablesArrayYaml) {
                 if (globalFunction.isChange(this.sources.tablesArrayYaml[i], this.originalMetadata.tablesArrayYaml, GlobalTypes.ArrayobjectType[2])) {
                     fileYaml = this.sources.tablesArrayYaml[i].contentFile;
-                    if ('temporaryType' in fileYaml && fileYaml.temporaryType !== '') {
+                    if (('temporaryType' in fileYaml && fileYaml.temporaryType !== '') || !('temporaryType' in fileYaml)) {
                         tableName = fileYaml.table.name;
                         if (tableName === 'art_grup')
                             tableName = tableName;
