@@ -189,13 +189,15 @@ class pgExtractLoadData {
         //emitter.setMaxListeners();
         try {
             await this.pgDb.connect();
-            console.log('Deshabilitando triggers');
+            console.log('Deshabilitando triggers e indices');
             //await this.pgDb.query('BEGIN');
             for (let i = 0; i < filesDirSource1.length; i++) {
                 tableName = filesDirSource1[i].file;
                 tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
-                if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase())
+                if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase()) {
                     await this.pgDb.query('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DISABLE TRIGGER ALL');
+                    await this.pgDb.query("UPDATE pg_index SET indisready=false WHERE indrelid = (SELECT oid FROM pg_class WHERE relname='" + tableName.toLowerCase() + "');");
+                }
             }
             //await this.pgDb.query('COMMIT');
             if (this.deletedata) {
@@ -226,13 +228,23 @@ class pgExtractLoadData {
             console.log(err.message);
         }
         try {
-            console.log('Habilitando triggers');
+            console.log('Habilitando triggers e indices');
             //await this.pgDb.query('BEGIN');    
             for (let i = 0; i < filesDirSource1.length; i++) {
                 tableName = filesDirSource1[i].file;
                 tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
                 if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase()) {
                     await this.pgDb.query('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' ENABLE TRIGGER ALL');
+                    await this.pgDb.query("UPDATE pg_index SET indisready=true WHERE indrelid = (SELECT oid FROM pg_class WHERE relname='" + tableName.toLowerCase() + "');");
+                }
+            }
+            //await this.pgDb.query('BEGIN');    
+            for (let i = 0; i < filesDirSource1.length; i++) {
+                tableName = filesDirSource1[i].file;
+                tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
+                if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase()) {
+                    console.log('Reindexando tabla ' + tableName);
+                    await this.pgDb.query('REINDEX ' + globalFunction.quotedString(tableName));
                 }
             }
             //await this.pgDb.query('COMMIT');
