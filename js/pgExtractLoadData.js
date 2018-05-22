@@ -194,7 +194,8 @@ class pgExtractLoadData {
             for (let i = 0; i < filesDirSource1.length; i++) {
                 tableName = filesDirSource1[i].file;
                 tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
-                await this.pgDb.query('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DISABLE TRIGGER ALL');
+                if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase())
+                    await this.pgDb.query('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DISABLE TRIGGER ALL');
             }
             //await this.pgDb.query('COMMIT');
             if (this.deletedata) {
@@ -203,19 +204,22 @@ class pgExtractLoadData {
                 for (let i = 0; i < filesDirSource1.length; i++) {
                     tableName = filesDirSource1[i].file;
                     tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
-                    await this.pgDb.query('DELETE FROM ' + globalFunction.quotedString(tableName));
+                    if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase())
+                        await this.pgDb.query('DELETE FROM ' + globalFunction.quotedString(tableName));
                 }
                 //await this.pgDb.query('COMMIT');
             }
             for (let i = 0; i < filesDirSource1.length; i++) {
                 tableName = filesDirSource1[i].file;
                 tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
-                console.log('Importando ' + tableName);
-                //await this.pgDb.query('BEGIN');
-                stream = this.pgDb.query(copyFrom('COPY ' + globalFunction.quotedString(tableName) + ' FROM STDIN WITH CSV HEADER'));
-                fileStream = fs.createReadStream(filesDirSource1[i].path + filesDirSource1[i].file);
-                await execute(stream, fileStream);
-                // await this.pgDb.query('COMMIT');
+                if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase()) {
+                    console.log('Importando ' + tableName);
+                    //await this.pgDb.query('BEGIN');
+                    stream = this.pgDb.query(copyFrom('COPY ' + globalFunction.quotedString(tableName) + ' FROM STDIN WITH CSV HEADER'));
+                    fileStream = fs.createReadStream(filesDirSource1[i].path + filesDirSource1[i].file);
+                    await execute(stream, fileStream);
+                    // await this.pgDb.query('COMMIT');
+                }
             }
         }
         catch (err) {
@@ -227,7 +231,9 @@ class pgExtractLoadData {
             for (let i = 0; i < filesDirSource1.length; i++) {
                 tableName = filesDirSource1[i].file;
                 tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
-                await this.pgDb.query('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' ENABLE TRIGGER ALL');
+                if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase()) {
+                    await this.pgDb.query('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' ENABLE TRIGGER ALL');
+                }
             }
             //await this.pgDb.query('COMMIT');
         }
