@@ -298,7 +298,7 @@ export class pgExtractLoadData {
                 tableName = tableName.substring(0, tableName.length - 4).toLowerCase(); //quito extension
                 if (objectName === '' || objectName.toLowerCase() === tableName.toLowerCase()) {
                     console.log('Reindexando tabla '+tableName); 
-                    await this.pgDb.query('REINDEX ' + globalFunction.quotedString(tableName));
+                    await this.pgDb.query('REINDEX TABLE ' + globalFunction.quotedString(tableName));
                 }    
             }
             
