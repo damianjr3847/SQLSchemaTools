@@ -127,6 +127,7 @@ class pgApplyMetadata {
             if (aYaml.procedure.pg.resultType.toUpperCase().trim() === 'TABLE') {
                 if ('outputs' in aYaml.procedure) {
                     aProc += paramString(aYaml.procedure.outputs, ' RETURNS TABLE', 'O') + GlobalTypes.CR;
+                    withOutputs = true;
                 }
                 else {
                     aProc += ' RETURNS void ' + GlobalTypes.CR;
@@ -135,7 +136,7 @@ class pgApplyMetadata {
             }
             else {
                 aProc += ' RETURNS ' + aYaml.procedure.pg.resultType + GlobalTypes.CR;
-                withOutputs = true;
+                withOutputs = false;
             }
             if ('language' in aYaml.procedure.pg) {
                 if (GlobalTypes.ArrayPgFunctionLenguage.indexOf(aYaml.procedure.pg.language) > -1) {
@@ -186,28 +187,30 @@ class pgApplyMetadata {
             for (let i in this.sources.proceduresArrayYaml) {
                 fileYaml = this.sources.proceduresArrayYaml[i].contentFile;
                 procedureName = fileYaml.procedure.name.toLowerCase().trim();
-                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
-                    j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
-                    procedureBody = procedureYamltoString(fileYaml, true);
-                    if (j !== -1) {
-                        procedureInDB = procedureYamltoString(dbYaml[j], true);
-                    }
-                    if (procedureInDB !== procedureBody) {
-                        cambios = true;
-                        rQuery = [];
-                        if (j !== -1)
-                            rQuery.push('DROP FUNCTION ' + this.schema + '.' + procedureName);
-                        rQuery.push(procedureYamltoString(fileYaml, aWithBody));
-                        if (j === -1) {
-                            if ('inputs' in fileYaml.procedure)
-                                rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + paramString(fileYaml.procedure.inputs, '', 'I', true) + ' OWNER TO ' + this.dbRole + ';');
-                            else
-                                rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + '() OWNER TO ' + this.dbRole + ';');
+                if (('applyDb' in fileYaml.procedure && fileYaml.procedure.applyDb.indexOf('pg') !== -1) || (!('applyDb' in fileYaml.procedure))) {
+                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
+                        j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
+                        procedureBody = procedureYamltoString(fileYaml, true);
+                        if (j !== -1) {
+                            procedureInDB = procedureYamltoString(dbYaml[j], true);
                         }
-                        await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, rQuery);
+                        if (procedureInDB !== procedureBody) {
+                            cambios = true;
+                            rQuery = [];
+                            if (j !== -1)
+                                rQuery.push('DROP FUNCTION ' + this.schema + '.' + procedureName);
+                            rQuery.push(procedureYamltoString(fileYaml, aWithBody));
+                            if (j === -1) {
+                                if ('inputs' in fileYaml.procedure)
+                                    rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + paramString(fileYaml.procedure.inputs, '', 'I', true) + ' OWNER TO ' + this.dbRole + ';');
+                                else
+                                    rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + '() OWNER TO ' + this.dbRole + ';');
+                            }
+                            await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, rQuery);
+                        }
+                        procedureBody = '';
+                        procedureInDB = '';
                     }
-                    procedureBody = '';
-                    procedureInDB = '';
                 }
             }
             return cambios;

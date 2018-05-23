@@ -39,7 +39,7 @@ function arrayToString(aArray, aSeparated = '', aSubValue = '') {
     return aText;
 }
 exports.arrayToString = arrayToString;
-function readRecursiveDirectory(dir) {
+function readRecursiveDirectory(dir, aExtension = '') {
     var retArrayFile = [];
     var files;
     var fStat;
@@ -49,9 +49,11 @@ function readRecursiveDirectory(dir) {
     for (var i in files) {
         fStat = fs.statSync(dir + files[i]);
         if (fStat && fStat.isDirectory())
-            retArrayFile = retArrayFile.concat(readRecursiveDirectory(dir + files[i]));
-        else
-            retArrayFile.push({ path: dir, file: files[i], ctime: fStat.ctime, atime: fStat.atime, mtime: fStat.mtime, ctimeMs: fStat.ctimeMs, atimeMs: fStat.atimeMs, mtimeMs: fStat.mtimeMs });
+            retArrayFile = retArrayFile.concat(readRecursiveDirectory(dir + files[i], aExtension));
+        else {
+            if (aExtension === '' || String(files[i]).endsWith(aExtension))
+                retArrayFile.push({ path: dir, file: files[i], ctime: fStat.ctime, atime: fStat.atime, mtime: fStat.mtime, ctimeMs: fStat.ctimeMs, atimeMs: fStat.atimeMs, mtimeMs: fStat.mtimeMs });
+        }
     }
     return retArrayFile;
 }

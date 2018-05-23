@@ -41,7 +41,7 @@ export function arrayToString(aArray: Array<any>, aSeparated: string = '', aSubV
     return aText;
 }
 
-export function readRecursiveDirectory(dir: string): Array<any> {
+export function readRecursiveDirectory(dir: string, aExtension: string = ''): Array<any> {
     var retArrayFile: Array<any> = [];
     var files: any;
     var fStat: any;
@@ -52,9 +52,11 @@ export function readRecursiveDirectory(dir: string): Array<any> {
     for (var i in files) {
         fStat = fs.statSync(dir + files[i]);
         if (fStat && fStat.isDirectory())
-            retArrayFile = retArrayFile.concat(readRecursiveDirectory(dir + files[i]));
-        else
-            retArrayFile.push({ path: dir, file: files[i], ctime: fStat.ctime, atime: fStat.atime, mtime: fStat.mtime, ctimeMs: fStat.ctimeMs, atimeMs: fStat.atimeMs, mtimeMs: fStat.mtimeMs });
+            retArrayFile = retArrayFile.concat(readRecursiveDirectory(dir + files[i], aExtension));
+        else {
+            if (aExtension === '' || String(files[i]).endsWith(aExtension))
+                retArrayFile.push({ path: dir, file: files[i], ctime: fStat.ctime, atime: fStat.atime, mtime: fStat.mtime, ctimeMs: fStat.ctimeMs, atimeMs: fStat.atimeMs, mtimeMs: fStat.mtimeMs });
+        }    
     }
     return retArrayFile;
 };

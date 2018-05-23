@@ -173,6 +173,7 @@ export class pgApplyMetadata {
             if (aYaml.procedure.pg.resultType.toUpperCase().trim() === 'TABLE') {
                 if ('outputs' in aYaml.procedure) {
                     aProc += paramString(aYaml.procedure.outputs, ' RETURNS TABLE', 'O') + GlobalTypes.CR;
+                    withOutputs = true;
                 }
                 else {
                     aProc += ' RETURNS void ' + GlobalTypes.CR;
@@ -181,7 +182,7 @@ export class pgApplyMetadata {
             }
             else {
                 aProc += ' RETURNS ' + aYaml.procedure.pg.resultType + GlobalTypes.CR;
-                withOutputs = true;
+                withOutputs = false;
             }
 
             if ('language' in aYaml.procedure.pg) {
@@ -245,36 +246,37 @@ export class pgApplyMetadata {
                 fileYaml = this.sources.proceduresArrayYaml[i].contentFile;
 
                 procedureName = fileYaml.procedure.name.toLowerCase().trim();
+                if (('applyDb' in fileYaml.procedure && fileYaml.procedure.applyDb.indexOf('pg') !== -1) || (!('applyDb' in fileYaml.procedure))) {
 
+                    if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
 
-                if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[0], procedureName)) {
+                        j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
 
-                    j = dbYaml.findIndex(aItem => (aItem.procedure.name.toLowerCase().trim() === procedureName));
-
-                    procedureBody = procedureYamltoString(fileYaml, true);
-                    if (j !== -1) {
-                        procedureInDB = procedureYamltoString(dbYaml[j], true);
-                    }
-
-                    if (procedureInDB !== procedureBody) {
-                        cambios = true;
-                        rQuery = [];
-                        if (j !== -1)
-                            rQuery.push('DROP FUNCTION ' + this.schema + '.' + procedureName);
-
-                        rQuery.push(procedureYamltoString(fileYaml, aWithBody));
-                        if (j === -1) {
-                            if ('inputs' in fileYaml.procedure)
-                                rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + paramString(fileYaml.procedure.inputs, '', 'I', true) + ' OWNER TO ' + this.dbRole + ';');
-                            else
-                                rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + '() OWNER TO ' + this.dbRole + ';');
+                        procedureBody = procedureYamltoString(fileYaml, true);
+                        if (j !== -1) {
+                            procedureInDB = procedureYamltoString(dbYaml[j], true);
                         }
-                        await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, rQuery);
-                    }
 
-                    procedureBody = '';
-                    procedureInDB = '';
-                }
+                        if (procedureInDB !== procedureBody) {
+                            cambios = true;
+                            rQuery = [];
+                            if (j !== -1)
+                                rQuery.push('DROP FUNCTION ' + this.schema + '.' + procedureName);
+
+                            rQuery.push(procedureYamltoString(fileYaml, aWithBody));
+                            if (j === -1) {
+                                if ('inputs' in fileYaml.procedure)
+                                    rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + paramString(fileYaml.procedure.inputs, '', 'I', true) + ' OWNER TO ' + this.dbRole + ';');
+                                else
+                                    rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + '() OWNER TO ' + this.dbRole + ';');
+                            }
+                            await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, rQuery);
+                        }
+
+                        procedureBody = '';
+                        procedureInDB = '';
+                    }
+                }    
             }
             return cambios;
         }
@@ -612,7 +614,7 @@ export class pgApplyMetadata {
                 if (globalFunction.isChange(this.sources.tablesArrayYaml[i], this.originalMetadata.tablesArrayYaml, GlobalTypes.ArrayobjectType[2])) {
                     fileYaml = this.sources.tablesArrayYaml[i].contentFile;
 
-                    if (('temporaryType' in fileYaml.table && fileYaml.table.temporaryType === '') || (!('temporaryType' in fileYaml.table))) {    
+                    if (('temporaryType' in fileYaml.table && fileYaml.table.temporaryType === '') || (!('temporaryType' in fileYaml.table))) {
                         tableName = fileYaml.table.name;
                         if (tableName === 'art_grup')
                             tableName = tableName;
@@ -636,8 +638,8 @@ export class pgApplyMetadata {
                             if (tableScript.length > 0)
                                 await this.applyChange(GlobalTypes.ArrayobjectType[2], tableName, tableScript);
                         }
-                    }    
-                }    
+                    }
+                }
             }
 
             // solamente para los constraint van a lo ultimo por los foreinkey
@@ -645,7 +647,7 @@ export class pgApplyMetadata {
                 if (globalFunction.isChange(this.sources.tablesArrayYaml[i], this.originalMetadata.tablesArrayYaml, GlobalTypes.ArrayobjectType[2])) {
                     fileYaml = this.sources.tablesArrayYaml[i].contentFile;
 
-                    if ('temporaryType' in fileYaml && fileYaml.temporaryType !== '') { 
+                    if ('temporaryType' in fileYaml && fileYaml.temporaryType !== '') {
                         tableName = fileYaml.table.name.toLowerCase().trim();
 
                         if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
@@ -950,7 +952,7 @@ export class pgApplyMetadata {
                     this.pgExMe.schema = this.schema;
                     this.pgExMe.filesPath = this.saveafterapply;
 
-                    this.originalMetadata.pathSource1=this.saveafterapply;
+                    this.originalMetadata.pathSource1 = this.saveafterapply;
                     this.originalMetadata.readSource(objectType, objectName);
                 }
 

@@ -140,10 +140,10 @@ class tSource {
         this.triggersArrayYaml = [];
         this.generatorsArrayYaml = [];
         this.viewsArrayYaml = [];
-        filesDirSource1 = globalFunction.readRecursiveDirectory(this.pathSource1);
+        filesDirSource1 = globalFunction.readRecursiveDirectory(this.pathSource1, 'yaml');
         this.loadArrayYaml(filesDirSource1, aObjectType, aObjectName);
         if (this.pathSource2 !== '') {
-            filesDirSource2 = globalFunction.readRecursiveDirectory(this.pathSource2);
+            filesDirSource2 = globalFunction.readRecursiveDirectory(this.pathSource2, 'yaml');
             this.loadArrayYaml(filesDirSource2, aObjectType, aObjectName);
         }
         this.loadYaml = true;
