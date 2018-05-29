@@ -144,6 +144,7 @@ export class pgExtractMetadata {
                     outProcedure.procedure.pg.resultRows = rProcedures[i].rows;
                     outProcedure.procedure.pg.options.optimization.type = rProcedures[i].volatility;
                     outProcedure.procedure.pg.options.optimization.returnNullonNullInput = rProcedures[i].isStrict;
+                    outProcedure.procedure.pg.options.optimization.parallelMode = rProcedures[i].parallelMode;
 
                     //"schema","functionName","objectName","proArgModes","proArgType","proArgNames",
                     //"proArgTypeName","proArgPosition" 
@@ -167,6 +168,10 @@ export class pgExtractMetadata {
 
                     body = rProcedures[i].source;
 
+                    if (body.startsWith(String.fromCharCode(10)))
+                        body=body.substring(1);
+                    if (body.endsWith(String.fromCharCode(10)))
+                        body=body.substring(0,body.length-1);    
                     outProcedure.procedure.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
 
                     if (outProcedureParameterInput.length > 0)

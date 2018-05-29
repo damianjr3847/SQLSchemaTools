@@ -140,7 +140,7 @@ export class tSource {
             }
         }
         catch (err) {
-            throw new Error('Archivo: ' + nameFile + ' ' + err.message);
+            throw new Error('Archivo: ' + nameFile.file + ' ' + err.message);
         }
     };
 

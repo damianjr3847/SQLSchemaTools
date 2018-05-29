@@ -5,6 +5,8 @@ export const ArrayobjectType: string[] = ['procedures', 'triggers', 'tables', 'g
 
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 
+export const ArrayPgFunctionParallelMode: string[] = ['safe', 'unsafe', 'restricted'];
+
 export const ArrayPgFunctionLenguage: string[] = ['plpython3u', 'c', 'sql', 'plpgsql'];
 
 export const saveToLog_Table = 'ZLG_META_UPD';
@@ -74,10 +76,10 @@ export function emptyTriggerYamlType() {
 				language: 'plpgsql',
 				options: {
 					optimization: {
-						type: 'STABLE'						
+						type: 'STABLE'
 					}
 				},
-				executionCost: 100,				
+				executionCost: 100,
 				body: ''
 			}
 		}
@@ -116,6 +118,7 @@ export interface iProcedureYamlType {
 			options: {
 				optimization: {
 					type?: string,
+					parallelMode?: string,
 					returnNullonNullInput?: boolean
 				}
 			},
@@ -137,6 +140,7 @@ export function emptyProcedureYamlType() {
 				options: {
 					optimization: {
 						type: 'STABLE',
+						parallelMode: 'UNSAFE',
 						returnNullonNullInput: false
 					}
 				},

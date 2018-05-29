@@ -6,7 +6,7 @@ import * as sources from './loadsource';
 import * as pg from 'pg';
 import * as pgMetadataQuerys from './pgMetadataQuerys';
 import * as pgExtractMetadata from './pgExtractMetadata';
-import { globalAgent } from 'https';
+//import { globalAgent } from 'https';
 
 const defaultSchema = 'public';
 
@@ -129,50 +129,43 @@ export class pgApplyMetadata {
     //******************************************************************* */
 
     private async readProcedures(aWithBody: boolean, dbYaml: Array<any>) {
-        let paramString = (aParam: any, aExtra: string, aInOut: string, aOnlyType: boolean = false) => {
+
+        let paramString = (aParam: any, aInOut: string, aOnlyType: boolean = false) => {
             let aText: string = '';
 
             if (aParam.length > 0) {
-                if (aInOut === 'O')
+                if (aInOut === 'OUT')
                     withOutputs = true;
                 for (let j = 0; j < aParam.length - 1; j++) {
                     if (aOnlyType)
-                        aText += GlobalTypes.convertDataTypeToPG(aParam[j].param.type, true) + ',';
+                        aText += aInOut + ' ' + GlobalTypes.convertDataTypeToPG(aParam[j].param.type, true) + ',';
                     else
-                        aText += globalFunction.quotedString(aParam[j].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(aParam[j].param.type, true) + ',';
+                        aText += aInOut + ' ' + globalFunction.quotedString(aParam[j].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(aParam[j].param.type, true) + ',';
                 }
                 if (aOnlyType)
-                    aText += GlobalTypes.convertDataTypeToPG(aParam[aParam.length - 1].param.type, true);
+                    aText += aInOut + ' ' + GlobalTypes.convertDataTypeToPG(aParam[aParam.length - 1].param.type, true);
                 else
-                    aText += globalFunction.quotedString(aParam[aParam.length - 1].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(aParam[aParam.length - 1].param.type, true);
-                aText = aExtra + '(' + GlobalTypes.CR + aText + ')';
-            } else {
-                if (aInOut === 'I') {
-                    aText = aExtra + '()';
-                }
-                else {
-                    aText += ' RETURNS void ';
-                    withOutputs = false;
-                }
+                    aText += aInOut + ' ' + globalFunction.quotedString(aParam[aParam.length - 1].param.name) + ' ' + GlobalTypes.convertDataTypeToPG(aParam[aParam.length - 1].param.type, true);
             }
             return aText;
         };
 
+
         let procedureYamltoString = (aYaml: any, aWithBody: boolean) => {
 
             let aProc: string = '';
+            let aParams: string = '';
 
             aProc = 'CREATE OR REPLACE FUNCTION ' + this.schema + '.' + globalFunction.quotedString(aYaml.procedure.name);
 
             if ('inputs' in aYaml.procedure)
-                aProc += paramString(aYaml.procedure.inputs, '', 'I');
-            else
-                aProc += '() ';
+                aParams = paramString(aYaml.procedure.inputs, '');
 
 
             if (aYaml.procedure.pg.resultType.toUpperCase().trim() === 'TABLE') {
+                aProc += '(' + aParams + ')';
                 if ('outputs' in aYaml.procedure) {
-                    aProc += paramString(aYaml.procedure.outputs, ' RETURNS TABLE', 'O') + GlobalTypes.CR;
+                    aProc += ' RETURNS TABLE (' + paramString(aYaml.procedure.outputs, 'O') + ')' + GlobalTypes.CR;
                     withOutputs = true;
                 }
                 else {
@@ -180,14 +173,15 @@ export class pgApplyMetadata {
                     withOutputs = false;
                 }
             }
-            else {
-                aProc += ' RETURNS ' + aYaml.procedure.pg.resultType + GlobalTypes.CR;
+            else if ('outputs' in aYaml.procedure) {
+                aParams = '(' + aParams + ',' + paramString(aYaml.procedure.outputs, 'OUT') + ')';
+                aProc += aParams + ' RETURNS ' + aYaml.procedure.pg.resultType + GlobalTypes.CR;
                 withOutputs = false;
             }
 
             if ('language' in aYaml.procedure.pg) {
                 if (GlobalTypes.ArrayPgFunctionLenguage.indexOf(aYaml.procedure.pg.language) > -1) {
-                    aProc += 'LANGUAGE ' + aYaml.procedure.pg.language + GlobalTypes.CR;
+                    aProc += 'LANGUAGE ' + aYaml.procedure.pg.language.toUpperCase() + GlobalTypes.CR;
                 }
                 else
                     throw new Error('lenguaje no soportado ' + aYaml.procedure.pg.language + '. ' + aYaml.procedure.name);
@@ -202,11 +196,17 @@ export class pgApplyMetadata {
                 aProc += 'COST 100' + GlobalTypes.CR;
 
             if ('type' in aYaml.procedure.pg.options.optimization) {
-                aProc += aYaml.procedure.pg.options.optimization.type + GlobalTypes.CR;
+                aProc += aYaml.procedure.pg.options.optimization.type.toUpperCase() + GlobalTypes.CR;
             }
             else
                 aProc += 'VOLATILE' + GlobalTypes.CR;
 
+            if ('parallelMode' in aYaml.procedure.pg.options.optimization) {
+                if (GlobalTypes.ArrayPgFunctionParallelMode.indexOf(aYaml.procedure.pg.options.optimization.parallelMode.trim().toLowerCase()) > -1)
+                    aProc += 'PARALLEL ' + aYaml.procedure.pg.options.optimization.parallelMode.toUpperCase() + GlobalTypes.CR;
+                else
+                    throw new Error('parallelMode incorrecto ' + aYaml.procedure.pg.options.optimization.parallelMode + '. ' + aYaml.procedure.name);
+            }
 
             if ('returnNullonNullInput' in aYaml.procedure.pg.options.optimization) {
                 if (aYaml.procedure.pg.options.optimization.returnNullonNullInput)
@@ -266,7 +266,7 @@ export class pgApplyMetadata {
                             rQuery.push(procedureYamltoString(fileYaml, aWithBody));
                             if (j === -1) {
                                 if ('inputs' in fileYaml.procedure)
-                                    rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + paramString(fileYaml.procedure.inputs, '', 'I', true) + ' OWNER TO ' + this.dbRole + ';');
+                                    rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + paramString(fileYaml.procedure.inputs, 'I', true) + ' OWNER TO ' + this.dbRole + ';');
                                 else
                                     rQuery.push('ALTER FUNCTION ' + this.schema + '.' + procedureName + '() OWNER TO ' + this.dbRole + ';');
                             }
@@ -276,7 +276,7 @@ export class pgApplyMetadata {
                         procedureBody = '';
                         procedureInDB = '';
                     }
-                }    
+                }
             }
             return cambios;
         }
@@ -376,7 +376,7 @@ export class pgApplyMetadata {
 
             if ('language' in aYaml.triggerFunction.function) {
                 if (GlobalTypes.ArrayPgFunctionLenguage.indexOf(aYaml.triggerFunction.function.language) > -1) {
-                    aProc += 'LANGUAGE ' + aYaml.triggerFunction.function.language + GlobalTypes.CR;
+                    aProc += 'LANGUAGE ' + aYaml.triggerFunction.function.language.toUpperCase() + GlobalTypes.CR;
                 }
                 else
                     throw new Error('lenguaje no soportado ' + aYaml.triggerFunction.function + '. ' + aYaml.triggerFunction.name);
@@ -391,18 +391,20 @@ export class pgApplyMetadata {
                 aProc += 'COST 100' + GlobalTypes.CR;
 
             if ('type' in aYaml.triggerFunction.function.options.optimization) {
-                aProc += aYaml.triggerFunction.function.options.optimization.type + GlobalTypes.CR;
+                aProc += aYaml.triggerFunction.function.options.optimization.type.toUpperCase() + GlobalTypes.CR;
             }
             else
                 aProc += 'VOLATILE' + GlobalTypes.CR;
 
             //esta puesto por separado el AS y as porque no puedo pasar al body del trigger a upper o lower por si tiene literales
+            aYaml.triggerFunction.function.body = aYaml.triggerFunction.function.body.trimRight();
+           
             if (aYaml.triggerFunction.function.body.startsWith('AS'))
-                aProc += GlobalTypes.CR + aYaml.triggerFunction.function.body.replace('AS', 'AS $BODY$') + ' $BODY$' + GlobalTypes.CR;
+                aProc += aYaml.triggerFunction.function.body.replace('AS', 'AS $BODY$') + ' $BODY$';
             else if (aYaml.triggerFunction.function.body.startsWith('as'))
-                aProc += GlobalTypes.CR + aYaml.triggerFunction.function.body.replace('as', 'as $BODY$') + ' $BODY$' + GlobalTypes.CR;
+                aProc += aYaml.triggerFunction.function.body.replace('as', 'AS $BODY$') + ' $BODY$';
             else
-                aProc += 'AS' + GlobalTypes.CR + '$BODY$' + aYaml.triggerFunction.function.body + GlobalTypes.CR + ' $BODY$';
+                aProc += 'AS $BODY$' + aYaml.triggerFunction.function.body + ' $BODY$';
 
             return aProc;
         };
@@ -444,8 +446,9 @@ export class pgApplyMetadata {
                     rQuery = [];
 
                     if (triggerBody !== triggerInDb) {
-                        if (j !== -1)
-                            rQuery.push('DROP FUNCTION ' + this.schema + '.' + triggerName + '()');
+                        //no puedo borrar la funcion del trigger porque sino deberia de borrar todas la dependencias
+                        //if (j !== -1)
+                          //  rQuery.push('DROP FUNCTION ' + this.schema + '.' + triggerName + '()');
 
                         rQuery.push(triggerBody);
 
@@ -455,9 +458,7 @@ export class pgApplyMetadata {
 
                         await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, rQuery);
 
-                    }
-
-                    await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, triggerYamltoString(fileYaml, dbYaml[j]));
+                    }                   
 
                     triggerBody = '';
                     triggerInDb = '';

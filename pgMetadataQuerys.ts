@@ -9,12 +9,18 @@ export const queryProcedureTrigger: string =
             p.prorows 										as "rows",
             p.proisstrict 									as "isStrict",
             t.typname										as "returnType",
-            case p.provolatile when 'i' then 'inmutable'
+            case p.provolatile when 'i' then 'immutable'
                                when 's' then 'stable'
                                when 'v' then 'volatile'	
             end 											as "volatility",
             p.prosrc										as "source",
-            pg_catalog.obj_description(p.oid, 'pg_proc')    AS "description"
+            pg_catalog.obj_description(p.oid, 'pg_proc')    AS "description",
+		    case p.proparallel when 's' then 'safe'
+                               when 'u' then 'unsafe'
+                               when 'r' then 'restricted'   
+		                       else ''
+            end 											as "parallelMode",
+            p.oid                                           as oid
             
         from pg_namespace ns
         left outer join pg_proc p on p.pronamespace = ns.oid
@@ -207,7 +213,7 @@ export const queryTableIndexesField: string =
             INNER JOIN pg_namespace ns ON (ns.oid = t.relnamespace)
             WHERE ns.nspname = {FILTER_SCHEMA}
             ORDER BY t.relname,i.relname, 11, 14) CC
-    {FILTER_OBJECT}`;
+    {FILTER_OBJECT}`; 
 
 export const queryTableCheckConstraint: string =
     `SELECT *

@@ -10,6 +10,7 @@ const fbExtractLoadData = require("./fbExtractLoadData");
 const pgApplyMetadata = require("./pgApplyMetadata");
 const pgExtractMetadata = require("./pgExtractMetadata");
 const pgExtractLoadData = require("./pgExtractLoadData");
+const pgCheckMetadata = require("./pgCheckMetadata");
 let operation = '';
 let source1 = '';
 let source2 = '';
@@ -62,7 +63,7 @@ let excludefrom: string     = './export/';
 excludeObject= JSON.parse(excludeObjectStr);
 */
 params.version('1.0.0');
-params.option('--operation', '<readmetadata/writemetadata/extractdata/importdata>');
+params.option('--operation', '<readmetadata/writemetadata/extractdata/importdata/checkmetadata>');
 params.option('--source1 <source1>', 'Path del directorio a leer');
 params.option('--source2 <source2>', 'Path del directorio a leer');
 params.option('-x, --pathsave <pathsave>', 'Path del directorio donde se guardaran los archivos');
@@ -160,8 +161,8 @@ if (params.conf) {
 }
 if (params.operation)
     operation = params.operation;
-if (!(operation === 'readmetadata' || operation === 'writemetadata' || operation === 'extractdata' || operation === 'importdata')) {
-    console.log('debe haber una operacion valida para continuar <readmetadata/writemetadata/extractdata/importdata>');
+if (!(operation === 'readmetadata' || operation === 'writemetadata' || operation === 'extractdata' || operation === 'importdata' || operation === 'checkmetadata')) {
+    console.log('debe haber una operacion valida para continuar <readmetadata/writemetadata/extractdata/importdata/checkmetadata>');
     process.exit(1);
 }
 if (params.dbdriver)
@@ -336,6 +337,7 @@ console.log('p '+params.outscript)
     let pgam;
     let pgem;
     let pgdata;
+    let pgcheck;
     beginTime = new Date();
     if (!(pathSave.endsWith('/')))
         pathSave += '/';
@@ -398,7 +400,9 @@ console.log('p '+params.outscript)
                 }
             await pgam.applyYalm(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);
         }
-        else if (operation === 'extractdata') {
+        else if (operation === 'checkmetadata') {
+            pgcheck = new pgCheckMetadata.pgCheckMetadata;
+            await pgcheck.check(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);
         }
         else if (operation === 'importdata') {
             pgdata = new pgExtractLoadData.pgExtractLoadData;

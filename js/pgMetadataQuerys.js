@@ -10,12 +10,18 @@ exports.queryProcedureTrigger = `SELECT *
             p.prorows 										as "rows",
             p.proisstrict 									as "isStrict",
             t.typname										as "returnType",
-            case p.provolatile when 'i' then 'inmutable'
+            case p.provolatile when 'i' then 'immutable'
                                when 's' then 'stable'
                                when 'v' then 'volatile'	
             end 											as "volatility",
             p.prosrc										as "source",
-            pg_catalog.obj_description(p.oid, 'pg_proc')    AS "description"
+            pg_catalog.obj_description(p.oid, 'pg_proc')    AS "description",
+		    case p.proparallel when 's' then 'safe'
+                               when 'u' then 'unsafe'
+                               when 'r' then 'restricted'   
+		                       else ''
+            end 											as "parallelMode",
+            p.oid                                           as oid
             
         from pg_namespace ns
         left outer join pg_proc p on p.pronamespace = ns.oid

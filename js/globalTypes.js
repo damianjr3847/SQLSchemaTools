@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArrayDbDriver = ['pg', 'fb'];
 exports.ArrayobjectType = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields'];
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
+exports.ArrayPgFunctionParallelMode = ['safe', 'unsafe', 'restricted'];
 exports.ArrayPgFunctionLenguage = ['plpython3u', 'c', 'sql', 'plpgsql'];
 exports.saveToLog_Table = 'ZLG_META_UPD';
 exports.yamlExportOptions = {
@@ -59,6 +60,7 @@ function emptyProcedureYamlType() {
                 options: {
                     optimization: {
                         type: 'STABLE',
+                        parallelMode: 'UNSAFE',
                         returnNullonNullInput: false
                     }
                 },

@@ -28,6 +28,7 @@ import * as fbExtractLoadData from './fbExtractLoadData';
 import * as pgApplyMetadata from './pgApplyMetadata';
 import * as pgExtractMetadata from './pgExtractMetadata';
 import * as pgExtractLoadData from './pgExtractLoadData';
+import * as pgCheckMetadata from './pgCheckMetadata';
 
 let operation: string = '';
 let source1: string = '';
@@ -86,7 +87,7 @@ excludeObject= JSON.parse(excludeObjectStr);
 
 params.version('1.0.0');
 
-params.option('--operation', '<readmetadata/writemetadata/extractdata/importdata>');
+params.option('--operation', '<readmetadata/writemetadata/extractdata/importdata/checkmetadata>');
 
 params.option('--source1 <source1>', 'Path del directorio a leer');
 params.option('--source2 <source2>', 'Path del directorio a leer');
@@ -117,6 +118,7 @@ params.option('--conf <archivoconf>', 'archivo de configuracion');
 params.option('--saveafterapply <pathsave>', 'Path del directorio donde se guardaran los archivos despues de aplicar cambios en el metadata solo PG');
 
 params.option('--deletedata', 'operacion=importdata. Borra el contenido de las tablas antes de importar');
+
 
 params.parse(process.argv);
 
@@ -200,8 +202,8 @@ if (params.conf) {
 if (params.operation)
     operation = params.operation;
 
-if (!(operation === 'readmetadata' || operation === 'writemetadata' || operation === 'extractdata' || operation === 'importdata')) {
-    console.log('debe haber una operacion valida para continuar <readmetadata/writemetadata/extractdata/importdata>');
+if (!(operation === 'readmetadata' || operation === 'writemetadata' || operation === 'extractdata' || operation === 'importdata' || operation === 'checkmetadata')) {
+    console.log('debe haber una operacion valida para continuar <readmetadata/writemetadata/extractdata/importdata/checkmetadata>');
     process.exit(1);
 }
 
@@ -418,6 +420,7 @@ console.log('p '+params.outscript)
     let pgam: pgApplyMetadata.pgApplyMetadata;
     let pgem: pgExtractMetadata.pgExtractMetadata;
     let pgdata: pgExtractLoadData.pgExtractLoadData;
+    let pgcheck: pgCheckMetadata.pgCheckMetadata;
 
     beginTime = new Date();
 
@@ -488,8 +491,10 @@ console.log('p '+params.outscript)
                 }
             await pgam.applyYalm(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);
         }
-        else if (operation === 'extractdata') {
-
+        else if (operation === 'checkmetadata') {
+            pgcheck = new pgCheckMetadata.pgCheckMetadata;
+            
+            await pgcheck.check(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);    
 
         }
         else if (operation === 'importdata') {
