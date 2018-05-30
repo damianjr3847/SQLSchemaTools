@@ -67,8 +67,8 @@ class pgCheckMetadata {
         let dbTrigger = [];
         let result;
         let cRet = { total: 0, cError: 0, cOk: 0 };
-        console.log('');
-        console.log('');
+        console.log(' ');
+        console.log(' ');
         try {
             await this.pgDb.query('BEGIN');
             try {
@@ -100,6 +100,44 @@ class pgCheckMetadata {
             throw new Error(err.message);
         }
     }
+    async checkIndexes(aobjectName) {
+        let dbIdx = [];
+        let result;
+        let tAux = '';
+        console.log(' ');
+        console.log(' ');
+        try {
+            await this.pgDb.query('BEGIN');
+            try {
+                result = await this.pgDb.query(this.analyzeQuery(pgMetadataQuerys.queryCheckIndexes, aobjectName, GlobalTypes.ArrayobjectType[6]));
+                dbIdx = result.rows;
+                if (dbIdx.length > 0) {
+                    console.log('\x1b[31m' + 'REVISAR LOS SIGUIENTES INDICES: ');
+                    console.log('\x1b[31m\x1b[5m' + '************************************************************');
+                    console.log('\x1b[31m\x1b[5m' + '***                 A D V E R T E N C I A                ***');
+                    console.log('\x1b[31m\x1b[5m' + '***  ESTO NO QUIERE DECIR QUE TENGA QUE BORRAR ESTOS     ***');
+                    console.log('\x1b[31m\x1b[5m' + '***          INDICES EN FORMA INDISCRIMINADA             ***');
+                    console.log('\x1b[31m\x1b[5m' + '************************************************************');
+                }
+                for (let i = 0; i < dbIdx.length; i++) {
+                    /*table_name,Deletioncandidateindex,Deletioncandidatecolumns,Existingindex,Existingcolumns"*/
+                    if (tAux === '' || tAux !== dbIdx[i].table_name) {
+                        tAux = dbIdx[i].table_name;
+                        console.log('\x1b[0m');
+                        console.log('\x1b[0m' + 'Tabla: ' + dbIdx[i].table_name);
+                    }
+                    console.log('\x1b[0m' + 'Indice ' + dbIdx[i].Deletioncandidateindex + '(' + dbIdx[i].Deletioncandidatecolumns + '). Esta incluido en ' + dbIdx[i].Existingindex + '(' + dbIdx[i].Existingcolumns + ')');
+                }
+            }
+            finally {
+                console.log('\x1b[0m');
+                await this.pgDb.query('COMMIT');
+            }
+        }
+        catch (err) {
+            throw new Error(err.message);
+        }
+    }
     //****************************************************************** */
     //        D E C L A R A C I O N E S    P U B L I C A S
     //******************************************************************* */
@@ -122,6 +160,9 @@ class pgCheckMetadata {
                 }
                 if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[1]) {
                     cTri = await this.checkTriggers(objectName);
+                }
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[6]) {
+                    await this.checkIndexes(objectName);
                 }
             }
             finally {

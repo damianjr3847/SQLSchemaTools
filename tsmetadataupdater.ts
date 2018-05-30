@@ -87,7 +87,7 @@ excludeObject= JSON.parse(excludeObjectStr);
 
 params.version('1.0.0');
 
-params.option('--operation', '<readmetadata/writemetadata/extractdata/importdata/checkmetadata>');
+params.option('--operation <>', '<readmetadata/writemetadata/extractdata/importdata/checkmetadata>');
 
 params.option('--source1 <source1>', 'Path del directorio a leer');
 params.option('--source2 <source2>', 'Path del directorio a leer');

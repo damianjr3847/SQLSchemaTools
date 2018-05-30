@@ -1,7 +1,7 @@
 
 export const ArrayDbDriver: string[] = ['pg', 'fb'];
 
-export const ArrayobjectType: string[] = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields'];
+export const ArrayobjectType: string[] = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields', 'indexes'];
 
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 

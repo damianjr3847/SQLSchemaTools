@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArrayDbDriver = ['pg', 'fb'];
-exports.ArrayobjectType = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields'];
+exports.ArrayobjectType = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields', 'indexes'];
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 exports.ArrayPgFunctionParallelMode = ['safe', 'unsafe', 'restricted'];
 exports.ArrayPgFunctionLenguage = ['plpython3u', 'c', 'sql', 'plpgsql'];

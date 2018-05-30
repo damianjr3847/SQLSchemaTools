@@ -525,4 +525,32 @@ exports.queryTrigger = `SELECT *
             WHERE trg.tgisinternal = false and ns.nspname = {FILTER_SCHEMA}
         order by pgpr.proname ) cc
     {FILTER_OBJECT}`;
+exports.queryCheckIndexes = `WITH indexes AS (
+    SELECT
+      tnsp.nspname AS schema_name,
+      trel.relname AS table_name,
+      irel.relname AS index_name,
+      string_agg(a.attname, ', ' ORDER BY c.ordinality) AS columns
+    FROM pg_index AS i
+    JOIN pg_class AS trel ON trel.oid = i.indrelid
+    JOIN pg_namespace AS tnsp ON trel.relnamespace = tnsp.oid
+    JOIN pg_class AS irel ON irel.oid = i.indexrelid
+    JOIN pg_attribute AS a ON trel.oid = a.attrelid
+    JOIN LATERAL unnest(i.indkey) 
+      WITH ORDINALITY AS c(colnum, ordinality)
+        ON a.attnum = c.colnum
+    WHERE tnsp.nspname = {FILTER_SCHEMA}
+    GROUP BY i, tnsp.nspname, trel.relname, irel.relname
+  )
+  SELECT
+    i.table_name,
+    i.index_name AS "Deletioncandidateindex",
+    i.columns AS "Deletioncandidatecolumns",
+    j.index_name AS "Existingindex",
+    j.columns AS "Existingcolumns"
+  FROM indexes i
+  JOIN indexes j
+    ON i.schema_name = j.schema_name
+    AND i.table_name = j.table_name
+    AND j.columns LIKE i.columns || ',%';`;
 //# sourceMappingURL=pgMetadataQuerys.js.map
