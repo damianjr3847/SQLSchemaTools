@@ -522,7 +522,7 @@ exports.queryTrigger = `SELECT *
             INNER JOIN pg_class tbl on trg.tgrelid = tbl.oid
             INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
             INNER JOIN pg_proc pgpr on pgpr.oid=trg.tgfoid 
-            WHERE trg.tgisinternal = false
+            WHERE trg.tgisinternal = false and ns.nspname = {FILTER_SCHEMA}
         order by pgpr.proname ) cc
     {FILTER_OBJECT}`;
 //# sourceMappingURL=pgMetadataQuerys.js.map
