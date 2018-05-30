@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as fbClass from './classFirebird';
-import * as GlobalTypes from './globalTypes';
+import * as GlobalTypes from '../common/globalTypes';
 import * as fbExtractMetadata from './fbExtractMetadata';
-import * as globalFunction from './globalFunction';
-import * as sources from './loadsource';
+import * as globalFunction from '../common/globalFunction';
+import * as sources from '../common/loadsource';
 
 const saveMetadataTable = `CREATE TABLE {TABLE} (
                                 FINDICE  INTEGER NOT NULL PRIMARY KEY,

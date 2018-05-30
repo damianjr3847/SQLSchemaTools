@@ -3,14 +3,15 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs = require("fs");
 const params = require("commander");
-const fbExtractMetadata = require("./fbExtractMetadata");
-const fbApplyMetadata = require("./fbApplyMetadata");
-const GlobalTypes = require("./globalTypes");
-const fbExtractLoadData = require("./fbExtractLoadData");
-const pgApplyMetadata = require("./pgApplyMetadata");
-const pgExtractMetadata = require("./pgExtractMetadata");
-const pgExtractLoadData = require("./pgExtractLoadData");
-const pgCheckMetadata = require("./pgCheckMetadata");
+const fbExtractMetadata = require("./firebird/fbExtractMetadata");
+const fbApplyMetadata = require("./firebird/fbApplyMetadata");
+const GlobalTypes = require("./common/globalTypes");
+const fbExtractLoadData = require("./firebird/fbExtractLoadData");
+const fbCheckMetadata = require("./firebird/fbCheckMetadata");
+const pgApplyMetadata = require("./postgre/pgApplyMetadata");
+const pgExtractMetadata = require("./postgre/pgExtractMetadata");
+const pgExtractLoadData = require("./postgre/pgExtractLoadData");
+const pgCheckMetadata = require("./postgre/pgCheckMetadata");
 let operation = '';
 let source1 = '';
 let source2 = '';
@@ -334,6 +335,7 @@ console.log('p '+params.outscript)
     let fbem;
     let fbam;
     let fbdata;
+    let fbCheck;
     let pgam;
     let pgem;
     let pgdata;
@@ -372,6 +374,10 @@ console.log('p '+params.outscript)
             fbdata.excludeObject = excludeObject;
             fbdata.formatExport = 'csv';
             await fbdata.extractData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName);
+        }
+        else if (operation === 'checkmetadata') {
+            fbCheck = new fbCheckMetadata.fbCheckMetadata;
+            await fbCheck.check(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);
         }
     }
     else {

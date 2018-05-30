@@ -1,21 +1,19 @@
-import * as fs from 'fs';
-import * as fbClass from './classFirebird';
-import * as GlobalTypes from './globalTypes';
-import * as loadsource from './loadsource';
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const fs = require("fs");
+const GlobalTypes = require("./globalTypes");
 //esta funcion devuelve falso si el valor de aName esta dentro de los objetos a excluir
 //devuelve true si se puede aplicar el cambio
-export function includeObject(aObjExclude: any, aType: string, aName: string) {
-    var element: string = '';
-    var ret: boolean = false;
+function includeObject(aObjExclude, aType, aName) {
+    var element = '';
+    var ret = false;
     if (aObjExclude !== undefined && aType in aObjExclude) {
         for (var i in aObjExclude[aType]) {
             element = aObjExclude[aType][i];
             if (element.endsWith('*'))
-                ret = aName.toUpperCase().startsWith(element.replace('*', function (x: string) { return '' }).toUpperCase());
+                ret = aName.toUpperCase().startsWith(element.replace('*', function (x) { return ''; }).toUpperCase());
             else
                 ret = aName.trim().toUpperCase() === element.trim().toUpperCase();
-
             if (ret)
                 break;
         }
@@ -25,9 +23,9 @@ export function includeObject(aObjExclude: any, aType: string, aName: string) {
         return !ret;
     }
 }
-
-export function arrayToString(aArray: Array<any>, aSeparated: string = '', aSubValue: string = '') {
-    let aText: string = '';
+exports.includeObject = includeObject;
+function arrayToString(aArray, aSeparated = '', aSubValue = '') {
+    let aText = '';
     for (let j = 0; j < aArray.length - 1; j++) {
         if (aSubValue === '')
             aText += aArray[j] + aSeparated;
@@ -40,14 +38,13 @@ export function arrayToString(aArray: Array<any>, aSeparated: string = '', aSubV
         aText += aArray[aArray.length - 1][aSubValue];
     return aText;
 }
-
-export function readRecursiveDirectory(dir: string, aExtension: string = ''): Array<any> {
-    var retArrayFile: Array<any> = [];
-    var files: any;
-    var fStat: any;
+exports.arrayToString = arrayToString;
+function readRecursiveDirectory(dir, aExtension = '') {
+    var retArrayFile = [];
+    var files;
+    var fStat;
     if (!(dir.endsWith('/') || dir.endsWith('\\')))
         dir += '/';
-
     files = fs.readdirSync(dir);
     for (var i in files) {
         fStat = fs.statSync(dir + files[i]);
@@ -56,16 +53,15 @@ export function readRecursiveDirectory(dir: string, aExtension: string = ''): Ar
         else {
             if (aExtension === '' || String(files[i]).endsWith(aExtension))
                 retArrayFile.push({ path: dir, file: files[i], ctime: fStat.ctime, atime: fStat.atime, mtime: fStat.mtime, ctimeMs: fStat.ctimeMs, atimeMs: fStat.atimeMs, mtimeMs: fStat.mtimeMs });
-        }    
+        }
     }
     return retArrayFile;
-};
-
-
-export function varToSql(aValue: any, AType: number, ASubType: number) {
-    let ft: string = '';
-    let aDate: string = '';
-
+}
+exports.readRecursiveDirectory = readRecursiveDirectory;
+;
+function varToSql(aValue, AType, ASubType) {
+    let ft = '';
+    let aDate = '';
     if (aValue === null)
         ft = 'NULL';
     else {
@@ -78,16 +74,15 @@ export function varToSql(aValue: any, AType: number, ASubType: number) {
                 ft = aValue.toString().replace(',', '.');
                 break;
             case 37:
-            case 14: //varchar-char
-                if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+            case 14://varchar-char
+                if (aValue === undefined)
                     ft = "''";
                 else
                     ft = "'" + aValue.replace("'", "''") + "'";
-
                 break;
-            case 261: //blob
+            case 261://blob
                 if (ASubType === 1) {
-                    if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+                    if (aValue === undefined)
                         ft = "''";
                     else {
                         ft = "'" + aValue.replace("'", "''") + "'";
@@ -97,15 +92,15 @@ export function varToSql(aValue: any, AType: number, ASubType: number) {
                     ft = "'" + aValue.replace("'", "''") + "'";
                 }
                 break;
-            case 12: //date
+            case 12://date
                 aDate = new Date(aValue).toJSON();
                 ft = "'" + aDate.substr(0, aDate.indexOf('T')) + "'";
                 break;
-            case 13: //time
+            case 13://time
                 aDate = new Date(aValue).toJSON();
                 ft = "'" + aDate.substr(aDate.indexOf('T') + 1).replace('Z', '') + "'";
                 break;
-            case 35: //timestamp 
+            case 35://timestamp 
                 aDate = new Date(aValue).toJSON();
                 ft = "'" + aDate.replace('T', ' ').replace('Z', '') + "'";
                 break;
@@ -115,11 +110,10 @@ export function varToSql(aValue: any, AType: number, ASubType: number) {
     }
     return ft;
 }
-
-export function varToJSON(aValue: any, AType: number, ASubType: number) {
-    let ft: any;
-    let aDate: string = '';
-
+exports.varToSql = varToSql;
+function varToJSON(aValue, AType, ASubType) {
+    let ft;
+    let aDate = '';
     if (aValue === null)
         ft = null;
     else {
@@ -127,32 +121,32 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
             case 7:
             case 8:
             case 16:
-                if (ASubType == 1) //numeric
+                if (ASubType == 1)
                     ft = aValue;
-                else if (ASubType == 2) //decimal
+                else if (ASubType == 2)
                     ft = aValue;
-                else if (ASubType == 7) //small
+                else if (ASubType == 7)
                     ft = { $numberint: aValue };
-                else if (ASubType == 8) //int
+                else if (ASubType == 8)
                     ft = { $numberint: aValue };
                 else
                     ft = { $numberlong: aValue };
                 break;
             case 10: //float
-            case 27: //double precision
+            case 27://double precision
                 ft = aValue;
                 break;
             case 37:
-            case 14: //varchar-char
-                if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+            case 14://varchar-char
+                if (aValue === undefined)
                     ft = '';
                 else
                     ft = aValue.toString('binary');
                 break;
-            case 261: //blob
+            case 261://blob
                 if (ASubType === 1) {
-                    if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
-                        ft = ''
+                    if (aValue === undefined)
+                        ft = '';
                     else {
                         ft = aValue.toString('binary');
                     }
@@ -161,17 +155,17 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
                     ft = { $binary: aValue.toString() };
                 }
                 break;
-            case 12: //date
+            case 12://date
                 aDate = new Date(aValue).toLocaleDateString();
                 ft = aDate;
                 break;
-            case 13: //time 
+            case 13://time 
                 aDate = new Date(aValue).toLocaleString();
                 ft = aDate.substr(aDate.indexOf(' ') + 1);
                 break;
-            /*case 12: //date 
+            /*case 12: //date
             case 13: //time    */
-            case 35: //timestamp 
+            case 35://timestamp 
                 ft = { $date: new Date(aValue).toJSON() };
                 break;
             default:
@@ -182,17 +176,14 @@ export function varToJSON(aValue: any, AType: number, ASubType: number) {
         aValue = aValue;
     return ft;
 }
-
-function quotedCSV(aValue: string): string {
-    let ft: string = '';
-
+exports.varToJSON = varToJSON;
+function quotedCSV(aValue) {
+    let ft = '';
     //va con RegExp porque el replace cambia solo la primer ocurrencia.        
     aValue = aValue.replace(new RegExp('"', 'g'), '""');
     //aValue = aValue.replace(new RegExp(String.fromCharCode(13), 'g'), '\\r');
     //aValue = aValue.replace(new RegExp(String.fromCharCode(10), 'g'), '\\n');
     //aValue = aValue.replace(new RegExp(String.fromCharCode(9), 'g'), '\\t');
-
-
     if (aValue.indexOf(',') !== -1 ||
         aValue.indexOf('"') !== -1 ||
         aValue.indexOf(String.fromCharCode(13)) !== -1 ||
@@ -202,15 +193,12 @@ function quotedCSV(aValue: string): string {
         ft = '"' + aValue + '"';
     else
         ft = aValue;
-
     return ft;
 }
-
-export function varToCSV(aValue: any, AType: number, ASubType: number) {
-    let ft: string;
-    let aDate: string = '';
-    let aux: any;
-
+function varToCSV(aValue, AType, ASubType) {
+    let ft;
+    let aDate = '';
+    let aux;
     if (aValue === null)
         ft = '';
     else if (aValue === undefined)
@@ -220,60 +208,57 @@ export function varToCSV(aValue: any, AType: number, ASubType: number) {
             case 7:
             case 8:
             case 16:
-                if (ASubType == 1) //numeric
+                if (ASubType == 1)
                     ft = aValue;
-                else if (ASubType == 2) //decimal
+                else if (ASubType == 2)
                     ft = String(aValue).replace(',', '.');
-                else if (ASubType == 7) //small
+                else if (ASubType == 7)
                     ft = String(aValue).replace(',', '.');
-                else if (ASubType == 8) //int
+                else if (ASubType == 8)
                     ft = String(aValue).replace(',', '.');
                 else
                     ft = String(aValue).replace(',', '.');
                 break;
             case 10: //float
-            case 27: //double precision
+            case 27://double precision
                 ft = String(aValue).replace(',', '.');
                 break;
             case 37:
-            case 14: //varchar-char
-                if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
+            case 14://varchar-char
+                if (aValue === undefined)
                     ft = '';
                 else
                     ft = quotedCSV(aValue.toString('binary')); //por la Ñ
                 break;
-            case 261: //blob
-                if (ASubType === 1) { //type text
-                    if (aValue === undefined) //manda esto cuando el dato generalmente es vacio
-                        ft = ''
+            case 261://blob
+                if (ASubType === 1) {
+                    if (aValue === undefined)
+                        ft = '';
                     else {
                         ft = quotedCSV(aValue.toString('binary')); //por la Ñ
                     }
                 }
-                else { //type binary
+                else {
                     ft = '\\x' + aValue.toString();
                 }
                 break;
-            case 12: //date
+            case 12://date
                 aDate = new Date(aValue).toLocaleDateString();
                 ft = aDate;
                 break;
-            case 13: //time 
-
+            case 13://time 
                 //aDate = new Date(aValue).toLocaleString();
-
                 aux = aValue.getHours() + ':';
                 aux += aValue.getMinutes() + ':';
                 aux += aValue.getSeconds() + '.';
                 aux += aValue.getMilliseconds();
                 //aux = new Date(aValue).getTime();
-
                 //ft = aDate.substr(aDate.indexOf(' ') + 1);
                 ft = aux;
                 break;
-            /*case 12: //date 
+            /*case 12: //date
             case 13: //time    */
-            case 35: //timestamp 
+            case 35://timestamp 
                 ft = new Date(aValue).toJSON();
                 break;
             default:
@@ -284,27 +269,25 @@ export function varToCSV(aValue: any, AType: number, ASubType: number) {
         aValue = aValue;
     return ft;
 }
-
-export function quotedString(aValue: string): string {
-    let x: boolean = false;
+exports.varToCSV = varToCSV;
+function quotedString(aValue) {
+    let x = false;
     // x=/[^A-Z_0-9]/.test(aValue);
     // x=/[^A-Z_^a-z_0-9]/.test(aValue);
-
-
     if (/[^A-Z_^a-z_0-9]/.test(aValue[0]))
-        return '"' + aValue + '"'
+        return '"' + aValue + '"';
     else
-        return aValue
+        return aValue;
 }
-
-export function ifThen(aCondition: boolean, aTrue: any, aFalse: any) {
+exports.quotedString = quotedString;
+function ifThen(aCondition, aTrue, aFalse) {
     if (aCondition)
         return aTrue;
     else
         return aFalse;
 }
-
-export function outFileScript(aType: string, aScript: Array<any> | string, pathFileScript: string) {
+exports.ifThen = ifThen;
+function outFileScript(aType, aScript, pathFileScript) {
     switch (aType) {
         case GlobalTypes.ArrayobjectType[2]:
             if (aScript.length > 0) {
@@ -337,29 +320,28 @@ export function outFileScript(aType: string, aScript: Array<any> | string, pathF
             break;
     }
 }
-
-export function isChange(aFileToApply: loadsource.ifile, aOriginalMetadata: Array<any>, aType: string) {
-    let j: number = 0;
-    let ret: boolean = false;
-
+exports.outFileScript = outFileScript;
+function isChange(aFileToApply, aOriginalMetadata, aType) {
+    let j = 0;
+    let ret = false;
     if (aOriginalMetadata.length === 0)
         ret = true;
     else {
         j = -1;
         switch (aType) {
-            case GlobalTypes.ArrayobjectType[0]: //procedures
+            case GlobalTypes.ArrayobjectType[0]://procedures
                 j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.procedure.name.toLowerCase().trim() === aFileToApply.contentFile.procedure.name.toLowerCase().trim()));
                 break;
-            case GlobalTypes.ArrayobjectType[1]: //trigger
+            case GlobalTypes.ArrayobjectType[1]://trigger
                 j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.triggerFunction.name.toLowerCase().trim() === aFileToApply.contentFile.triggerFunction.name.toLowerCase().trim()));
                 break;
-            case GlobalTypes.ArrayobjectType[2]: //tables
+            case GlobalTypes.ArrayobjectType[2]://tables
                 j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.table.name.toLowerCase().trim() === aFileToApply.contentFile.table.name.toLowerCase().trim()));
                 break;
-            case GlobalTypes.ArrayobjectType[3]: //generator
+            case GlobalTypes.ArrayobjectType[3]://generator
                 j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.generator.name.toLowerCase().trim() === aFileToApply.contentFile.generator.name.toLowerCase().trim()));
                 break;
-            case GlobalTypes.ArrayobjectType[4]: //views
+            case GlobalTypes.ArrayobjectType[4]://views
                 j = aOriginalMetadata.findIndex(aitem => (aitem.contentFile.view.name.toLowerCase().trim() === aFileToApply.contentFile.view.name.toLowerCase().trim()));
                 break;
         }
@@ -370,6 +352,7 @@ export function isChange(aFileToApply: loadsource.ifile, aOriginalMetadata: Arra
                 ret = true;
         }
     }
-
     return ret;
 }
+exports.isChange = isChange;
+//# sourceMappingURL=globalFunction.js.map

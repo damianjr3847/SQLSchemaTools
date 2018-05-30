@@ -134,10 +134,10 @@ export const queryCheckIndexes = `WITH RECURSIVE INDEXES (TABLE_NAME,INDEX_NAME,
     GROUP BY 1,2)
  
  SELECT
-     I.TABLE_NAME,
-     I.INDEX_NAME AS "Deletioncandidateindex",
-     I.COLUMNS AS "Deletioncandidatecolumns",
-     J.INDEX_NAME AS "Existingindex",
-     J.COLUMNS AS "Existingcolumns"
+     CAST(TRIM(I.TABLE_NAME) AS VARCHAR(100)) AS "table_name",
+     CAST(TRIM(I.INDEX_NAME) AS VARCHAR(100)) AS "Deletioncandidateindex",
+     CAST(TRIM(I.COLUMNS) AS VARCHAR(1000)) AS "Deletioncandidatecolumns",
+     CAST(TRIM(J.INDEX_NAME) AS VARCHAR(100)) AS "Existingindex",
+     CAST(TRIM(J.COLUMNS) AS VARCHAR(1000)) AS "Existingcolumns"
  FROM INDEXES I
  JOIN INDEXES J ON I.TABLE_NAME = J.TABLE_NAME AND J.COLUMNS LIKE I.COLUMNS || ',%';`    

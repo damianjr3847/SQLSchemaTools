@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as fbClass from './classFirebird';
-import * as GlobalTypes from './globalTypes';
-import * as globalFunction from './globalFunction';
+import * as GlobalTypes from '../common/globalTypes';
+import * as globalFunction from '../common/globalFunction';
 import * as fbExtractMetadata from './fbExtractMetadata';
 import * as metadataQuerys from './fbMetadataQuerys';
 

@@ -21,14 +21,15 @@ https://github.com/hgourvest/node-firebird
 
 import * as fs from 'fs';
 import * as params from 'commander';
-import * as fbExtractMetadata from './fbExtractMetadata';
-import * as fbApplyMetadata from './fbApplyMetadata';
-import * as GlobalTypes from './globalTypes';
-import * as fbExtractLoadData from './fbExtractLoadData';
-import * as pgApplyMetadata from './pgApplyMetadata';
-import * as pgExtractMetadata from './pgExtractMetadata';
-import * as pgExtractLoadData from './pgExtractLoadData';
-import * as pgCheckMetadata from './pgCheckMetadata';
+import * as fbExtractMetadata from './firebird/fbExtractMetadata';
+import * as fbApplyMetadata from './firebird/fbApplyMetadata';
+import * as GlobalTypes from './common/globalTypes';
+import * as fbExtractLoadData from './firebird/fbExtractLoadData';
+import * as fbCheckMetadata from './firebird/fbCheckMetadata';
+import * as pgApplyMetadata from './postgre/pgApplyMetadata';
+import * as pgExtractMetadata from './postgre/pgExtractMetadata';
+import * as pgExtractLoadData from './postgre/pgExtractLoadData';
+import * as pgCheckMetadata from './postgre/pgCheckMetadata';
 
 let operation: string = '';
 let source1: string = '';
@@ -416,6 +417,7 @@ console.log('p '+params.outscript)
     let fbem: fbExtractMetadata.fbExtractMetadata;
     let fbam: fbApplyMetadata.fbApplyMetadata;
     let fbdata: fbExtractLoadData.fbExtractLoadData;
+    let fbCheck: fbCheckMetadata.fbCheckMetadata;
 
     let pgam: pgApplyMetadata.pgApplyMetadata;
     let pgem: pgExtractMetadata.pgExtractMetadata;
@@ -461,6 +463,12 @@ console.log('p '+params.outscript)
             fbdata.formatExport = 'csv';
             
             await fbdata.extractData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName);
+        }
+        else if (operation === 'checkmetadata') {
+            fbCheck = new fbCheckMetadata.fbCheckMetadata;
+            
+            await fbCheck.check(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);    
+
         }
 
     }
