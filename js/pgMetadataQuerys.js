@@ -541,7 +541,7 @@ exports.queryCheckIndexes = `WITH indexes AS (
     JOIN LATERAL unnest(i.indkey) 
       WITH ORDINALITY AS c(colnum, ordinality)
         ON a.attnum = c.colnum
-    WHERE tnsp.nspname = {FILTER_SCHEMA}
+    WHERE i.indisprimary = false and tnsp.nspname = {FILTER_SCHEMA}
     GROUP BY i, tnsp.nspname, trel.relname, irel.relname
   )
   SELECT
