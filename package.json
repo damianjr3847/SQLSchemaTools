@@ -1,6 +1,6 @@
 {
   "name": "tsmetadataupdater",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Updater metadata FB y PG",
   "main": "tsmetadataupdater.js",
   "scripts": {
