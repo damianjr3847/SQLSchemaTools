@@ -129,7 +129,7 @@ export class pgCheckMetadata {
     private async checkIndexes(aobjectName: string) {
         let dbIdx: Array<any> = [];
         let result: any;
-        let tAux: string = '';
+        let tAux: string = '';R
 
         console.log(' ');
         console.log(' ');
