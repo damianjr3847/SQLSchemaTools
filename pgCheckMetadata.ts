@@ -52,6 +52,8 @@ export class pgCheckMetadata {
             try {
                 result = await this.pgDb.query(this.analyzeQuery(pgMetadataQuerys.queryProcedureTrigger, aobjectName, GlobalTypes.ArrayobjectType[0]));
                 dbProcedures = result.rows;
+                console.log('\x1b[31m' + 'REVISAR LAS SIGUIENTES FUNCIONES: ');
+                console.log('\x1b[31m ');
                 for (let i = 0; i < dbProcedures.length; i++) {
                     result = await this.pgDb.query('select plpgsql_check_function as textline from plpgsql_check_function(' + dbProcedures[i].oid + ')');
                     if (result.rows.length > 0) {
@@ -94,6 +96,8 @@ export class pgCheckMetadata {
             try {
                 result = await this.pgDb.query(this.analyzeQuery(pgMetadataQuerys.queryTrigger, aobjectName, GlobalTypes.ArrayobjectType[1]));
                 dbTrigger = result.rows;
+                console.log('\x1b[31m' + 'REVISAR LOS SIGUIENTES TRIGGERS: ');
+                console.log('\x1b[31m ');
                 for (let i = 0; i < dbTrigger.length; i++) {
                     result = await this.pgDb.query("select plpgsql_check_function as textline from plpgsql_check_function('" + dbTrigger[i].functionName + "()','" + dbTrigger[i].tableName + "')");
                     if (result.rows.length > 0) {
@@ -136,11 +140,12 @@ export class pgCheckMetadata {
                 result = await this.pgDb.query(this.analyzeQuery(pgMetadataQuerys.queryCheckIndexes, aobjectName, GlobalTypes.ArrayobjectType[6]));
                 dbIdx = result.rows;
                 if (dbIdx.length > 0) {
-                    console.log('\x1b[31m' + 'REVISAR LOS SIGUIENTES INDICES: ');
+                    console.log('\x1b[31m' + 'REVISAR LOS SIGUIENTES INDICES REDUNDANTES: ');
                     console.log('\x1b[31m\x1b[5m' + '************************************************************');
                     console.log('\x1b[31m\x1b[5m' + '***                 A D V E R T E N C I A                ***');
                     console.log('\x1b[31m\x1b[5m' + '***  ESTO NO QUIERE DECIR QUE TENGA QUE BORRAR ESTOS     ***');
                     console.log('\x1b[31m\x1b[5m' + '***          INDICES EN FORMA INDISCRIMINADA             ***');
+                    console.log('\x1b[31m\x1b[5m' + '***       REVISE USTED CUAL ES NECESARIO BORRAR          ***');
                     console.log('\x1b[31m\x1b[5m' + '************************************************************');                    
                 }    
                 

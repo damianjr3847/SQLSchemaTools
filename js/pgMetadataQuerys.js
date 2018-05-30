@@ -28,7 +28,8 @@ exports.queryProcedureTrigger = `SELECT *
         left outer join pg_language l on p.prolang = l.oid
         left outer join pg_type t on t.oid=p.prorettype
         where ns.nspname = {FILTER_SCHEMA}  {RELTYPE}) cc
-    {FILTER_OBJECT}`;
+    {FILTER_OBJECT}
+    order by cc.schema, cc."functionName" `;
 exports.queryProcedureParameters = `SELECT *
     FROM (select 
         ns.nspname										as "schema", 
@@ -524,7 +525,8 @@ exports.queryTrigger = `SELECT *
             INNER JOIN pg_proc pgpr on pgpr.oid=trg.tgfoid 
             WHERE trg.tgisinternal = false and ns.nspname = {FILTER_SCHEMA}
         order by pgpr.proname ) cc
-    {FILTER_OBJECT}`;
+    {FILTER_OBJECT}
+    order by cc.schema, cc."functionName"`;
 exports.queryCheckIndexes = `WITH indexes AS (
     SELECT
       tnsp.nspname AS schema_name,

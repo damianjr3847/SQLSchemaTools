@@ -27,7 +27,8 @@ export const queryProcedureTrigger: string =
         left outer join pg_language l on p.prolang = l.oid
         left outer join pg_type t on t.oid=p.prorettype
         where ns.nspname = {FILTER_SCHEMA}  {RELTYPE}) cc
-    {FILTER_OBJECT}`;
+    {FILTER_OBJECT}
+    order by cc.schema, cc."functionName" `;
 
 export const queryProcedureParameters: string =
     `SELECT *
@@ -539,7 +540,8 @@ export const queryTrigger: string =
             INNER JOIN pg_proc pgpr on pgpr.oid=trg.tgfoid 
             WHERE trg.tgisinternal = false and ns.nspname = {FILTER_SCHEMA}
         order by pgpr.proname ) cc
-    {FILTER_OBJECT}`;
+    {FILTER_OBJECT}
+    order by cc.schema, cc."functionName"`;
 
 export const queryCheckIndexes = `WITH indexes AS (
     SELECT
