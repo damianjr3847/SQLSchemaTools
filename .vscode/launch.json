@@ -15,7 +15,7 @@
             ],
             "args": [
                 "--conf",
-                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/params.conf",
+                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/params.conf"/*,
                 "--operation",
                 "checkmetadata"/*,
                 "--pathsave",

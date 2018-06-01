@@ -175,14 +175,18 @@ class pgCheckMetadata {
                 console.log('');
                 console.log('');
                 console.log('Resumen:');
-                console.log('');
-                console.log('Total de functiones: ' + cFunc.total.toString());
-                console.log('-Con errores: ' + cFunc.cError.toString());
-                console.log('-Sin errores: ' + cFunc.cOk.toString());
-                console.log('');
-                console.log('Total de triggers: ' + cTri.total.toString());
-                console.log('-Con errores: ' + cTri.cError.toString());
-                console.log('-Sin errores: ' + cTri.cOk.toString());
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[0]) {
+                    console.log('');
+                    console.log('Total de functiones: ' + cFunc.total.toString());
+                    console.log('-Con errores: ' + cFunc.cError.toString());
+                    console.log('-Sin errores: ' + cFunc.cOk.toString());
+                }
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[1]) {
+                    console.log('');
+                    console.log('Total de triggers: ' + cTri.total.toString());
+                    console.log('-Con errores: ' + cTri.cError.toString());
+                    console.log('-Sin errores: ' + cTri.cOk.toString());
+                }
             }
         }
         catch (err) {

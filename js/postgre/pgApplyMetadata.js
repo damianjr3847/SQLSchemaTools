@@ -427,14 +427,14 @@ class pgApplyMetadata {
         let fileYaml;
         let dbYaml;
         try {
-            this.pgDb.query('BEGIN');
+            await this.pgDb.query('BEGIN');
             try {
                 dbYaml = await this.pgExMe.extractMetadataGenerators('', true, false);
                 if (dbYaml === undefined)
                     throw 'no se pudo extraer el metadata de la base';
             }
             finally {
-                this.pgDb.query('COMMIT');
+                await this.pgDb.query('COMMIT');
             }
             for (let i in this.sources.generatorsArrayYaml) {
                 if (globalFunction.isChange(this.sources.generatorsArrayYaml[i], this.originalMetadata.generatorsArrayYaml, GlobalTypes.ArrayobjectType[3])) {
@@ -457,6 +457,40 @@ class pgApplyMetadata {
         }
         catch (err) {
             throw new Error('Error aplicando generador ' + genName + '. ' + err.message);
+        }
+    }
+    //****************************************************************** */
+    //        E X T E N S I O N
+    //******************************************************************* */
+    async applyExtension() {
+        let extName = '';
+        let extBody = [];
+        let fileYaml;
+        let dbYaml;
+        let rquery;
+        try {
+            await this.pgDb.query('BEGIN');
+            try {
+                rquery = await this.pgDb.query('select * from pg_extension');
+                dbYaml = rquery.rows;
+            }
+            finally {
+                await this.pgDb.query('COMMIT');
+            }
+            for (let i in this.sources.extensionArrayYaml) {
+                fileYaml = this.sources.extensionArrayYaml[i].contentFile;
+                for (let j = 0; j < fileYaml.installExtension.length; j++) {
+                    extName = fileYaml.installExtension[j].extension.name.trim().toLowerCase();
+                    if (dbYaml.findIndex(aItem => (aItem.extname.toLowerCase() === extName)) === -1) {
+                        extBody.push('CREATE EXTENSION IF NOT EXISTS ' + extName);
+                    }
+                }
+            }
+            if (extBody.length > 0)
+                await this.applyChange(GlobalTypes.ArrayobjectType[3], 'extension', extBody);
+        }
+        catch (err) {
+            throw new Error('Error aplicando generador ' + extName + '. ' + err.message);
         }
     }
     //****************************************************************** */
@@ -796,6 +830,9 @@ class pgApplyMetadata {
                     await this.applyTriggers();
                     if (this.saveafterapply !== '')
                         await this.pgExMe.extractMetadataTriggers(objectName, false, false);
+                }
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[7]) {
+                    await this.applyExtension();
                 }
             }
             finally {

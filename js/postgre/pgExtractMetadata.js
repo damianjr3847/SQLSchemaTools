@@ -533,6 +533,30 @@ class pgExtractMetadata {
             throw new Error('Error generando procedimiento ' + genName + '. ' + err.message);
         }
     }
+    async extractExtension() {
+        let rExtension;
+        let rQuery;
+        let outExtYalm = GlobalTypes.emptyExtensionYamlType();
+        //let extYaml: Array<GlobalTypes.iExtensionYamlType> = [];
+        let extName = '';
+        let j = 0;
+        try {
+            await this.pgDb.query('BEGIN');
+            rQuery = await this.pgDb.query('select * from pg_extension');
+            rExtension = rQuery.rows;
+            for (let i = 0; i < rExtension.length; i++) {
+                extName = rExtension[i].extname.trim().toLowerCase();
+                outExtYalm.installExtension.push({ extension: { name: extName, version: rExtension[i].extversion } });
+            }
+            //outExtYalm.install.push(extYaml);
+            this.saveToFile(outExtYalm, GlobalTypes.ArrayobjectType[7], 'extensions');
+            console.log(('exportando extensions.yaml').padEnd(70, '.') + 'OK');
+            await this.pgDb.query('COMMIT');
+        }
+        catch (err) {
+            throw new Error('Error exportando extensiones. ' + err.message);
+        }
+    }
     async writeYalm(ahostName, aportNumber, adatabase, adbUser, adbPassword, objectType, objectName) {
         this.connectionString.host = ahostName;
         this.connectionString.database = adatabase;
@@ -557,6 +581,9 @@ class pgExtractMetadata {
                 }
                 if (objectType === GlobalTypes.ArrayobjectType[4] || objectType === '') {
                     await this.extractMetadataViews(objectName);
+                }
+                if (objectType === GlobalTypes.ArrayobjectType[7] || objectType === '') {
+                    await this.extractExtension();
                 }
             }
             finally {

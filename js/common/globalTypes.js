@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArrayDbDriver = ['pg', 'fb'];
-exports.ArrayobjectType = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields', 'indexes'];
+exports.ArrayobjectType = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields', 'indexes', 'extension'];
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 exports.ArrayPgFunctionParallelMode = ['safe', 'unsafe', 'restricted'];
 exports.ArrayPgFunctionLenguage = ['plpython3u', 'c', 'sql', 'plpgsql'];
@@ -120,6 +120,15 @@ function emptyViewYamlType() {
     };
 }
 exports.emptyViewYamlType = emptyViewYamlType;
+;
+;
+;
+function emptyExtensionYamlType() {
+    return {
+        installExtension: []
+    };
+}
+exports.emptyExtensionYamlType = emptyExtensionYamlType;
 ;
 /**************************************************************************************** */
 /**********                 D A T A   T Y P E S                                           */

@@ -12,6 +12,7 @@ class tSource {
         this.triggersArrayYaml = [];
         this.generatorsArrayYaml = [];
         this.viewsArrayYaml = [];
+        this.extensionArrayYaml = [];
         this.pathSource1 = '';
         this.pathSource2 = '';
         this.loadYaml = false;
@@ -119,11 +120,24 @@ class tSource {
                             file.atimeMs = nameFile.atimeMs;
                             file.ctimeMs = nameFile.ctimeMs;
                             file.mtimeMs = nameFile.mtimeMs;
-                            this.triggersArrayYaml.push(file);
+                            this.extensionArrayYaml.push(file);
                         }
                         else
                             throw new Error('trigger: no puede haber objetos duplicados en source1 y source2');
                     }
+                }
+                else if ('installExtension' in ym && (aObjectType === '' || aObjectType === GlobalTypes.ArrayobjectType[7])) {
+                    file = {};
+                    file.contentFile = ym;
+                    file.file = nameFile.file;
+                    file.path = nameFile.path;
+                    file.atime = nameFile.atime;
+                    file.ctime = nameFile.ctime;
+                    file.mtime = nameFile.mtime;
+                    file.atimeMs = nameFile.atimeMs;
+                    file.ctimeMs = nameFile.ctimeMs;
+                    file.mtimeMs = nameFile.mtimeMs;
+                    this.extensionArrayYaml.push(file);
                 }
             }
         }
@@ -140,6 +154,7 @@ class tSource {
         this.triggersArrayYaml = [];
         this.generatorsArrayYaml = [];
         this.viewsArrayYaml = [];
+        this.extensionArrayYaml = [];
         filesDirSource1 = globalFunction.readRecursiveDirectory(this.pathSource1, 'yaml');
         this.loadArrayYaml(filesDirSource1, aObjectType, aObjectName);
         if (this.pathSource2 !== '') {

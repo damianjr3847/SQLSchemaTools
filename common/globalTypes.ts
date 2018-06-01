@@ -1,7 +1,7 @@
 
 export const ArrayDbDriver: string[] = ['pg', 'fb'];
 
-export const ArrayobjectType: string[] = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields', 'indexes'];
+export const ArrayobjectType: string[] = ['procedures', 'triggers', 'tables', 'generators', 'views', 'fields', 'indexes','extension'];
 
 //export const ArrayVariableType:string[] = ['NUMERIC', 'DECIMAL', 'SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DATE', 'TIME', 'CHAR', 'DOUBLE PRECISION', 'TIMESTAMP', 'VARCHAR', 'BLOB'];
 
@@ -282,6 +282,28 @@ export function emptyViewYamlType() {
 		}
 	};
 };
+
+/**************************************************************************************** */
+/**********                         E X T E N S I O N                                     */
+/**************************************************************************************** */
+
+export interface iInstallExtensionYamlType {
+	installExtension: Array<iExtensionYamlType>
+};
+
+export interface iExtensionYamlType {
+	extension: {
+		name: string,		
+		version?: string
+	}
+};
+
+export function emptyExtensionYamlType() {
+	return {
+		installExtension: []
+	};
+};
+
 
 /**************************************************************************************** */
 /**********                 D A T A   T Y P E S                                           */

@@ -398,7 +398,7 @@ export class pgApplyMetadata {
 
             //esta puesto por separado el AS y as porque no puedo pasar al body del trigger a upper o lower por si tiene literales
             aYaml.triggerFunction.function.body = aYaml.triggerFunction.function.body.trimRight();
-           
+
             if (aYaml.triggerFunction.function.body.startsWith('AS'))
                 aProc += aYaml.triggerFunction.function.body.replace('AS', 'AS $BODY$') + ' $BODY$';
             else if (aYaml.triggerFunction.function.body.startsWith('as'))
@@ -448,7 +448,7 @@ export class pgApplyMetadata {
                     if (triggerBody !== triggerInDb) {
                         //no puedo borrar la funcion del trigger porque sino deberia de borrar todas la dependencias
                         //if (j !== -1)
-                          //  rQuery.push('DROP FUNCTION ' + this.schema + '.' + triggerName + '()');
+                        //  rQuery.push('DROP FUNCTION ' + this.schema + '.' + triggerName + '()');
 
                         rQuery.push(triggerBody);
 
@@ -458,7 +458,7 @@ export class pgApplyMetadata {
 
                         await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, rQuery);
 
-                    }                   
+                    }
 
                     triggerBody = '';
                     triggerInDb = '';
@@ -549,7 +549,7 @@ export class pgApplyMetadata {
 
         try {
 
-            this.pgDb.query('BEGIN');
+            await this.pgDb.query('BEGIN');
             try {
                 dbYaml = await this.pgExMe.extractMetadataGenerators('', true, false);
 
@@ -557,7 +557,7 @@ export class pgApplyMetadata {
                     throw 'no se pudo extraer el metadata de la base';
             }
             finally {
-                this.pgDb.query('COMMIT');
+                await this.pgDb.query('COMMIT');
             }
 
             for (let i in this.sources.generatorsArrayYaml) {
@@ -583,6 +583,45 @@ export class pgApplyMetadata {
         }
         catch (err) {
             throw new Error('Error aplicando generador ' + genName + '. ' + err.message);
+        }
+    }
+
+    //****************************************************************** */
+    //        E X T E N S I O N
+    //******************************************************************* */
+
+    private async applyExtension() {
+        let extName: string = '';
+        let extBody: Array<string> = [];
+        let fileYaml: any;
+        let dbYaml: Array<any>;
+        let rquery: any;
+
+        try {
+            await this.pgDb.query('BEGIN');
+            try {
+                rquery = await this.pgDb.query('select * from pg_extension');
+                dbYaml = rquery.rows;
+            }
+            finally {
+                await this.pgDb.query('COMMIT');
+            }
+
+            for (let i in this.sources.extensionArrayYaml) {
+
+                fileYaml = this.sources.extensionArrayYaml[i].contentFile;
+                for (let j = 0; j < fileYaml.installExtension.length; j++) {
+                    extName = fileYaml.installExtension[j].extension.name.trim().toLowerCase();
+                    if (dbYaml.findIndex(aItem => (aItem.extname.toLowerCase() === extName)) === -1) {
+                        extBody.push('CREATE EXTENSION IF NOT EXISTS ' + extName);
+                    }
+                }
+            }
+            if (extBody.length > 0)
+                await this.applyChange(GlobalTypes.ArrayobjectType[3], 'extension', extBody);
+        }
+        catch (err) {
+            throw new Error('Error aplicando generador ' + extName + '. ' + err.message);
         }
     }
 
@@ -982,6 +1021,9 @@ export class pgApplyMetadata {
                     await this.applyTriggers();
                     if (this.saveafterapply !== '')
                         await this.pgExMe.extractMetadataTriggers(objectName, false, false);
+                }
+                if (objectType === '' || objectType === GlobalTypes.ArrayobjectType[7]) {
+                    await this.applyExtension();
                 }
 
             }
