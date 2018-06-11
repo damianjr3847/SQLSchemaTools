@@ -369,7 +369,7 @@ class pgApplyMetadata {
     async applyViews() {
         let viewYamltoString = (aYaml) => {
             let aView = '';
-            aView = 'CREATE OR REPLACE VIEW ' + globalFunction.quotedString(aYaml.view.name) + '(' + GlobalTypes.CR;
+            aView = 'CREATE OR REPLACE VIEW ' + this.schema + '.' + globalFunction.quotedString(aYaml.view.name) + '(' + GlobalTypes.CR;
             for (let j = 0; j < aYaml.view.columns.length - 1; j++) {
                 aView += globalFunction.quotedString(aYaml.view.columns[j]) + ',' + GlobalTypes.CR;
             }
@@ -520,8 +520,6 @@ class pgApplyMetadata {
                     fileYaml = this.sources.tablesArrayYaml[i].contentFile;
                     if (('temporaryType' in fileYaml.table && fileYaml.table.temporaryType === '') || (!('temporaryType' in fileYaml.table))) {
                         tableName = fileYaml.table.name;
-                        if (tableName === 'art_grup')
-                            tableName = tableName;
                         if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[2], tableName)) {
                             j = dbYaml.findIndex(aItem => (aItem.table.name.toLowerCase() === tableName.toLowerCase()));
                             tableScript = [];

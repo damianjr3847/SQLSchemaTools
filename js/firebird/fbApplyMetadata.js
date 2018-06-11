@@ -104,6 +104,7 @@ class fbApplyMetadata {
         };
         let readProcedures = async (aWithBody) => {
             let cambios = false;
+            let aplProc = [];
             for (let i in this.sources.proceduresArrayYaml) {
                 fileYaml = this.sources.proceduresArrayYaml[i].contentFile;
                 procedureName = fileYaml.procedure.name.toLowerCase().trim();
@@ -115,7 +116,15 @@ class fbApplyMetadata {
                     }
                     if (procedureInDB !== procedureBody) {
                         cambios = true;
-                        await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, Array(procedureYamltoString(fileYaml, aWithBody)));
+                        aplProc = [];
+                        if (aWithBody) {
+                            if (procedureInDB == '')
+                                aplProc.push('--INFO -> Creacion de Procedure ' + procedureName);
+                            else
+                                aplProc.push('--INFO -> Alter de Procedure ' + procedureName);
+                        }
+                        aplProc.push(procedureYamltoString(fileYaml, aWithBody));
+                        await this.applyChange(GlobalTypes.ArrayobjectType[0], procedureName, aplProc);
                     }
                     procedureBody = '';
                     procedureInDB = '';
@@ -173,6 +182,7 @@ class fbApplyMetadata {
         let triggerBody = '';
         let triggerInDb = '';
         let j = 0;
+        let aplTrigger = [];
         try {
             await this.fb.startTransaction(true);
             dbYaml = await this.fbExMe.extractMetadataTriggers('', true, false);
@@ -187,7 +197,13 @@ class fbApplyMetadata {
                         triggerInDb = triggerYamltoString(dbYaml[j]);
                     }
                     if (triggerBody !== triggerInDb) {
-                        await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, Array(triggerBody));
+                        aplTrigger = [];
+                        if (triggerInDb == '')
+                            aplTrigger.push('--INFO -> Creacion de trigger ' + triggerName);
+                        else
+                            aplTrigger.push('--INFO -> Alter de trigger ' + triggerName);
+                        aplTrigger.push(triggerBody);
+                        await this.applyChange(GlobalTypes.ArrayobjectType[1], triggerName, aplTrigger);
                     }
                     triggerBody = '';
                     triggerInDb = '';
@@ -219,6 +235,7 @@ class fbApplyMetadata {
         let j = 0;
         let fileYaml;
         let viewBody = '';
+        let aplBody = [];
         try {
             await this.fb.startTransaction(true);
             dbYaml = await this.fbExMe.extractMetadataViews('', true, false);
@@ -233,6 +250,12 @@ class fbApplyMetadata {
                         viewInDb = viewYamltoString(dbYaml[j]);
                     }
                     if (viewBody !== viewInDb) {
+                        aplBody = [];
+                        if (viewInDb == '')
+                            aplBody.push('--INFO ->  Create View ' + viewName);
+                        else
+                            aplBody.push('--INFO ->  Alter View ' + viewName);
+                        aplBody.push(viewBody);
                         await this.applyChange(GlobalTypes.ArrayobjectType[4], viewName, Array(viewBody));
                     }
                     viewBody = '';
@@ -267,6 +290,7 @@ class fbApplyMetadata {
                 genBody = [];
                 genName = fileYaml.generator.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
+                    genBody.push('--INFO -> Creacion de generador ' + genName);
                     genBody.push('CREATE SEQUENCE ' + globalFunction.quotedString(genName) + ' INCREMENT BY ' + fileYaml.generator.increment.toString() + ';');
                     if ('description' in fileYaml.generator)
                         genBody.push('COMMENT ON GENERATOR ' + genName + " IS '" + fileYaml.generator.description + "'");
@@ -348,6 +372,7 @@ class fbApplyMetadata {
                                         String(fileYaml.table.constraint.foreignkeys[z].foreignkey.toColumn).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.toColumn).trim().toUpperCase() ||
                                         String(fileYaml.table.constraint.foreignkeys[z].foreignkey.updateRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.updateRole).trim().toUpperCase() ||
                                         String(fileYaml.table.constraint.foreignkeys[z].foreignkey.deleteRole).trim().toUpperCase() !== String(dbYaml[j].table.constraint.foreignkeys[iDB].foreignkey.deleteRole).trim().toUpperCase()) {
+                                        tableScript.push('--INFO ->  Alter FK ' + fileYaml.table.constraint.foreignkeys[z] + ' en ' + tableName);
                                         tableScript.push('ALTER TABLE ' + globalFunction.quotedString(tableName) + ' DROP CONSTRAINT ' + globalFunction.quotedString(fileYaml.table.constraint.foreignkeys[z].foreignkey.name) + ';');
                                         tableScript = tableScript.concat(foreignkeysToSql(globalFunction.quotedString(tableName), Array(fileYaml.table.constraint.foreignkeys[z])));
                                     }
@@ -374,13 +399,16 @@ class fbApplyMetadata {
             aTable += GlobalTypes.TAB + fieldToSql(aYaml.columns[j].column) + ',' + GlobalTypes.CR;
         }
         aTable += GlobalTypes.TAB + fieldToSql(aYaml.columns[aYaml.columns.length - 1].column) + ');' + GlobalTypes.CR;
+        aRet.push('--INFO -> Creacion de tabla ' + aNameTable);
         aRet.push(aTable);
         if ('constraint' in aYaml) {
             if ('checks' in aYaml.constraint) {
                 aRet = aRet.concat(checkToSql(aNameTable, aYaml.constraint.checks));
             }
             if ('primaryKey' in aYaml.constraint) {
-                aRet = aRet.concat(primaryKeyToSql(aNameTable, aYaml.constraint.primaryKey));
+                aText = primaryKeyToSql(aNameTable, aYaml.constraint.primaryKey);
+                aRet.push('--INFO -> Creacion de PK  en tabla ' + aNameTable);
+                aRet.push(aText);
             }
         }
         if ('indexes' in aYaml) {
@@ -409,26 +437,32 @@ class fbApplyMetadata {
             if (globalFunction.includeObject(this.excludeObject, 'fields', aFileColumnsYaml[j].column.name)) {
                 i = aDbColumnsYaml.findIndex(aItem => (aItem.column.name.toLowerCase().trim() === aFileColumnsYaml[j].column.name.toLowerCase().trim()));
                 if (i === -1) {
+                    retArray.push('--INFO ->  Creacion de campo ' + aFileColumnsYaml[j].column + ' en ' + aTableName);
                     retArray.push('ALTER TABLE ' + aTableName + ' ADD ' + fieldToSql(aFileColumnsYaml[j].column) + ';');
                 }
                 else {
                     if (!("computed" in aFileColumnsYaml[j].column)) {
                         if (aFileColumnsYaml[j].column.type.toUpperCase() !== aDbColumnsYaml[i].column.type.toUpperCase()) {
+                            retArray.push('--INFO ->  Alter de campo (datatype)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
                             retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' TYPE ' + aFileColumnsYaml[j].column.type + ';');
                         }
                     }
                     if (aFileColumnsYaml[j].column.default !== aDbColumnsYaml[i].column.default) {
-                        if (aFileColumnsYaml[j].column.default !== '')
+                        if (aFileColumnsYaml[j].column.default !== '') {
+                            retArray.push('--INFO ->  Alter de campo (def value)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
                             retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' SET DEFAULT ' + aFileColumnsYaml[j].column.default + ';');
-                        else
+                        }
+                        else {
+                            retArray.push('--INFO ->  Alter de campo (def value)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
                             retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' DROP DEFAULT;');
+                        }
                     }
                     if (aFileColumnsYaml[j].column.nullable !== aDbColumnsYaml[i].column.nullable) {
                         retAux = 'ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name);
                         retCmd = '';
                         if (aFileColumnsYaml[j].column.nullable === false && aDbColumnsYaml[i].column.nullable === true) {
                             if (!('nullableToNotNullValue' in aFileColumnsYaml[j].column))
-                                throw new Error('Si cambia de null a not null complete la opcion "nullableToNotNullValue" para llenar el campo');
+                                throw new Error('Si cambia de null a not null complete la opcion "nullableToNotNullValue" para llenar el campo ' + aFileColumnsYaml[j].column.name);
                             retCmd = 'UPDATE ' + aTableName + ' SET ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + "='" + aFileColumnsYaml[j].column.nullableToNotNullValue + "' WHERE " + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' IS NULL;';
                             retAux += ' SET NOT NULL'; //ver con que lo lleno al campo que seteo asi   
                         }
@@ -437,13 +471,16 @@ class fbApplyMetadata {
                         }
                         if (retCmd !== '')
                             retArray.push(retCmd);
+                        retArray.push('--INFO ->  Alter de campo (null/not null)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
                         retArray.push(retAux + ';');
                     }
                     if (String(aFileColumnsYaml[j].column.computed).toUpperCase().trim() !== String(aDbColumnsYaml[i].column.computed).toUpperCase().trim()) {
+                        retArray.push('--INFO ->  Alter de campo (computed)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
                         retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' COMPUTED BY ' + aFileColumnsYaml[j].column.computed + ';');
                     }
                     //present?: boolean
                     if (i !== j) {
+                        retArray.push('--INFO ->  Alter de campo (position)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
                         retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' POSITION ' + (j + 1) + ';');
                     }
                 }
@@ -469,6 +506,7 @@ class fbApplyMetadata {
                     retArray = retArray.concat(checkToSql(aTableName, Array(aFileConstraintYaml.checks[j])));
                 else {
                     if (String(aFileConstraintYaml.checks[j].expresion).trim().toUpperCase() !== String(aDbConstraintYaml.checks[iDB].expresion).trim().toUpperCase()) {
+                        retArray.push('--INFO ->  Alter de check' + aFileConstraintYaml[j].foreignkey.name + ' en ' + aTableName);
                         retArray.push('ALTER TABLE ' + aTableName + ' DROP CONSTRAINT ' + globalFunction.quotedString(aFileConstraintYaml[j].foreignkey.name) + ';');
                         retArray = retArray.concat(checkToSql(aTableName, Array(aFileConstraintYaml.foreignkeys[j])));
                     }
@@ -479,6 +517,7 @@ class fbApplyMetadata {
             pkFY = primaryKeyToSql(aTableName, aFileConstraintYaml.primaryKey);
             pkDB = primaryKeyToSql(aTableName, aDbConstraintYaml.primaryKey);
             if (pkFY.trim().toUpperCase() !== pkDB.trim().toUpperCase()) {
+                retArray.push('--INFO ->  Alter PK ' + aDbConstraintYaml.primaryKey.name + ' en ' + aTableName);
                 if (pkDB !== '')
                     retArray.push('ALTER TABLE ' + aTableName + ' DROP CONSTRAINT ' + globalFunction.quotedString(aDbConstraintYaml.primaryKey.name));
                 retArray.push(pkFY);
@@ -506,6 +545,7 @@ class fbApplyMetadata {
                 else {
                     idxDB = indexesToSql(aTableName, Array(aDbIdxYaml.indexes[iDB]))[0];
                     if (idxDB.trim().toUpperCase() !== idxYL.trim().toUpperCase()) {
+                        retArray.push('--INFO ->  Alter Index ' + aFileIdxYaml.indexes[j].index.name + ' en ' + aTableName);
                         retArray.push('DROP INDEX ' + globalFunction.quotedString(aFileIdxYaml.indexes[j].index.name) + ';');
                         retArray.push(idxYL);
                     }
@@ -617,6 +657,7 @@ function foreignkeysToSql(aTableName, aForeinKey) {
         if ('deleteRole' in aForeinKey[j].foreignkey) {
             aText += ' ON DELETE ' + aForeinKey[j].foreignkey.deleteRole;
         }
+        aRet.push('--INFO ->  Creacion FK ' + aForeinKey[j].foreignkey.name + ' en ' + aTableName);
         aRet.push(aText + ';');
     }
     return aRet;
@@ -634,6 +675,7 @@ function checkToSql(aTableName, aCheck) {
         else {
             aText += ' CHECK ' + aCheck[j].check.expresion.trim() + ';';
         }
+        aRet.push('--INFO -> Creacion de check ' + aCheck[j].check.name + ' en tabla ' + aTableName);
         aRet.push(aText);
     }
     return aRet;
@@ -687,6 +729,7 @@ function indexesToSql(aTableName, aIdx) {
                 aText += globalFunction.quotedString(aIdx[j].index.columns[aIdx[j].index.columns.length - 1].name) + ')';
             }
         }
+        aRet.push('--INFO -> Creacion de indice ' + aIdx[j].index.name + ' en tabla ' + aTableName);
         aRet.push(aText + ';');
     }
     return aRet;
