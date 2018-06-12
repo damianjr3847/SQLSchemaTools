@@ -7,7 +7,8 @@ import * as sources from '../common/loadsource';
 import * as metadataQuerys from './fbMetadataQuerys';
 
 export interface iFieldType {
-    AName?: string | any;
+    AName?: string | any,
+    AQueryField?: string | any,
     AType?: number | any,
     ASubType?: number | any,
     ALength?: number | any,

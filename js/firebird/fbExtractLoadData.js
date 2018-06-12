@@ -101,8 +101,12 @@ class fbExtractLoadData {
                                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[5], rFields[j].FIELDNAME)) {
                                     iField = {};
                                     iField.AName = rFields[j].FIELDNAME.trim();
+                                    iField.AQueryField = rFields[j].FIELDNAME.trim();
                                     iField.AType = rFields[j].FTYPE;
                                     iField.ASubType = rFields[j].SUBTYPE;
+                                    if (iField.AType === 37) {
+                                        iField.AQueryField = 'trim(trailing from ' + rFields[j].FIELDNAME.trim() + ') as ' + rFields[j].FIELDNAME.trim();
+                                    }
                                     qFields.push(iField);
                                     if (iField.AType === 261)
                                         qBlobFields.push(iField);
@@ -110,7 +114,7 @@ class fbExtractLoadData {
                                 j++;
                             }
                             await this.fb.startTransaction(true);
-                            query = 'SELECT ' + globalFunction.arrayToString(qFields, ',', 'AName') + ' FROM ' + globalFunction.quotedString(tableName);
+                            query = 'SELECT ' + globalFunction.arrayToString(qFields, ',', 'AQueryField') + ' FROM ' + globalFunction.quotedString(tableName);
                             //query += ' where fcodint=33771';
                             rData = [];
                             xCont = 0;

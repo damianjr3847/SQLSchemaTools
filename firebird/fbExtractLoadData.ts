@@ -20,18 +20,18 @@ function outFileScript(aFields: Array<fbExtractMetadata.iFieldType>, aData: Arra
 
 
     for (let i = 0; i < aData.length; i++) {
-        
-        qSQL = [];    
+
+        qSQL = [];
 
         for (let j = 0; j < aFields.length; j++) {
             if (aFormat === 'sql')
                 qSQL.push(globalFunction.varToJSON(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType));
             else {
-                if (j < (aFields.length-1))    
-                    insertQuery += globalFunction.varToCSV(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType) +',';
-                else     
+                if (j < (aFields.length - 1))
+                    insertQuery += globalFunction.varToCSV(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType) + ',';
+                else
                     insertQuery += globalFunction.varToCSV(aData[i][aFields[j].AName], aFields[j].AType, aFields[j].ASubType);
-            }    
+            }
         }
 
         if (aFormat === 'sql')
@@ -142,8 +142,13 @@ export class fbExtractLoadData {
                                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[5], rFields[j].FIELDNAME)) {
                                     iField = {};
                                     iField.AName = rFields[j].FIELDNAME.trim();
+                                    iField.AQueryField = rFields[j].FIELDNAME.trim();
                                     iField.AType = rFields[j].FTYPE;
                                     iField.ASubType = rFields[j].SUBTYPE;
+
+                                    if (iField.AType === 37) {
+                                        iField.AQueryField = 'trim(trailing from ' + rFields[j].FIELDNAME.trim() + ') as ' + rFields[j].FIELDNAME.trim();
+                                    }
                                     qFields.push(iField);
                                     if (iField.AType === 261)  //blobs solamente para hacer mas rapida la busqueda en el callback
                                         qBlobFields.push(iField);
@@ -153,7 +158,7 @@ export class fbExtractLoadData {
 
                             await this.fb.startTransaction(true);
 
-                            query = 'SELECT ' + globalFunction.arrayToString(qFields, ',', 'AName') + ' FROM ' + globalFunction.quotedString(tableName);
+                            query = 'SELECT ' + globalFunction.arrayToString(qFields, ',', 'AQueryField') + ' FROM ' + globalFunction.quotedString(tableName);
                             //query += ' where fcodint=33771';
                             rData = [];
                             xCont = 0;
@@ -176,10 +181,10 @@ export class fbExtractLoadData {
                                                 if (formatExport.toLowerCase() === 'sql')
                                                     value = new Buffer(row[qBlobFields[i].AName]).toString('base64');
                                                 else (formatExport.toLowerCase() === 'csv')
-                                                    value = new Buffer(row[qBlobFields[i].AName]).toString('hex');
-                                                
+                                                value = new Buffer(row[qBlobFields[i].AName]).toString('hex');
+
                                                 row[qBlobFields[i].AName] = value.toString();    //piso el valor convertido
-                                            }                                            
+                                            }
                                         }
                                     }
                                 }
