@@ -47,14 +47,14 @@ class fbApplyMetadata {
                     //console.log(i.toString()+'--'+aAlterScript[i]);    
                     query = aAlterScript[i];
                     if (query !== '') {
-                        if (aObjectName === 'lis_hojadecarga_faltante')
-                            aObjectName = aObjectName;
-                        await this.fb.startTransaction(false);
-                        await this.fb.execute(aAlterScript[i], []);
-                        if (this.saveToLog !== '') {
-                            await this.fb.execute(saveQueryLog.replace(new RegExp('{TABLE}', 'g'), this.saveToLog), [aObjectType, aObjectName, aAlterScript[i]]);
+                        if (!(aAlterScript[i].startsWith('--INFO'))) {
+                            await this.fb.startTransaction(false);
+                            await this.fb.execute(aAlterScript[i], []);
+                            if (this.saveToLog !== '') {
+                                await this.fb.execute(saveQueryLog.replace(new RegExp('{TABLE}', 'g'), this.saveToLog), [aObjectType, aObjectName, aAlterScript[i]]);
+                            }
+                            await this.fb.commit();
                         }
-                        await this.fb.commit();
                     }
                 }
                 console.log(('Aplicando ' + aObjectType + ' ' + aObjectName).padEnd(70, '.') + 'OK');
@@ -291,7 +291,10 @@ class fbApplyMetadata {
                 genName = fileYaml.generator.name.toLowerCase().trim();
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
                     genBody.push('--INFO -> Creacion de generador ' + genName);
-                    genBody.push('CREATE SEQUENCE ' + globalFunction.quotedString(genName) + ' INCREMENT BY ' + fileYaml.generator.increment.toString() + ';');
+                    if ('initialize' in fileYaml.generator)
+                        genBody.push('CREATE SEQUENCE ' + globalFunction.quotedString(genName) + ' START WITH ' + fileYaml.generator.initialize.toString() + ' INCREMENT BY ' + fileYaml.generator.increment.toString() + ';');
+                    else
+                        genBody.push('CREATE SEQUENCE ' + globalFunction.quotedString(genName) + ' INCREMENT BY ' + fileYaml.generator.increment.toString() + ';');
                     if ('description' in fileYaml.generator)
                         genBody.push('COMMENT ON GENERATOR ' + genName + " IS '" + fileYaml.generator.description + "'");
                     i;
@@ -437,23 +440,23 @@ class fbApplyMetadata {
             if (globalFunction.includeObject(this.excludeObject, 'fields', aFileColumnsYaml[j].column.name)) {
                 i = aDbColumnsYaml.findIndex(aItem => (aItem.column.name.toLowerCase().trim() === aFileColumnsYaml[j].column.name.toLowerCase().trim()));
                 if (i === -1) {
-                    retArray.push('--INFO ->  Creacion de campo ' + aFileColumnsYaml[j].column + ' en ' + aTableName);
+                    retArray.push('--INFO ->  Creacion de campo ' + aFileColumnsYaml[j].column.name + ' en ' + aTableName);
                     retArray.push('ALTER TABLE ' + aTableName + ' ADD ' + fieldToSql(aFileColumnsYaml[j].column) + ';');
                 }
                 else {
                     if (!("computed" in aFileColumnsYaml[j].column)) {
                         if (aFileColumnsYaml[j].column.type.toUpperCase() !== aDbColumnsYaml[i].column.type.toUpperCase()) {
-                            retArray.push('--INFO ->  Alter de campo (datatype)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
+                            retArray.push('--INFO ->  Alter de campo (datatype)' + aFileColumnsYaml[j].column.name + ' en ' + aTableName);
                             retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' TYPE ' + aFileColumnsYaml[j].column.type + ';');
                         }
                     }
                     if (aFileColumnsYaml[j].column.default !== aDbColumnsYaml[i].column.default) {
                         if (aFileColumnsYaml[j].column.default !== '') {
-                            retArray.push('--INFO ->  Alter de campo (def value)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
+                            retArray.push('--INFO ->  Alter de campo (def value)' + aFileColumnsYaml[j].column.name + ' en ' + aTableName);
                             retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' SET DEFAULT ' + aFileColumnsYaml[j].column.default + ';');
                         }
                         else {
-                            retArray.push('--INFO ->  Alter de campo (def value)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
+                            retArray.push('--INFO ->  Alter de campo (def value)' + aFileColumnsYaml[j].column.name + ' en ' + aTableName);
                             retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' DROP DEFAULT;');
                         }
                     }
@@ -471,16 +474,16 @@ class fbApplyMetadata {
                         }
                         if (retCmd !== '')
                             retArray.push(retCmd);
-                        retArray.push('--INFO ->  Alter de campo (null/not null)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
+                        retArray.push('--INFO ->  Alter de campo (null/not null)' + aFileColumnsYaml[j].column.name + ' en ' + aTableName);
                         retArray.push(retAux + ';');
                     }
                     if (String(aFileColumnsYaml[j].column.computed).toUpperCase().trim() !== String(aDbColumnsYaml[i].column.computed).toUpperCase().trim()) {
-                        retArray.push('--INFO ->  Alter de campo (computed)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
+                        retArray.push('--INFO ->  Alter de campo (computed)' + aFileColumnsYaml[j].column.name + ' en ' + aTableName);
                         retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' COMPUTED BY ' + aFileColumnsYaml[j].column.computed + ';');
                     }
                     //present?: boolean
                     if (i !== j) {
-                        retArray.push('--INFO ->  Alter de campo (position)' + aFileColumnsYaml[j].column + ' en ' + aTableName);
+                        retArray.push('--INFO ->  Alter de campo (position)' + aFileColumnsYaml[j].column.name + ' en ' + aTableName);
                         retArray.push('ALTER TABLE ' + aTableName + ' ALTER COLUMN ' + globalFunction.quotedString(aFileColumnsYaml[j].column.name) + ' POSITION ' + (j + 1) + ';');
                     }
                 }

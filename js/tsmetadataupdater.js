@@ -155,7 +155,10 @@ if (params.conf) {
                 saveafterapply = aValue;
                 break;
             case 'deletedata':
-                deletedata = true;
+                if (aValue.toUpperCase() === 'TRUE')
+                    deletedata = true;
+                else
+                    deletedata = false;
                 break;
         }
     });

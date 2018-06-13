@@ -153,7 +153,7 @@ class fbExtractMetadata {
                     }
                     else {
                         this.saveToFile(outProcedure, GlobalTypes.ArrayobjectType[0], outProcedure.procedure.name);
-                        console.log(('generado procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outProcedure = GlobalTypes.emptyProcedureYamlType();
                     outProcedureParameterInput = [];
@@ -168,7 +168,7 @@ class fbExtractMetadata {
             }
         }
         catch (err) {
-            throw new Error('Error generando procedimiento ' + procedureName + '. ' + err.message);
+            throw new Error('Error exportando procedimiento ' + procedureName + '. ' + err.message);
         }
     }
     async extractMetadataTables(objectName, aRetYaml = false, openTr = true) {
@@ -367,7 +367,7 @@ class fbExtractMetadata {
                     }
                     else {
                         this.saveToFile(outTables, GlobalTypes.ArrayobjectType[2], outTables.table.name);
-                        console.log(('generado tabla ' + outTables.table.name + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando tabla ' + outTables.table.name + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outTables = GlobalTypes.emptyTablesYamlType();
                     outFields = [];
@@ -384,7 +384,7 @@ class fbExtractMetadata {
             }
         }
         catch (err) {
-            throw new Error('Error generando tabla ' + tableName + '.' + err.message);
+            throw new Error('Error exportando tabla ' + tableName + '.' + err.message);
         }
     }
     async extractMetadataTriggers(objectName, aRetYaml = false, openTr = true) {
@@ -437,7 +437,7 @@ class fbExtractMetadata {
                     }
                     else {
                         this.saveToFile(outTrigger, GlobalTypes.ArrayobjectType[1], triggerName);
-                        console.log(('generado trigger ' + triggerName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando trigger ' + triggerName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outTrigger = GlobalTypes.emptyTriggerYamlType();
                     outTriggerTables = [];
@@ -451,7 +451,7 @@ class fbExtractMetadata {
             }
         }
         catch (err) {
-            throw new Error('Error generando trigger ' + triggerName + '. ' + err.message);
+            throw new Error('Error exportando trigger ' + triggerName + '. ' + err.message);
         }
     }
     async extractMetadataViews(objectName, aRetYaml = false, openTr = true) {
@@ -494,7 +494,7 @@ class fbExtractMetadata {
                     }
                     else {
                         this.saveToFile(outViews, GlobalTypes.ArrayobjectType[4], viewName);
-                        console.log(('generado view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outViews = GlobalTypes.emptyViewYamlType();
                 }
@@ -507,7 +507,7 @@ class fbExtractMetadata {
             }
         }
         catch (err) {
-            throw new Error('Error generando view ' + viewName + '.' + err.message);
+            throw new Error('Error exportando view ' + viewName + '.' + err.message);
         }
     }
     async extractMetadataGenerators(objectName, aRetYaml = false, openTr = true) {
@@ -515,6 +515,7 @@ class fbExtractMetadata {
         let outGenerator = { generator: { name: '' } };
         let genName = '';
         let outGeneratorYalm = [];
+        let nextVal;
         let j = 0;
         try {
             if (openTr) {
@@ -526,6 +527,8 @@ class fbExtractMetadata {
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
                     outGenerator.generator.name = genName;
                     outGenerator.generator.increment = rGenerator[i].INCREMENT;
+                    nextVal = await this.fb.query('select gen_id(' + genName + ',0) as nextval from rdb$database', []);
+                    outGenerator.generator.initialize = nextVal[0].NEXTVAL;
                     if (rGenerator[i].DESCRIPTION !== null) {
                         outGenerator.generator.description = await fbClass.getBlob(rGenerator[i].DESCRIPTION, 'text');
                     }
@@ -534,7 +537,7 @@ class fbExtractMetadata {
                     }
                     else {
                         this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
-                        console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outGenerator = { generator: { name: '' } };
                 }
@@ -546,7 +549,7 @@ class fbExtractMetadata {
                 return outGeneratorYalm;
         }
         catch (err) {
-            throw new Error('Error generando procedimiento ' + genName + '. ' + err.message);
+            throw new Error('Error exportando generador ' + genName + '. ' + err.message);
         }
     }
     async writeYalm(ahostName, aportNumber, adatabase, adbUser, adbPassword, objectType, objectName) {

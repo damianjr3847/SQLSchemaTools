@@ -169,9 +169,9 @@ export class pgExtractMetadata {
                     body = rProcedures[i].source;
 
                     if (body.startsWith(String.fromCharCode(10)))
-                        body=body.substring(1);
+                        body = body.substring(1);
                     if (body.endsWith(String.fromCharCode(10)))
-                        body=body.substring(0,body.length-1);    
+                        body = body.substring(0, body.length - 1);
                     outProcedure.procedure.body = body.replace(new RegExp(String.fromCharCode(9), 'g'), '    ');
 
                     if (outProcedureParameterInput.length > 0)
@@ -185,7 +185,7 @@ export class pgExtractMetadata {
                     }
                     else {
                         this.saveToFile(outProcedure, GlobalTypes.ArrayobjectType[0], outProcedure.procedure.name);
-                        console.log(('generado procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Expirtando procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
                     }
 
                     outProcedure = GlobalTypes.emptyProcedureYamlType();
@@ -394,7 +394,7 @@ export class pgExtractMetadata {
                     }
                     else {
                         this.saveToFile(outTables, GlobalTypes.ArrayobjectType[2], outTables.table.name);
-                        console.log(('generado tabla ' + outTables.table.name + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando tabla ' + outTables.table.name + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outTables = GlobalTypes.emptyTablesYamlType();
                     outFields = [];
@@ -504,7 +504,7 @@ export class pgExtractMetadata {
                     }
                     else {
                         this.saveToFile(outTrigger, GlobalTypes.ArrayobjectType[1], triggerFunctionName);
-                        console.log(('generado trigger ' + triggerFunctionName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando trigger ' + triggerFunctionName + '.yaml').padEnd(70, '.') + 'OK');
                     }
 
                     outTrigger = GlobalTypes.emptyTriggerYamlType();
@@ -574,7 +574,7 @@ export class pgExtractMetadata {
                     }
                     else {
                         this.saveToFile(outViews, GlobalTypes.ArrayobjectType[4], viewName);
-                        console.log(('generado view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outViews = GlobalTypes.emptyViewYamlType();
                 }
@@ -596,6 +596,7 @@ export class pgExtractMetadata {
         let outGenerator: GlobalTypes.iGeneratorYamlType = { generator: { name: '' } };
         let genName: string = '';
         let outGenYalm: Array<any> = [];
+        let nextVal: any;
 
         let j: number = 0;
 
@@ -614,6 +615,10 @@ export class pgExtractMetadata {
 
                     outGenerator.generator.increment = Number(rGenerator[i].increment);
 
+                    
+                    nextVal = await this.pgDb.query('SELECT last_value FROM '+genName);
+                    outGenerator.generator.initialize = nextVal.rows[0].last_value;
+
                     if (rGenerator[i].description !== null) {
                         outGenerator.generator.description = rGenerator[i].description;
                     }
@@ -622,7 +627,7 @@ export class pgExtractMetadata {
                         outGenYalm.push(outGenerator);
                     else {
                         this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
-                        console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outGenerator = { generator: { name: '' } };
                 }
@@ -646,7 +651,7 @@ export class pgExtractMetadata {
 
         let j: number = 0;
 
-        try {        
+        try {
             await this.pgDb.query('BEGIN');
 
             rQuery = await this.pgDb.query('select * from pg_extension');
@@ -655,15 +660,15 @@ export class pgExtractMetadata {
             for (let i = 0; i < rExtension.length; i++) {
 
                 extName = rExtension[i].extname.trim().toLowerCase();
-                outExtYalm.installExtension.push({ extension: {name: extName, version: rExtension[i].extversion}});
-               
+                outExtYalm.installExtension.push({ extension: { name: extName, version: rExtension[i].extversion } });
+
             }
 
             //outExtYalm.install.push(extYaml);
             this.saveToFile(outExtYalm, GlobalTypes.ArrayobjectType[7], 'extensions');
             console.log(('exportando extensions.yaml').padEnd(70, '.') + 'OK');
 
-            await this.pgDb.query('COMMIT');            
+            await this.pgDb.query('COMMIT');
         }
         catch (err) {
             throw new Error('Error exportando extensiones. ' + err.message);

@@ -159,7 +159,7 @@ class pgExtractMetadata {
                     }
                     else {
                         this.saveToFile(outProcedure, GlobalTypes.ArrayobjectType[0], outProcedure.procedure.name);
-                        console.log(('generado procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Expirtando procedimiento ' + outProcedure.procedure.name + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outProcedure = GlobalTypes.emptyProcedureYamlType();
                     outProcedureParameterInput = [];
@@ -335,7 +335,7 @@ class pgExtractMetadata {
                     }
                     else {
                         this.saveToFile(outTables, GlobalTypes.ArrayobjectType[2], outTables.table.name);
-                        console.log(('generado tabla ' + outTables.table.name + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando tabla ' + outTables.table.name + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outTables = GlobalTypes.emptyTablesYamlType();
                     outFields = [];
@@ -422,7 +422,7 @@ class pgExtractMetadata {
                     }
                     else {
                         this.saveToFile(outTrigger, GlobalTypes.ArrayobjectType[1], triggerFunctionName);
-                        console.log(('generado trigger ' + triggerFunctionName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando trigger ' + triggerFunctionName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outTrigger = GlobalTypes.emptyTriggerYamlType();
                     outTriggerTables = [];
@@ -479,7 +479,7 @@ class pgExtractMetadata {
                     }
                     else {
                         this.saveToFile(outViews, GlobalTypes.ArrayobjectType[4], viewName);
-                        console.log(('generado view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando view ' + viewName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outViews = GlobalTypes.emptyViewYamlType();
                 }
@@ -501,6 +501,7 @@ class pgExtractMetadata {
         let outGenerator = { generator: { name: '' } };
         let genName = '';
         let outGenYalm = [];
+        let nextVal;
         let j = 0;
         try {
             if (openTr)
@@ -512,6 +513,8 @@ class pgExtractMetadata {
                 if (globalFunction.includeObject(this.excludeObject, GlobalTypes.ArrayobjectType[3], genName)) {
                     outGenerator.generator.name = genName;
                     outGenerator.generator.increment = Number(rGenerator[i].increment);
+                    nextVal = await this.pgDb.query('SELECT last_value FROM ' + genName);
+                    outGenerator.generator.initialize = nextVal.rows[0].last_value;
                     if (rGenerator[i].description !== null) {
                         outGenerator.generator.description = rGenerator[i].description;
                     }
@@ -519,7 +522,7 @@ class pgExtractMetadata {
                         outGenYalm.push(outGenerator);
                     else {
                         this.saveToFile(outGenerator, GlobalTypes.ArrayobjectType[3], genName);
-                        console.log(('generado generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
+                        console.log(('Exportando generator ' + genName + '.yaml').padEnd(70, '.') + 'OK');
                     }
                     outGenerator = { generator: { name: '' } };
                 }

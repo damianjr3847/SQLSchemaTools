@@ -196,7 +196,7 @@ export interface iTablesIndexesType {
 		columns: Array<any | string>,
 		name: string,
 		unique: boolean,
-		descending?: boolean;
+		descending?: boolean,
 		description?: string
 	}
 };
@@ -257,7 +257,8 @@ export interface iGeneratorYamlType {
 	generator: {
 		name: string,
 		description?: string,
-		increment?: number
+		increment?: number,
+		initialize?: number
 	}
 };
 

@@ -61,7 +61,7 @@ let endTime: any;
 let textTime: string = '';
 let dbRole: string = '';
 let saveafterapply: string = '';
-let deletedata:boolean = false;
+let deletedata: boolean = false;
 
 /**********para pruebas */
 /*let actionYalm:string       = 'write';
@@ -193,7 +193,10 @@ if (params.conf) {
                 saveafterapply = aValue;
                 break;
             case 'deletedata':
-                deletedata=true;
+                if (aValue.toUpperCase() === 'TRUE')
+                    deletedata = true;
+                else
+                    deletedata = false;
                 break;
         }
     });
@@ -461,13 +464,13 @@ console.log('p '+params.outscript)
             fbdata.filesPath = pathSave;
             fbdata.excludeObject = excludeObject;
             fbdata.formatExport = 'csv';
-            
+
             await fbdata.extractData(dbHost, dbPort, dbPath, dbUser, dbPass, objectName);
         }
         else if (operation === 'checkmetadata') {
             fbCheck = new fbCheckMetadata.fbCheckMetadata;
-            
-            await fbCheck.check(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);    
+
+            await fbCheck.check(dbHost, dbPort, dbPath, dbUser, dbPass, objectType, objectName);
 
         }
 
@@ -501,8 +504,8 @@ console.log('p '+params.outscript)
         }
         else if (operation === 'checkmetadata') {
             pgcheck = new pgCheckMetadata.pgCheckMetadata;
-            
-            await pgcheck.check(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);    
+
+            await pgcheck.check(dbHost, dbPort, dbPath, dbUser, dbPass, dbRole, objectType, objectName);
 
         }
         else if (operation === 'importdata') {
