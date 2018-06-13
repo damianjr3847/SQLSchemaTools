@@ -8,18 +8,18 @@
             "type": "node",
             "request": "launch",
             "name": "Iniciar programa",
-            "program": "${workspaceFolder}/tsmetadataupdater.ts",
+            "program": "${workspaceFolder}/sqlschematools.ts",
             "preLaunchTask": "tsc: build - tsconfig.json",
             "outFiles": [
                 "${workspaceFolder}//**/js/*.js"
             ],
             "args": [
                 "--conf",
-                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/params.conf"/*,
+                "/home/damian/git/TypeScriptProjects/SQLSchemaTools/params.conf"/*,
                 "--operation",
                 "checkmetadata"/*,
                 "--pathsave",
-                "/home/damian/git/TypeScriptProjects/TSMetadataUpdater/export/",                
+                "/home/damian/git/TypeScriptProjects/SQLSchemaTools/export/",                
                 "--dbdriver",
                 "fb",
                 "--dbuser",

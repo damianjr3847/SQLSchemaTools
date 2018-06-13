@@ -425,4 +425,4 @@ console.log('p '+params.outscript)
     textTime = new Date(endTime - beginTime).toJSON();
     console.log('Tiempo total: ' + textTime.substr(textTime.indexOf('T') + 1).replace('Z', ''));
 })();
-//# sourceMappingURL=tsmetadataupdater.js.map
+//# sourceMappingURL=sqlschematools.js.map
